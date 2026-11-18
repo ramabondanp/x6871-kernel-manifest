@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  W1VO36.88-36-7  -  kernel workspace manifest
+  Hanya repo yang punya branch android-16-release-w1vo36.88-36-7 (11 repo).
+
+  Pakai:
+    mkdir w1vo-kernel && cd w1vo-kernel
+    repo init -u <path-ke-dir-ini> -b master
+    repo sync -j8
+-->
+<manifest>
+  <remote name="moto" fetch="https://github.com/MotorolaMobilityLLC" />
+  <default revision="android-16-release-w1vo36.88-36-7" remote="moto" sync-j="8" />
+
+  <!-- Kleaf (AOSP build/kernel) + entrypoint tools/bazel -->
+  <project path="build/kernel" name="kernel-build-kernel">
+    <linkfile src="kleaf/bazel.sh" dest="tools/bazel" />
+    <linkfile src="kleaf/bzlmod/bazel.MODULE.bazel" dest="MODULE.bazel" />
+    <linkfile src="kleaf/bzlmod/bazel.WORKSPACE.bzlmod" dest="WORKSPACE.bzlmod" />
+  </project>
+
+  <!-- MTK MGK bazel rules -->
+  <project path="build/bazel_mgk_rules" name="kernel-build-bazel_mgk_rules" />
+
+  <!-- Full MTK ACK: Linux 6.12.38 + GKI android16-6.12-2025-09_r32 -->
+  <project path="kernel-6.12" name="kernel-mtk" />
+
+  <!-- Device modules (repo yang sudah dibersihkan dari kode Moto) -->
+  <project path="kernel_device_modules-6.12" name="kernel-kernel_device_modules-6.12" />
+
+  <!-- Module out-of-tree Motorola (moto_binder, moto_mm, utags, dll) -->
+  <project path="motorola/kernel/modules" name="motorola-kernel-modules" />
+
+  <!-- Vendor modules MTK yang punya branch w1vo -->
+  <project path="vendor/mediatek/kernel_modules/gpu"
+           name="vendor-mediatek-kernel_modules-gpu" />
+  <project path="vendor/mediatek/kernel_modules/mtkcam"
+           name="vendor-mediatek-kernel_modules-mtkcam" />
+  <project path="vendor/mediatek/kernel_modules/connectivity/conninfra"
+           name="vendor-mediatek-kernel_modules-connectivity-conninfra" />
+  <project path="vendor/mediatek/kernel_modules/connectivity/bt/linux_v2"
+           name="vendor-mediatek-kernel_modules-connectivity-bt-linux_v2" />
+  <project path="vendor/mediatek/kernel_modules/connectivity/bt/mt66xx"
+           name="vendor-mediatek-kernel_modules-connectivity-bt-mt66xx" />
+  <project path="vendor/mediatek/kernel_modules/connectivity/wlan/core/gen4m"
+           name="vendor-mediatek-kernel_modules-connectivity-wlan-core-gen4m" />
+</manifest>
