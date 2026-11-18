@@ -1,11 +1,16 @@
 #!/bin/bash
 # Build kernel_device_modules-6.12 (w1vo). Jalankan dari root workspace.
 #
-#   ./build.sh              # user, mt6895 (default)
+#   ./build.sh              # user, mt6895, tanpa overlay (baseline)
 #   ./build.sh user userdebug
 #   PLATFORM=mt6991 ./build.sh user
+#   OVERLAYS=entry_level_legacy.config ./build.sh user
 #
-# Perintah ini sudah diverifikasi: 1.401 .ko, 0 error.
+# OVERLAYS: nama file di kernel_device_modules-6.12/kernel/configs/,
+# dipisah spasi. Contoh yang sudah diverifikasi:
+#   entry_level_legacy.config  -> +13 modul, 764 jadi 775 (lihat PLAN.md)
+#
+# Perintah ini sudah diverifikasi: 1.401 .ko, 0 error (baseline).
 #
 # Tiga hal yang wajib, semuanya dari build.sh MTK/Samsung asli:
 #   --allow_ddk_unsafe_headers=1
@@ -19,6 +24,7 @@ set -e
 
 VARIANT=${1:-user}
 PLATFORM=${PLATFORM:-mt6895}
+OVERLAYS=${OVERLAYS:-}
 
 # Jangan pakai /tmp. Override dengan TMPDIR=... kalau perlu.
 export TMPDIR=${TMPDIR:-$PWD/../tmp}
@@ -33,6 +39,7 @@ OUT=${OUT_DIR:-$PWD/out_bazel}
 echo "target  : $TARGET"
 echo "platform: $PLATFORM"
 echo "variant : $VARIANT"
+echo "overlays: ${OVERLAYS:-(tidak ada)}"
 
 export BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
 
@@ -44,7 +51,7 @@ exec tools/bazel --output_user_root="$OUT" build \
   --user_ddk_unsafe_headers=//kernel_device_modules-6.12:mtk_use_gki_unsafe_headers \
   --repo_env=KERNEL_VERSION=kernel-6.12 \
   --repo_env=KERNEL_BUILD_VARIANT="$VARIANT" \
-  --repo_env=DEFCONFIG_OVERLAYS= \
+  --repo_env=DEFCONFIG_OVERLAYS="$OVERLAYS" \
   --repo_env=SUPPORT_PLATFORM="$PLATFORM" \
   --repo_env=SOURCE_DATE_EPOCH=0 \
   --//build/bazel_mgk_rules:kernel_version=6.12 \

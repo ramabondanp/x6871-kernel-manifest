@@ -32,21 +32,23 @@ Bandingkan 546 modul di firmware X6871 vs 764 modul hasil build w1vo:
 | | jumlah |
 |---|---|
 | modul firmware X6871 | 546 |
-| sudah dibangun w1vo | **439** (80%) |
-| selisih | 107 |
+| sudah dibangun w1vo (baseline) | **439** (80%) |
+| sudah dibangun w1vo (setelah Tingkat A) | **452** (82%) |
+| selisih awal | 107 |
+| **selisih sekarang** | **94** |
 
 107 selisih itu dipecah 4 tingkat:
 
-| Tingkat | Isi | Jumlah | Sifat pekerjaan |
+| Tingkat | Isi | Jumlah | Status |
 |---|---|---|---|
-| **A** | sudah ada target Bazel di tree w1vo, cuma dimatikan config | **12** | satu flag |
-| **B** | sudah dibangun tapi beda nama (`fpsgo`→`mtk_fpsgo_v3/v8`, `game`→`mtk_game`) | **2** | rename |
-| **C** | source GPL-2.0 ada di donor mt6897 (kernel 6.1) | **38** | port 6.1→6.12 |
-| **D** | tidak ada di mana pun | **~55** | cari donor / RE |
+| **A** | sudah ada target Bazel di tree w1vo, cuma dimatikan config | ~~12~~ **13** | ✅ selesai |
+| **B** | sudah dibangun tapi beda nama (`fpsgo`→`mtk_fpsgo_v3/v8`, `game`→`mtk_game`) | **2** | belum |
+| **C** | source GPL-2.0 ada di donor mt6897 (kernel 6.1) | **38** | belum |
+| **D** | tidak ada di mana pun | **~41** | belum |
 
 ---
 
-## 3. Tingkat A — 12 modul, cuma perlu flag
+## 3. Tingkat A — 12 modul, cuma perlu flag  ✅ SELESAI
 
 Bukan port. Ini modul MTK "legacy" yang **sudah ada di tree w1vo** dan sudah
 punya target Bazel. Kita mematikannya sendiri waktu build dengan
@@ -66,29 +68,40 @@ CONFIG_MTK_SWPM_PERF_ARMV8_PMU_LEGACY_V2=m -> mtk-swpm-perf-arm-pmu-legacy
 CONFIG_MTK_EMI_LEGACY=m                -> emi-mpu-v2
 ```
 
-12 modul yang jadi hidup:
+### Hasil build (terverifikasi 2026-11-18)
+
+```
+flag    : --repo_env=DEFCONFIG_OVERLAYS=entry_level_legacy.config
+hasil   : Build completed successfully, 784 actions, 715s
+modul   : 764 -> 775  (+13, -2)
+gap     : 107 -> 94   (coverage 439/546 = 80% -> 452/546 = 82%)
+```
+
+13 modul yang hidup (semua menutup selisih nyata, 0 bonus):
 
 ```
 emi-mpu-hook-v1   emi-mpu-v2          mtk-lpm-dbg-common-v1-legacy
 mtk-lpm-dbg-mt6895-legacy             mtk-lpm-legacy
 mtk-lpm-plat-v1-legacy                mtk-swpm-dbg-common-v1-legacy
-mtk-swpm-legacy   mtk-swpm-perf-arm-pmu-legacy
+mtk-swpm-dbg-v6895                    mtk-swpm-legacy
+mtk-swpm-perf-arm-pmu-legacy
 mtk_cm_ipi_legacy_v1                  mtk_cm_mgr_legacy_v1
 mtk_cm_mgr_mt6895
 ```
 
-Bukti sudah lengkap: `mgk_64.bzl` baris 2136 punya blok `if "entry_level.config"
-in DEFCONFIG_OVERLAYS:` yang menambah/menghapus label ini; semua Kconfig-nya
-ada di tree (`cm_mgr_legacy_v1/Kconfig`, `lpm_legacy/Kconfig`,
-`swpm_legacy_v2/Kconfig`, `drivers/memory/mediatek/Kconfig`).
+Catatan: PLAN awal menebak 12, hasilnya 13. Bedanya `mtk-swpm-dbg-v6895` —
+ikut hidup dari blok yang sama, tidak saya hitung karena di daftar gap
+namanya `mtk-swpm-dbg-v6895` dan saya salah memasukkan yang `...-legacy`.
 
-**Langkah:** build dengan
-`--repo_env=DEFCONFIG_OVERLAYS=kernel/configs/entry_level_legacy.config`,
-lalu diff daftar `.ko` terhadap 107 selisih. Harus nambah 12.
+2 modul yang hilang, dan aman:
 
-Catatan: `entry_level_legacy.config` juga mematikan beberapa hal
-(`# CONFIG_MTK_MBRAINK_* is not set`, `# CONFIG_MTK_CM_MGR is not set` dll).
-Perlu dicek bahwa mt6895 tidak butuh yang dimatikan itu.
+```
+ffa-core, ffa-module   -> X6871 tidak memakai keduanya (0 di firmware)
+ffa_v11                -> tetap ter-build; modinfo depends kosong
+```
+
+Semua `.ko` baru ber-vermagic benar
+(`6.12.38-android16-5-g2c4fd33ae6d8-4k SMP`).
 
 ---
 
