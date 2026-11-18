@@ -1,173 +1,97 @@
 # Manifest W1VO36.88-36-7
 
-Workspace kernel Motorola W1VO36.88-36-7 (Android 16 / kernel 6.12):
+Workspace kernel Motorola W1VO36.88-36-7 (Android 16 / kernel 6.12.38 /
+MediaTek mt6895), dibangun dengan Bazel+Kleaf.
 
-- 11 repo yang punya branch `android-16-release-w1vo36.88-36-7`
-- 1 donor repo OPPO mt6896 (Android 16 / 6.12) untuk module yang tidak
-  dipublikasikan Motorola
-
-## File
-
-| File | Pakai untuk |
-|---|---|
-| `HANDOFF.md` | **status lengkap + cara lanjut di server baru** |
-| `default.xml` | workspace berdiri sendiri |
-| `local_manifest.xml` | overlay ke manifest AOSP 2025-09 (disarankan) |
-| `post-sync.sh` | MODULE.bazel MGK, symlink common-6.12, donor, vendor parent |
-| `trim-missing.sh` | hapus label `//vendor/...` yang tidak tersedia |
-| `build-w1vo.sh` | build module (`./build-w1vo.sh user`) |
-| `verify-abi.sh` | verifikasi ABI (`./verify-abi.sh user`) |
-| `reproduce-cleanup.sh` | buat ulang branch `mtk-base` / `mtk-base-latest` |
-
-## Cara 1 - overlay AOSP (disarankan)
-
-Manifest AOSP dipakai untuk Kleaf + prebuilts + dependency bzlmod,
-lalu kernel/common dan kernel/build diganti versi w1vo.
+## Quickstart
 
 ```bash
 git clone https://github.com/ramabondanp/w1vo36-kernel-manifest
+cd w1vo36-kernel-manifest
 
-mkdir w1vo && cd w1vo
+# 1. Buat branch kernel_device_modules yang sudah dibersihkan dari kode Moto
+./reproduce-cleanup.sh ~/kernel-kernel_device_modules-6.12
+
+# 2. Sync workspace AOSP + overlay
+mkdir -p ~/w1vo && cd ~/w1vo
 repo init -u https://android.googlesource.com/kernel/manifest \
           -b common-android16-6.12-2025-09
-cp ../w1vo36-kernel-manifest/local_manifest.xml .repo/local_manifests/w1vo.xml
-repo sync -j8
-../w1vo36-kernel-manifest/post-sync.sh
+cp ~/w1vo36-kernel-manifest/local_manifest.xml .repo/local_manifests/w1vo.xml
+repo sync -j16
+
+# 3. Pasang branch hasil cleanup
+cd kernel_device_modules-6.12
+git remote add local ~/kernel-kernel_device_modules-6.12
+git fetch local mtk-base-latest
+git checkout -B mtk-base-latest FETCH_HEAD
+cd ..
+
+# 4. Siapkan workspace, lalu build
+~/w1vo36-kernel-manifest/setup.sh
+~/w1vo36-kernel-manifest/build.sh user
 ```
 
-Hasil:
+Hasil: `1.401 .ko` di
+`out_bazel/*/execroot/_main/bazel-out/k8-fastbuild/bin/kernel_device_modules-6.12/mgk_64_k612_customer_modules_install.user/`.
+
+Soc lain: `PLATFORM=mt6991 ./build.sh user` (default `mt6895`).
+
+## File
+
+| File | Isi |
+|---|---|
+| `local_manifest.xml` | 13 project w1vo + donor OPPO, overlay ke manifest AOSP |
+| `reproduce-cleanup.sh` | buat branch `mtk-base-latest` (MTK murni + 12 patch) |
+| `setup.sh` | MODULE.bazel, symlink donor + `../vendor/mediatek`, trim label |
+| `build.sh` | build module (`./build.sh user`) |
+
+## Kenapa ada `reproduce-cleanup.sh`
+
+Repo Motorola `kernel-kernel_device_modules-6.12` berisi 321 commit kode
+device (bogota/taipei/moto) di atas base MTK. Script ini checkout base MTK
+murni lalu cherry-pick 12 patch MTK yang diperlukan.
+
+Hasil terverifikasi identik dengan branch referensi:
 
 ```
-build/kernel/                  <- kernel-build-kernel (w1vo)
-build/bazel_mgk_rules/         <- kernel-build-bazel_mgk_rules (w1vo)
-kernel-6.12/                   <- kernel-mtk (6.12.38 + GKI 2025-09_r32)
-kernel_device_modules-6.12/    <- repo ini
-motorola/kernel/modules/       <- motorola-kernel-modules
-vendor/mediatek/kernel_modules/{gpu,mtkcam,connectivity/...}
-donor/oppo-mt6896/             <- donor OPPO
-prebuilts/...                  <- dari manifest AOSP
-tools/bazel                    <- linkfile dari build/kernel
+tree mtk-base-latest : fab94f37a9ee8a1d43828bdda55bc669e3138de6
 ```
 
-## Cara 2 - standalone
+## Kenapa ada donor OPPO
 
-```bash
-mkdir w1vo-kernel && cd w1vo-kernel
-repo init -u https://github.com/ramabondanp/w1vo36-kernel-manifest -b main
-repo sync -j8
-```
-
-Belum langsung bisa build: `prebuilts/clang/host/linux-x86` dan dependency
-Kleaf lain tidak ada di 12 repo ini. Pakai Cara 1 kalau mau langsung build.
-
-## Donor OPPO
-
-`oppo-source/android_kernel_modules_oppo_mt6896`
-branch `oppo/mt6896_b_16.0_reno12`, path `donor/oppo-mt6896`.
-
-Isinya yang dipakai (di-symlink `post-sync.sh`):
+20 grup module tidak dipublikasikan Motorola. 13 di antaranya ada di donor
+OPPO mt6896 dan di-symlink oleh `setup.sh`. Sisanya (49 label) dihapus dari
+`mgk_64.bzl` oleh `setup.sh`:
 
 ```
-vendor/mediatek/kernel_modules/
-  afs_common_utils
-  hbt_driver
-  hbt_driver_cus
-  met_drv_v3
-  sched_cus
-  connectivity/common
-  connectivity/connfem
-  connectivity/fmradio
-  connectivity/gps
-  connectivity/wlan/adaptor
-  connectivity/wlan/core/gen4-mt79xx
-  connectivity/bt/linux_v2_ce
-  connectivity/bt/mt76xx
+afs_core_cus/int  cpufreq_cus/int  fpsgo_cus/int  game_cus/int
+gpio_sap_ctrl     met_drv_secure_v3  msync2_frd_cus/int  mtk_input
+perf_common_cus/int  sched_int  task_turbo_cus/int
+thinmd_exception  wwan
 ```
 
-Catatan: donor ini dari OPPO mt6896. Untuk module yang sudah ada versi
-w1vo (gpu, mtkcam, conninfra, bt/linux_v2, bt/mt66xx, wlan/core/gen4m),
-versi w1vo yang dipakai. Campuran ini belum tentu ABI-compatible.
+Module donor **ikut ter-build** dan masuk output (afs_common_utils, hbt_*,
+met_drv_v3, sched_cus, connectivity/*). Campuran Moto+OPPO ini belum diuji
+runtime.
 
-## Module yang tetap tidak ada
+## Tiga flag yang wajib
 
-20 grup module tidak ada di w1vo maupun donor:
+Kalau salah satu hilang, build gagal:
 
-```
-afs_core_cus / afs_core_int
-cpufreq_cus / cpufreq_int
-fpsgo_cus / fpsgo_int
-game_cus / game_int
-gpio_sap_ctrl
-met_drv_secure_v3
-msync2_frd_cus / msync2_frd_int
-mtk_input
-perf_common_cus / perf_common_int
-sched_int
-task_turbo_cus / task_turbo_int
-thinmd_exception
-wwan
-```
+| Flag | Tanpa ini |
+|---|---|
+| `--user_ddk_unsafe_headers=//kernel_device_modules-6.12:mtk_use_gki_unsafe_headers` | `fatal error: '<header>' file not found` di puluhan module |
+| `--repo_env=SUPPORT_PLATFORM=<soc>` | semua 14 platform ikut dibangun, gagal di module platform lain |
+| `--repo_env=KERNEL_VERSION=...` | `key "KERNEL_VERSION" not found` |
 
-Jalankan ini supaya label-label itu tidak dicari Bazel:
+`--allow_ddk_unsafe_headers` saja tidak cukup — itu hanya mengaktifkan daftar
+bawaan AOSP yang tidak memuat header MTK.
 
-```bash
-./trim-missing.sh
-```
+## Batasan
 
-Script menghapus 49 baris dari `kernel_device_modules-6.12/kernel/kleaf/mgk_64.bzl`
-(backup ke `mgk_64.bzl.orig`) dan tidak menyentuh kode lain.
-
-## Build
-
-```bash
-cp ../w1vo36-kernel-manifest/build-w1vo.sh .
-./build-w1vo.sh user
-```
-
-Isi `build-w1vo.sh` (ringkas):
-
-```bash
-tools/bazel --output_user_root=$PWD/out_bazel build \
-  --repo_env=KERNEL_VERSION=kernel-6.12 \
-  --repo_env=KERNEL_BUILD_VARIANT=user \
-  --repo_env=DEFCONFIG_OVERLAYS= \
-  --repo_env=SUPPORT_PLATFORM= \
-  --repo_env=SOURCE_DATE_EPOCH=0 \
-  --//build/bazel_mgk_rules:kernel_version=6.12 \
-  --experimental_writable_outputs \
-  //kernel_device_modules-6.12:mgk_64_k612_customer_modules_install.user
-```
-
-Penting:
-
-- `KERNEL_VERSION` dkk wajib lewat `--repo_env`, **bukan `export`**.
-  `mgk_extension.bzl` membaca `module_ctx.os.environ`, dan Bazel hanya
-  meneruskan variabel yang di-`--repo_env`.
-- Workspace harus punya `../vendor/mediatek` (satu level di atas).
-  `mgk_repo.MODULE.bazel` memakai `path="../vendor/mediatek"`.
-  `post-sync.sh` sudah membuat symlink-nya.
-- Butuh `build/bazel_common_rules` (ada di manifest, dari repo Moto
-  `kernel_platform-build-bazel_common_rules`), karena `mgk.bzl`
-  load `//build/bazel_common_rules/dist:dist.bzl`.
-- Root `MODULE.bazel` harus `mgk.MODULE.bazel`, bukan punya AOSP.
-
-Dist:
-
-```bash
-tools/bazel --output_user_root=$PWD/out_bazel run \
-  --repo_env=KERNEL_VERSION=kernel-6.12 \
-  --repo_env=KERNEL_BUILD_VARIANT=user \
-  --//build/bazel_mgk_rules:kernel_version=6.12 \
-  --nokmi_symbol_list_violations_check \
-  //kernel_device_modules-6.12:mgk_64_k612_customer_dist.user \
-  -- --dist_dir=$PWD/out_krn/dist
-```
-
-Di tree Android MTK lengkap:
-
-```bash
-source build/envsetup.sh
-export OUT_DIR=out_krn
-lunch krn_mgk_64_k612-userdebug
-make -j$(nproc) krn_images
-```
+- `user_customer_abi` **tidak bisa lulus** di tree ini: `stg merge` gagal
+  karena 328 simbol duplikat antar varian driver yang memang dibangun
+  bersamaan (fpsgo v3+v8, mediatek_v2+v1, tee gud 510/600/610/700,
+  bt mt66xx+linux_v2). Ini artefak build multi-varian, bukan mismatch KMI.
+  Build referensi MTK/Samsung juga tidak menjalankan target ABI.
+- Detail status dan jebakan: lihat `HANDOFF.md`.

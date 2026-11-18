@@ -21,6 +21,14 @@ if [ ! -d "$DEST/.git" ]; then
 fi
 cd "$DEST"
 
+# Cherry-pick butuh identitas git. Di server bersih ini sering belum di-set,
+# dan git melaporkannya sebagai "Commiter identity unknown" (mirip konflik).
+if ! git config user.email >/dev/null; then
+  git config user.email "w1vo-cleanup@localhost"
+  git config user.name  "w1vo cleanup"
+  echo "== set git identity lokal: w1vo cleanup <w1vo-cleanup@localhost>"
+fi
+
 echo "== mtk-base"
 git branch -f mtk-base "$BASE"
 
@@ -42,9 +50,10 @@ c188c78edaba
 4000205a644b
 "
 
+CONFLICT_LOG=${TMPDIR:-/tmp}/w1vo-cherry-pick.err
 for c in $KEPT; do
   echo "== cherry-pick $c $(git log -1 --format='%s' $c)"
-  if git cherry-pick -x "$c" >/dev/null 2>&1; then
+  if git cherry-pick -x "$c" >"$CONFLICT_LOG" 2>&1; then
     continue
   fi
 
@@ -89,6 +98,8 @@ PY
     git -c core.editor=true cherry-pick --continue >/dev/null
   else
     echo "   ERROR: konflik tak terduga pada $c"
+    echo "   --- output git ---"
+    sed 's/^/   /' "$CONFLICT_LOG"
     git cherry-pick --abort 2>/dev/null || true
     exit 1
   fi

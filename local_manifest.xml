@@ -1,16 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Overlay untuk manifest AOSP:
+  Overlay untuk manifest AOSP kernel:
+
     repo init -u https://android.googlesource.com/kernel/manifest \
               -b common-android16-6.12-2025-09
     cp local_manifest.xml .repo/local_manifests/w1vo.xml
-    repo sync -j8
+    repo sync -j16
 
-  Mengganti kernel/common dan kernel/build AOSP dengan versi w1vo,
-  lalu menambah 9 repo w1vo lainnya.
+  Mengganti kernel/common dan kernel/build AOSP dengan versi MTK w1vo,
+  lalu menambah 11 repo w1vo + 1 donor OPPO.
 
-  Catatan: tidak ada tag <default> di sini karena manifest AOSP sudah
-  punya; revision/remote ditulis per project.
+  Tidak ada tag <default> di sini karena manifest AOSP sudah punya;
+  revision/remote ditulis per project.
 -->
 <manifest>
   <remote name="moto" fetch="https://github.com/MotorolaMobilityLLC" />
@@ -19,6 +20,7 @@
   <remove-project name="kernel/common" />
   <remove-project name="kernel/build" />
 
+  <!-- Kleaf + rules -->
   <project path="build/kernel" name="kernel-build-kernel"
            remote="moto" revision="android-16-release-w1vo36.88-36-7">
     <linkfile src="kleaf/bazel.sh" dest="tools/bazel" />
@@ -33,13 +35,15 @@
   <project path="build/bazel_mgk_rules" name="kernel-build-bazel_mgk_rules"
            remote="moto" revision="android-16-release-w1vo36.88-36-7" />
 
+  <!-- Kernel + device modules.
+       kernel_device_modules-6.12 di-branch ke mtk-base-latest oleh setup.sh
+       (lihat reproduce-cleanup.sh), bukan langsung dipakai apa adanya. -->
   <project path="kernel-6.12" name="kernel-mtk"
            remote="moto" revision="android-16-release-w1vo36.88-36-7" />
   <project path="kernel_device_modules-6.12" name="kernel-kernel_device_modules-6.12"
            remote="moto" revision="android-16-release-w1vo36.88-36-7" />
-  <project path="motorola/kernel/modules" name="motorola-kernel-modules"
-           remote="moto" revision="android-16-release-w1vo36.88-36-7" />
 
+  <!-- Vendor modules MTK -->
   <project path="vendor/mediatek/kernel_modules/gpu"
            name="vendor-mediatek-kernel_modules-gpu"
            remote="moto" revision="android-16-release-w1vo36.88-36-7" />
@@ -59,7 +63,10 @@
            name="vendor-mediatek-kernel_modules-connectivity-wlan-core-gen4m"
            remote="moto" revision="android-16-release-w1vo36.88-36-7" />
 
-  <!-- Donor OPPO mt6896 (Android 16 / 6.12) untuk module yang miss -->
+  <!-- Donor OPPO mt6896 (Android 16 / 6.12) untuk module yang tidak
+       dipublikasikan Motorola: afs_common_utils, hbt_driver, hbt_driver_cus,
+       met_drv_v3, sched_cus, connectivity/{common,connfem,fmradio,gps,
+       wlan/adaptor,wlan/core/gen4-mt79xx,bt/linux_v2_ce,bt/mt76xx}. -->
   <project path="donor/oppo-mt6896"
            name="android_kernel_modules_oppo_mt6896"
            remote="oppo" revision="oppo/mt6896_b_16.0_reno12" />
