@@ -17,3 +17,11 @@ vendor-mediatek-kernel_modules-connectivity-wlan-core-gen4m 1478b2b3e8   2025-09
 vendor-mediatek-kernel_modules-mtkcam                      7d44d7cf44   2025-12-17 | bogota W: solution to static code inspection issues
 
 Branch lain yang mirip (w1vo*): tidak ada. Semua 11 repo memakai nama branch yang sama.
+
+## Donor (bukan w1vo)
+
+Untuk module yang tidak dipublikasikan Motorola:
+
+    oppo-source/android_kernel_modules_oppo_mt6896
+    branch oppo/mt6896_b_16.0_reno12
+    Android 16 / kernel 6.12, SoC MT6896

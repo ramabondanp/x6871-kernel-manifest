@@ -1,14 +1,19 @@
 # Manifest W1VO36.88-36-7
 
-Semua repo di bawah punya branch `android-16-release-w1vo36.88-36-7`
-(hasil scan 312 repo public MotorolaMobilityLLC).
+Workspace kernel Motorola W1VO36.88-36-7 (Android 16 / kernel 6.12):
+
+- 11 repo yang punya branch `android-16-release-w1vo36.88-36-7`
+- 1 donor repo OPPO mt6896 (Android 16 / 6.12) untuk module yang tidak
+  dipublikasikan Motorola
 
 ## File
 
 | File | Pakai untuk |
 |---|---|
-| `default.xml` | workspace kernel berdiri sendiri (11 repo w1vo) |
-| `local_manifest.xml` | overlay ke manifest AOSP 2025-09 (cara yang disarankan) |
+| `default.xml` | workspace berdiri sendiri (12 repo) |
+| `local_manifest.xml` | overlay ke manifest AOSP 2025-09 (disarankan) |
+| `post-sync.sh` | MODULE.bazel MGK include, symlink common-6.12, symlink module donor |
+| `trim-missing.sh` | hapus label `//vendor/...` yang tidak tersedia |
 
 ## Cara 1 - overlay AOSP (disarankan)
 
@@ -23,6 +28,7 @@ repo init -u https://android.googlesource.com/kernel/manifest \
           -b common-android16-6.12-2025-09
 cp ../w1vo36-kernel-manifest/local_manifest.xml .repo/local_manifests/w1vo.xml
 repo sync -j8
+../w1vo36-kernel-manifest/post-sync.sh
 ```
 
 Hasil:
@@ -30,15 +36,84 @@ Hasil:
 ```
 build/kernel/                  <- kernel-build-kernel (w1vo)
 build/bazel_mgk_rules/         <- kernel-build-bazel_mgk_rules (w1vo)
-kernel-6.12/                   <- kernel-mtk (w1vo, 6.12.38 + GKI 2025-09_r32)
+kernel-6.12/                   <- kernel-mtk (6.12.38 + GKI 2025-09_r32)
 kernel_device_modules-6.12/    <- repo ini
 motorola/kernel/modules/       <- motorola-kernel-modules
 vendor/mediatek/kernel_modules/{gpu,mtkcam,connectivity/...}
+donor/oppo-mt6896/             <- donor OPPO
 prebuilts/...                  <- dari manifest AOSP
 tools/bazel                    <- linkfile dari build/kernel
 ```
 
-Build:
+## Cara 2 - standalone
+
+```bash
+mkdir w1vo-kernel && cd w1vo-kernel
+repo init -u https://github.com/ramabondanp/w1vo36-kernel-manifest -b main
+repo sync -j8
+```
+
+Belum langsung bisa build: `prebuilts/clang/host/linux-x86` dan dependency
+Kleaf lain tidak ada di 12 repo ini. Pakai Cara 1 kalau mau langsung build.
+
+## Donor OPPO
+
+`oppo-source/android_kernel_modules_oppo_mt6896`
+branch `oppo/mt6896_b_16.0_reno12`, path `donor/oppo-mt6896`.
+
+Isinya yang dipakai (di-symlink `post-sync.sh`):
+
+```
+vendor/mediatek/kernel_modules/
+  afs_common_utils
+  hbt_driver
+  hbt_driver_cus
+  met_drv_v3
+  sched_cus
+  connectivity/common
+  connectivity/connfem
+  connectivity/fmradio
+  connectivity/gps
+  connectivity/wlan/adaptor
+  connectivity/wlan/core/gen4-mt79xx
+  connectivity/bt/linux_v2_ce
+  connectivity/bt/mt76xx
+```
+
+Catatan: donor ini dari OPPO mt6896. Untuk module yang sudah ada versi
+w1vo (gpu, mtkcam, conninfra, bt/linux_v2, bt/mt66xx, wlan/core/gen4m),
+versi w1vo yang dipakai. Campuran ini belum tentu ABI-compatible.
+
+## Module yang tetap tidak ada
+
+20 grup module tidak ada di w1vo maupun donor:
+
+```
+afs_core_cus / afs_core_int
+cpufreq_cus / cpufreq_int
+fpsgo_cus / fpsgo_int
+game_cus / game_int
+gpio_sap_ctrl
+met_drv_secure_v3
+msync2_frd_cus / msync2_frd_int
+mtk_input
+perf_common_cus / perf_common_int
+sched_int
+task_turbo_cus / task_turbo_int
+thinmd_exception
+wwan
+```
+
+Jalankan ini supaya label-label itu tidak dicari Bazel:
+
+```bash
+./trim-missing.sh
+```
+
+Script menghapus 49 baris dari `kernel_device_modules-6.12/kernel/kleaf/mgk_64.bzl`
+(backup ke `mgk_64.bzl.orig`) dan tidak menyentuh kode lain.
+
+## Build
 
 ```bash
 export BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
@@ -54,67 +129,11 @@ tools/bazel run \
   -- --dist_dir=out_krn/dist
 ```
 
-## Cara 2 - standalone
+Di tree Android MTK lengkap:
 
 ```bash
-mkdir w1vo-kernel && cd w1vo-kernel
-repo init -u https://github.com/ramabondanp/w1vo36-kernel-manifest -b main
-repo sync -j8
-```
-
-Tapi cara ini **belum bisa langsung build**: `prebuilts/clang/host/linux-x86`
-dan dependency Kleaf lainnya tidak ada di 11 repo w1vo. Tambahkan manual
-dari AOSP atau pakai Cara 1.
-
-## Yang TIDAK ada di manifest ini
-
-`EXT_MODULES` di `build.config.mtk_kernel_device_modules` dan 198 label
-`//vendor/mediatek/kernel_modules/...` di `mgk_64.bzl` juga memakai module
-yang tidak punya branch w1vo:
-
-```
-connectivity/common        connectivity/connfem
-connectivity/gps           connectivity/fmradio
-connectivity/wlan/adaptor  hbt_driver_cus
-afs_common_utils           afs_core_cus / afs_core_int
-cpufreq_cus / cpufreq_int  fpsgo_cus / fpsgo_int
-game_cus / game_int        met_drv_v3
-```
-
-Repo-repo itu cuma punya branch lain (`android-16-release-w1ve36h.10-12r3`
-dll) atau tidak ada branch android-16 sama sekali.
-
-Kalau build gagal karena label `//vendor/...` tidak ketemu, ada 2 pilihan:
-
-1. Ambil repo tsb dari branch `android-16-release-w1ve36h.10-12r3`.
-2. Pangkas daftar `kleaf_modules` / `EXT_MODULES` di `mgk_64.bzl` dan
-   `build.config.mtk_kernel_device_modules` sesuai module yang ada.
-
-## Catatan
-
-- Branch `motorola/kernel/modules` diambil dari `kernel_helpers.bzl`
-  (`//motorola/kernel/modules:public_headers`).
-- `kernel-6.12` = repo `kernel-mtk`, bukan `kernel/common` AOSP.
-- Kalau mau murni MTK, hapus baris `motorola/kernel/modules` dari manifest.
-
-## Setelah sync
-
-Jalankan:
-
-```bash
-./post-sync.sh
-```
-
-Script itu:
-
-1. Mengganti symlink `MODULE.bazel` dengan file biasa, lalu menambah
-   `include("//build/bazel_mgk_rules/bzlmod:mgk_repo.MODULE.bazel")`.
-   Tanpa ini `@mgk_info` tidak ada dan `//kernel_device_modules-6.12` gagal load.
-2. Membuat symlink `common-6.12 -> kernel-6.12` (dipakai `mgk.bzl`
-   untuk build varian `ack`).
-
-Verifikasi cepat tanpa build penuh:
-
-```bash
-tools/bazel query //kernel_device_modules-6.12:all
+source build/envsetup.sh
+export OUT_DIR=out_krn
+lunch krn_mgk_64_k612-userdebug
+make -j$(nproc) krn_images
 ```

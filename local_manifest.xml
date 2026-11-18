@@ -14,6 +14,7 @@
 -->
 <manifest>
   <remote name="moto" fetch="https://github.com/MotorolaMobilityLLC" />
+  <remote name="oppo" fetch="https://github.com/oppo-source" />
 
   <remove-project name="kernel/common" />
   <remove-project name="kernel/build" />
@@ -53,4 +54,9 @@
   <project path="vendor/mediatek/kernel_modules/connectivity/wlan/core/gen4m"
            name="vendor-mediatek-kernel_modules-connectivity-wlan-core-gen4m"
            remote="moto" revision="android-16-release-w1vo36.88-36-7" />
+
+  <!-- Donor OPPO mt6896 (Android 16 / 6.12) untuk module yang miss -->
+  <project path="donor/oppo-mt6896"
+           name="android_kernel_modules_oppo_mt6896"
+           remote="oppo" revision="oppo/mt6896_b_16.0_reno12" />
 </manifest>
