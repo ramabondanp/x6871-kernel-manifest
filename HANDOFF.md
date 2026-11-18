@@ -79,3 +79,9 @@ Build referensi MTK/Samsung tidak menjalankan target ini sama sekali —
   menyebutnya.
 - 49 label module yang dihapus `setup.sh` (lihat README) — kalau nanti perlu,
   cari donor lain.
+
+## Rencana lanjutan
+
+`PLAN.md` berisi rencana port driver untuk device tanpa source vendor
+(Infinix X6871 / mt6895 / kernel 6.12.38-android16-5 — SoC dan KMI sama
+dengan tree ini), termasuk Phase 3 panel + Pixelworks Iris.

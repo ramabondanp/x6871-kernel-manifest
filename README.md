@@ -44,6 +44,7 @@ Soc lain: `PLATFORM=mt6991 ./build.sh user` (default `mt6895`).
 | `reproduce-cleanup.sh` | buat branch `mtk-base-latest` (MTK murni + 12 patch) |
 | `setup.sh` | MODULE.bazel, symlink donor + `../vendor/mediatek`, trim label |
 | `build.sh` | build module (`./build.sh user`) |
+| `PLAN.md` | rencana port driver device lain (X6871) — belum dikerjakan |
 
 ## Kenapa ada `reproduce-cleanup.sh`
 
