@@ -10,10 +10,14 @@ Workspace kernel Motorola W1VO36.88-36-7 (Android 16 / kernel 6.12):
 
 | File | Pakai untuk |
 |---|---|
-| `default.xml` | workspace berdiri sendiri (12 repo) |
+| `HANDOFF.md` | **status lengkap + cara lanjut di server baru** |
+| `default.xml` | workspace berdiri sendiri |
 | `local_manifest.xml` | overlay ke manifest AOSP 2025-09 (disarankan) |
-| `post-sync.sh` | MODULE.bazel MGK, symlink common-6.12, symlink module donor |
+| `post-sync.sh` | MODULE.bazel MGK, symlink common-6.12, donor, vendor parent |
 | `trim-missing.sh` | hapus label `//vendor/...` yang tidak tersedia |
+| `build-w1vo.sh` | build module (`./build-w1vo.sh user`) |
+| `verify-abi.sh` | verifikasi ABI (`./verify-abi.sh user`) |
+| `reproduce-cleanup.sh` | buat ulang branch `mtk-base` / `mtk-base-latest` |
 
 ## Cara 1 - overlay AOSP (disarankan)
 
