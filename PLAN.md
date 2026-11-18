@@ -41,10 +41,14 @@ Bandingkan 546 modul di firmware X6871 vs 764 modul hasil build w1vo:
 
 | Tingkat | Isi | Jumlah | Status |
 |---|---|---|---|
-| **A** | sudah ada target Bazel di tree w1vo, cuma dimatikan config | ~~12~~ **13** | ✅ selesai |
+| **A** | sudah ada target Bazel di tree w1vo, cuma dimatikan config | **13** | ✅ selesai |
 | **B** | sudah dibangun tapi beda nama (`fpsgo`→`mtk_fpsgo_v3/v8`, `game`→`mtk_game`) | **2** | belum |
-| **C** | source GPL-2.0 ada di donor mt6897 (kernel 6.1) | **38** | belum |
+| **C** | source Transsion/MTK ada di donor (6.1 atau OPPO 6.12) | **38** | ⚠️ blokir struktural, lihat §5 |
 | **D** | tidak ada di mana pun | **~41** | belum |
+
+Catatan penting hasil investigasi: dari 94 selisih, **hanya 15 yang dirujuk
+device tree X6871**. Sisanya kemungkinan dependensi internal atau modul yang
+tidak dipakai build ini. Lihat §5.0c.
 
 ---
 
@@ -114,53 +118,119 @@ sediakan symlink/alias di `.ko` atau di userspace.
 
 ---
 
-## 5. Tingkat C — 38 modul, port dari donor mt6897
+## 5. Tingkat C — 38 modul, port dari donor mt6897  ⚠️ BLOKIR STRUKTURAL
 
-Donor: `android15_kernel_modules_and_devicetree_mt6897.tar.gz` (1,7 GB,
-sudah diunduh dan diekstrak). Isinya kernel 6.1 / mt6897, **bukan** base
-build — salah generasi kernel dan tidak ada satu pun path `mt6895` di dalamnya.
-Fungsinya murni pemasok source.
+### 5.0 Hasil investigasi — baca ini dulu
 
-Yang paling berharga: **stack charging Transsion**, GPL-2.0, lengkap.
-`drivers/power/supply/transsion/` berisi 84 file. Ini menutup ~38 modul:
+Waktu mulai mengeksekusi Tingkat C, ketemu dua hal yang mengubah rencana.
+Keduanya terukur, bukan dugaan.
 
-```
-tc_adapter_class      tc_algorithm_class   tc_ambient_temp_det
-tc_audio              tc_auto_test         tc_charger_class
-tc_charger_framework  tc_chg_type_det      tc_common_class
-tc_gauge              tc_hl7139a           tc_lcd_notify
-tc_misc_intf          tc_otg_ctrl          tc_pd_adapter
-tc_pd_algo            tc_pep50             tc_phy_insert_det
-tc_pid_chg_algo       tc_pmic              tc_port_corrosion_prevention
-tc_ta_class           tc_tcpc              tc_temp_forecast
-tc_water_detect       tran_audio_control   tran_charge_transfer
-tran_usb_ctrl         aw36515              hiber
-leds-aw22xxx          nfc_i2c              snd-soc-aw87xxx
-snd-soc-fs1599        snd-soc-oca72xxx     splitswitch-gpio
-elliptic-ultrasound   mtk_cm_mgr_mt6895
-```
+**(a) `tc_charger_class` bukan penambahan, tapi PENGGANTI.**
 
-Penting: nama modul di firmware datang dari entri `obj-*` di Makefile, bukan
-dari nama file. Contoh `tc_charger_framework` = `tc_charger.o + tc_charger_intf.o
-+ tc_charger_attr.o + tc_basic_charger.o + tc_voter.o`. Jadi jangan cari file
-`tc_charger_framework.c` — tidak ada.
-
-### Biaya port 6.1 → 6.12 (terukur)
-
-Sudah discan pemakaian API yang dihapus di 6.4+:
+Transsion mem-fork `charger_class.c` MTK. Perbandingan simbol:
 
 ```
-class_create   11   (hanya yang signature-nya berubah: THIS_MODULE hilang)
-strlcpy         0
-timer_setup     0
-kernel_read     0
-get_user_pages  0
-proc_create     4
-i2c_new_dummy   0
+simbol diekspor charger_class.c MTK       : 104 dipakai driver lain
+simbol diekspor tc_charger_class.c        : 115
+simbol bentrok (nama sama, definisi beda) : 78
 ```
 
-`power_supply_*` stabil di batas 6.1/6.12 (13 register, 26 changed, 53 get, 24 set).
-Jadi pekerjaan mekanis: hapus argumen `THIS_MODULE` di 11 `class_create`.
+Artinya `tc_charger_class` **tidak bisa hidup berdampingan** dengan
+`charger_class` MTK. Di device X6871 tidak ada `charger_class.ko` sama sekali —
+hanya `tc_charger_class.ko`. Jadi ini migrasi framework, bukan tambah modul.
+
+**(b) X6871 membuang seluruh framework charger MTK.**
+
+Modul MTK yang kita bangun tapi **tidak ada** di firmware X6871:
+
+```
+charger_class   adapter_class   mtk_charger_framework
+mtk_charger_algorithm_class     mtk_pd_adapter   mtk_pd_charging
+mtk_chg_type_det  mtk_pep  mtk_pep20  mtk_pep40  mtk_pep45  mtk_pep50
+mtk_hvbpc  mtk_ufcs_adapter  mtk_2p_charger
+```
+
+15 modul. Kalau Transsion dipasang, 15 modul ini harus **dilepas**, dan
+`mt6375-charger`, `mt6375-battery`, `mtk_battery_manager` dll harus tetap
+jalan di atas API Transsion.
+
+Kabar baiknya: sudah diuji. `mt6375-charger.ko` di device mengimpor 6 simbol
+`charger_dev_*`, dan **keenamnya disediakan** `tc_charger_class.ko`. Jadi
+kompatibel — tapi ini pekerjaan ganti-fondasi, bukan salin-file.
+
+**(c) DT menunjukkan yang benar-benar dipakai cuma 15 dari 94 modul.**
+
+Dari 94 selisih, yang disebut di DT X6871 hanya 15:
+
+```
+aw8601af   ocp81375_v4l2   sgm37864_v4l2   pca_tfcp_ta
+rm69220_fhdp_dsi_vdo_dsc_csot_csot_144hz_x6871
+tc_auto_test  tc_gauge  tc_pd_adapter  tc_pmic  tc_tcpc
+tc_trancare   tran_audio_control  tran_fp  tran_ldo  tran-led-core
+```
+
+Sisanya (79 modul) tidak dirujuk DT — kemungkinan besar dependensi internal
+atau modul yang memang tidak dipakai build ini.
+
+### 5.1 Ketersediaan source untuk 15 modul yang DT butuhkan
+
+| Modul | Source ada di | Catatan |
+|---|---|---|
+| `tc_auto_test` `tc_gauge` `tc_pd_adapter` `tc_pmic` `tc_tcpc` | donor 6.1 | butuh fondasi Transsion (5.0a) |
+| `tran_audio_control` | donor 6.1 | mandiri, 628 baris |
+| `ocp81375_v4l2` `sgm37864_v4l2` | donor 6.1 | port flashlight |
+| `tran_fp` | donor 6.1 | CMD, perlu TEE |
+| `aw8601af` `pca_tfcp_ta` `tran_ldo` `tran-led-core` `rm69220...` | **tidak ada** | Phase 3 / cari donor |
+
+### 5.2 Yang bisa dikerjakan tanpa ganti fondasi
+
+Modul yang **mandiri** (tidak menyentuh `charger_class`), jadi aman ditambah:
+
+| Modul | Baris | Konflik simbol | Status port |
+|---|---|---|---|
+| `tran_audio_control` | 628 | 0 (5 simbol `tran_audio_*`) | bersih, 6.12-compatible |
+| `splitswitch-gpio` | 353 | 0 (1 simbol) | bersih |
+| `leds-aw22xxx` | 1818 | 0 | bersih |
+| `hiber` | 967 | 0 | 1× `strlcpy` |
+| `aw36515` | 1101 | 0 | **gagal** — lihat 5.3 |
+
+Stack audio Transsion (`aw87xxx`, `fs1599`, `oca72xxx`, `elliptic`) sekitar
+70.000 baris, mandiri, tapi butuh `BUILD.bazel` DDK baru untuk tiap codec.
+
+### 5.3 Jebakan nyata: aw36515 (sudah dicoba)
+
+Percobaan pertama: salin `aw36515.c` dari donor 6.1. **Gagal compile** dengan
+2 error:
+
+```
+aw36515.c:744: error: use of undeclared identifier 'FLASH_IOC_SET_CURRENT'
+aw36515.c:1094: error: incompatible function pointer types initializing
+                'int (*)(struct i2c_client *)' with 'int (struct i2c_client *,
+                const struct i2c_device_id *)'
+```
+
+Sebabnya: header 6.12 (`flashlight.h`) menghapus `FLASH_IOC_SET_CURRENT`, dan
+`i2c_driver.probe` di 6.12 tidak lagi menerima argumen `i2c_device_id`.
+
+**Jalan keluarnya bukan patch, tapi pakai source yang sudah 6.12.** Donor OPPO
+kita (`donor/oppo-mt6896`, tree 6.12) punya `aw36515_23021.c` yang sudah
+6.12-native: `probe(struct i2c_client *client)`, tanpa `FLASH_IOC_SET_CURRENT`,
+lengkap dengan `BUILD.bazel` yang sudah jalan.
+
+Pelajaran untuk sisa Tingkat C: **cek donor OPPO 6.12 dulu sebelum port dari
+6.1.** Untuk nama modul yang sama persis, OPPO 6.12 hanya punya 1 (`game`),
+tapi untuk codec audio/flashlight filenya beda nama dan sudah native.
+
+### 5.4 Rekomendasi urutan Tingkat C
+
+1. `tran_audio_control` + `splitswitch-gpio` — bersih, ~1.000 baris, mandiri.
+2. `leds-aw22xxx`, `hiber` — mandiri, ~2.800 baris.
+3. `aw8601af` / `ocp81375` / `sgm37864` — pakai pola 5.3 (cari yang 6.12-natively
+   di donor OPPO dulu).
+4. Stack audio penuh (~70k baris) — butuh penulisan `BUILD.bazel` per codec.
+5. **Charging Transsion (5 modul DT + fondasi)** — kerjakan paling akhir,
+   karena ini ganti fondasi dan harus melepas 15 modul MTK (§5.0b).
+
 
 ---
 
