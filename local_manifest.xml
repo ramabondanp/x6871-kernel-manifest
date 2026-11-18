@@ -26,6 +26,10 @@
     <linkfile src="kleaf/bzlmod/bazel.WORKSPACE.bzlmod" dest="WORKSPACE.bzlmod" />
   </project>
 
+  <project path="build/bazel_common_rules"
+           name="kernel_platform-build-bazel_common_rules"
+           remote="moto" revision="android-16-release-w2we36.56-98-2" />
+
   <project path="build/bazel_mgk_rules" name="kernel-build-bazel_mgk_rules"
            remote="moto" revision="android-16-release-w1vo36.88-36-7" />
 

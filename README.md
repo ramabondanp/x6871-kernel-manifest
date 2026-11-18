@@ -12,7 +12,7 @@ Workspace kernel Motorola W1VO36.88-36-7 (Android 16 / kernel 6.12):
 |---|---|
 | `default.xml` | workspace berdiri sendiri (12 repo) |
 | `local_manifest.xml` | overlay ke manifest AOSP 2025-09 (disarankan) |
-| `post-sync.sh` | MODULE.bazel MGK include, symlink common-6.12, symlink module donor |
+| `post-sync.sh` | MODULE.bazel MGK, symlink common-6.12, symlink module donor |
 | `trim-missing.sh` | hapus label `//vendor/...` yang tidak tersedia |
 
 ## Cara 1 - overlay AOSP (disarankan)
@@ -116,17 +116,47 @@ Script menghapus 49 baris dari `kernel_device_modules-6.12/kernel/kleaf/mgk_64.b
 ## Build
 
 ```bash
-export BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
-tools/bazel build \
+cp ../w1vo36-kernel-manifest/build-w1vo.sh .
+./build-w1vo.sh user
+```
+
+Isi `build-w1vo.sh` (ringkas):
+
+```bash
+tools/bazel --output_user_root=$PWD/out_bazel build \
+  --repo_env=KERNEL_VERSION=kernel-6.12 \
+  --repo_env=KERNEL_BUILD_VARIANT=user \
+  --repo_env=DEFCONFIG_OVERLAYS= \
+  --repo_env=SUPPORT_PLATFORM= \
+  --repo_env=SOURCE_DATE_EPOCH=0 \
   --//build/bazel_mgk_rules:kernel_version=6.12 \
   --experimental_writable_outputs \
-  //kernel_device_modules-6.12:mgk_64_k612_internal_modules_install.user
+  //kernel_device_modules-6.12:mgk_64_k612_customer_modules_install.user
+```
 
-tools/bazel run \
+Penting:
+
+- `KERNEL_VERSION` dkk wajib lewat `--repo_env`, **bukan `export`**.
+  `mgk_extension.bzl` membaca `module_ctx.os.environ`, dan Bazel hanya
+  meneruskan variabel yang di-`--repo_env`.
+- Workspace harus punya `../vendor/mediatek` (satu level di atas).
+  `mgk_repo.MODULE.bazel` memakai `path="../vendor/mediatek"`.
+  `post-sync.sh` sudah membuat symlink-nya.
+- Butuh `build/bazel_common_rules` (ada di manifest, dari repo Moto
+  `kernel_platform-build-bazel_common_rules`), karena `mgk.bzl`
+  load `//build/bazel_common_rules/dist:dist.bzl`.
+- Root `MODULE.bazel` harus `mgk.MODULE.bazel`, bukan punya AOSP.
+
+Dist:
+
+```bash
+tools/bazel --output_user_root=$PWD/out_bazel run \
+  --repo_env=KERNEL_VERSION=kernel-6.12 \
+  --repo_env=KERNEL_BUILD_VARIANT=user \
   --//build/bazel_mgk_rules:kernel_version=6.12 \
   --nokmi_symbol_list_violations_check \
-  //kernel_device_modules-6.12:mgk_64_k612_internal_dist.user \
-  -- --dist_dir=out_krn/dist
+  //kernel_device_modules-6.12:mgk_64_k612_customer_dist.user \
+  -- --dist_dir=$PWD/out_krn/dist
 ```
 
 Di tree Android MTK lengkap:

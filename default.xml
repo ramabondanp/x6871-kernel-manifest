@@ -22,6 +22,11 @@
     <linkfile src="kleaf/bzlmod/bazel.WORKSPACE.bzlmod" dest="WORKSPACE.bzlmod" />
   </project>
 
+  <!-- AOSP bazel_common_rules (dipakai mgk.bzl: //build/bazel_common_rules/dist:dist.bzl) -->
+  <project path="build/bazel_common_rules"
+           name="kernel_platform-build-bazel_common_rules"
+           remote="moto" revision="android-16-release-w2we36.56-98-2" />
+
   <!-- MTK MGK bazel rules -->
   <project path="build/bazel_mgk_rules" name="kernel-build-bazel_mgk_rules" />
 

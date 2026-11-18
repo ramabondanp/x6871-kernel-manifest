@@ -10,18 +10,18 @@ set -e
 [ -d kernel-6.12 ]           || { echo "ERROR: kernel-6.12 tidak ada"; exit 1; }
 
 # --- 1. MODULE.bazel ---
-if [ -L MODULE.bazel ]; then
-  echo "MODULE.bazel symlink -> file biasa + include MGK"
-  rm MODULE.bazel
-  cp build/kernel/kleaf/bzlmod/bazel.MODULE.bazel MODULE.bazel
-fi
-if ! grep -q 'bazel_mgk_rules/bzlmod:mgk_repo.MODULE.bazel' MODULE.bazel; then
-  {
-    echo ''
-    echo '# MTK MGK'
-    echo 'include("//build/bazel_mgk_rules/bzlmod:mgk_repo.MODULE.bazel")'
-  } >> MODULE.bazel
-  echo "include MGK ditambahkan ke MODULE.bazel"
+# Root MODULE.bazel harus versi MGK, bukan bazel.MODULE.bazel AOSP:
+# mgk.MODULE.bazel sudah include mgk_repo dan memakai mgk_kernel_toolchain_ext,
+# jadi tidak bentrok dengan use_repo("kernel_toolchain_info") milik Kleaf.
+MGK_MODULE=build/bazel_mgk_rules/bzlmod/mgk.MODULE.bazel
+if [ -f "$MGK_MODULE" ]; then
+  if [ -L MODULE.bazel ] || ! cmp -s MODULE.bazel "$MGK_MODULE"; then
+    rm -f MODULE.bazel
+    cp "$MGK_MODULE" MODULE.bazel
+    echo "MODULE.bazel <- build/bazel_mgk_rules/bzlmod/mgk.MODULE.bazel"
+  fi
+else
+  echo "WARNING: $MGK_MODULE tidak ada, MODULE.bazel dibiarkan"
 fi
 
 # --- 2. common-6.12 ---
@@ -63,6 +63,13 @@ if [ -d "$DONOR" ]; then
   done
 else
   echo "WARNING: donor/oppo-mt6896 tidak ada, skip symlink"
+fi
+
+# --- 4. parent vendor/mediatek (dipakai mgk_repo.MODULE.bazel path="../vendor/mediatek") ---
+if [ ! -e ../vendor/mediatek ]; then
+  mkdir -p ../vendor
+  ln -sfn "$PWD/vendor/mediatek" ../vendor/mediatek
+  echo "symlink ../vendor/mediatek -> $PWD/vendor/mediatek"
 fi
 
 echo
