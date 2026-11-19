@@ -511,6 +511,130 @@ Patch 6.12 (2):
 2. `class_create(THIS_MODULE, "tran_class")` -> `class_create("tran_class")`
    (6.12 membuang argumen owner).
 
+### 6.2e TEMUAN BESAR: `struct charger_ops` kita BUKAN layout firmware
+
+**Status 2026-11-19: SUDAH DIPERBAIKI. Bug ini akan membuat charger mati
+total saat boot, dan tidak terlihat dari perbandingan simbol.**
+
+#### Apa yang salah
+
+Perbandingan simbol (`readelf -sW`, nama ekspor/impor) hanya membuktikan
+**nama** fungsi sama. Ia tidak membuktikan **layout struct** sama. Untuk
+`tc_charger_class` — yang menggantikan fondasi `charger_class` — layout-lah
+yang menentukan semuanya.
+
+Kita mengukur langsung slot tiap wrapper di `.ko` firmware: di dalam
+`charger_dev_*` selalu ada pola `ldr x8,[x0,#16]` (chg_dev->ops) lalu
+`ldr x8,[x8,#N]`; `N/8` = indeks field. Hasil untuk
+`tc_charger_class.ko` firmware, 120 wrapper:
+
+| titik sisip | posisi firmware | isi |
+|---|---|---|
+| 1 | sebelum `run_aicl` | `get_mivr_gap`, `set_boot_volt_times` (2 field) |
+| 2 | sebelum `enable_usbid` | 1 field tak dikenal (tidak punya wrapper, slot 71) |
+| 3 | sebelum `get_ilim_state` | `pd_set_hiz_flag`, `pd_set_charge_flag` (2 field) |
+| 4 | sebelum `get_wireless_authenticate` | `need_hz_ctrl` (1 field) |
+
+Total: firmware punya **138** field, header kita **132**. Enam selisih.
+
+Verifikasi silang: layout hipotesis (header TC + 6 sisipan di posisi itu)
+dicocokkan ke **120 wrapper** firmware → **120 cocok, 0 beda**. Sisanya 14
+wrapper tidak punya padanan nama (`do_event`, `get_vbus`, `get_ibus`,
+`get_ibat`, `get_temperature`, `get_ts`, `get_vrefts`, `authenticate`,
+`wireless_ta_get_vbus/ibus`, `volt_sync`, `get_pg_state`,
+`set_reverse_boost`, `get_ce`) — perlu dipetakan ke field yang sudah ada,
+bukan field baru.
+
+#### Kenapa ini fatal, bukan kosmetik
+
+`mt6375-charger.ko` **kita** dibangun dengan `charger_class.h` MTK
+(89 field). Firmware membangunnya dengan `tc_charger_class.h` (138 field).
+Slot yang sama, arti berbeda:
+
+| slot | driver kita mengisi | `tc_charger_class` firmware membaca |
+|---|---|---|
+| 25 | `send_ta_current_pattern` | `set_mivr` |
+| 56 | `enable_discharge` | `get_mivr_gap` |
+| 57 | `set_boost_current_limit` | `run_aicl` |
+| 58 | `enable_chg_type_det` | `set_boot_volt_times` |
+| 59 | `run_aicl` | `reset_eoc_state` |
+| 64 | `set_pe20_efficiency_table` | `get_adc` |
+| 71 | `get_ibus_adc` | `enable_usbid` |
+| 85 | `enable_hz` | `pd_set_charge_flag` |
+
+Artinya: `charger_dev_get_adc()` akan memanggil `mt6375_set_pe20_efficiency_table()`.
+`charger_dev_set_mivr()` akan memanggil `mt6375_send_ta_current_pattern()`.
+Tidak crash — ia **memanggil fungsi yang salah dengan signature yang salah**.
+Yang paling mungkin: charger tidak mau charge, atau ADC baterai salah baca.
+
+Bukti tambahan bahwa firmware memang memakai layout TC: `mt6375-charger.ko`
+firmware punya `mt6375_tran_is_water_detected` dan `mt6375_set_dp_data`,
+yang **tidak ada** di `mt6375-charger.c` MTK. Keduanya ada di
+`transsion/mt6375-charger.c` (3.886 baris vs 3.112).
+
+Dan `.ko` firmware itu memakai layout hasil rekonstruksi:
+`plug_in`=2, `set_charging_current`=9, `set_mivr`=25, `run_aicl`=58,
+`reset_eoc_state`=59, `dump_registers`=63, `get_adc`=64, `enable_hz`=79
+→ **semua cocok dengan TC+6, tidak satu pun cocok dengan MTK**.
+
+#### Bahaya kedua: dua modul mengklaim simbol yang sama
+
+`charger_class.ko` (MTK, 89 field) **dan** `tc_charger_class.ko` (TC,
+138 field) sama-sama didaftarkan di `mgk_64.bzl` dan sama-sama masuk staging:
+**84 simbol `charger_dev_*` didefinisikan oleh keduanya**. Firmware X6871
+tidak mengirim `charger_class.ko` sama sekali. Jadi keduanya tidak boleh
+ada bersamaan — yang menang ditentukan urutan load, dan itu tidak deterministik.
+
+#### Hasil perbaikan (terverifikasi)
+
+1. `tc_charger_class.h`: 6 field disisipkan pada posisi terukur → 132 → **138 field**.
+   Verifikasi: 120 wrapper firmware, **120 cocok, 0 beda**.
+2. `tc_charger_class.c`: 5 ekspor baru ditambahkan dengan pola guard-then-dispatch
+   yang sama seperti wrapper lain.
+   Verifikasi: ekspor kita **136**, firmware **136** — `comm` kosong (identik).
+3. `mt6375-charger` sekarang dibangun dari `transsion/mt6375-charger.c`
+   (3.886 baris), bukan `mt6375-charger.c` MTK (3.112 baris).
+   Verifikasi slot `charger_ops`: **60 slot, semua cocok** dengan firmware —
+   `set_mivr`=25, `run_aicc`=58, `reset_eoc_state`=59, `get_adc`=64,
+   `enable_hz`=79, `set_dp_data`=89, `tran_is_water_detected`=127.
+   Verifikasi impor: **identik** dengan firmware (comm kosong).
+4. Build ulang: sukses, **659 `.ko`** tetap utuh.
+
+Patch 6.12 untuk `transsion/mt6375-charger.c` (selain layout):
+
+| masalah | perbaikan |
+|---|---|
+| `.usb_types = array` + `.num_usb_types` | 6.12 mengubahnya jadi bitmask `u32`; `num_usb_types` dihapus dari struct |
+| `remove()` mengembalikan `int` | 6.12 `void` |
+
+#### Rencana perbaikan
+
+1. Sisipkan 6 field ke `tc_charger_class.h` pada posisi terukur, dengan
+   signature dari pemanggil (bukan tebakan):
+   - `charger_dev_need_hz_ctrl(dev)` → `int`, tanpa argumen kedua
+     (dibuktikan: `tran_usb_ctrl.ko` tidak menyiapkan `w1`; `cbz w0` setelah call)
+   - `charger_dev_get_mivr_gap(dev)` → `int`, tanpa argumen kedua
+     (dibuktikan: `tc_charger_framework.ko` hanya menyiapkan `x0`)
+   - `set_boot_volt_times(dev, u32)` → dari MTK `charger_class.c`
+   - `pd_set_hiz_flag(dev, bool)`, `pd_set_charge_flag(dev, bool)` →
+     `and w1,w1,#1` di wrapper membuktikan argumen kedua `bool`
+   - slot 71: belum teridentifikasi, tidak punya wrapper di firmware
+2. Bangun ulang, verifikasi ulang slot-per-slot (harus 0 beda).
+3. Ganti `mt6375-charger.c` MTK dengan `transsion/mt6375-charger.c`.
+4. Keluarkan `charger_class` MTK dari daftar modul (firmware tidak punya).
+5. Audit modul lain yang sama-sama include `charger_class.h` — 8 modul kita
+   dibangun dengan layout MTK, tapi hanya `mt6375-charger` yang ada di
+   firmware X6871; sisanya (`rt9490`, `rt9758`, `mtk_chg_type_det`,
+   `mtk_2p_charger`, `rt9759`, `bq2589x_charger`) tidak dikirim firmware.
+
+#### Pelajaran umum
+
+Aturan §6.1b ("cocokkan lewat isi `.ko`, bukan nama") **belum cukup**.
+Perbandingan simbol hanya lapisan pertama. Untuk modul yang **mendefinisikan
+struct yang dipakai lintas modul**, yang wajib dibandingkan adalah
+**layout struct**, dan cara mengukurnya adalah offset `ldr` di wrapper —
+bukan daftar nama simbol.
+
 ### 6.2d Fondasi charger Transsion — 4 modul, 3 IDENTIK
 
 **Catatan: Transsion hanya merilis source kernel 6.1, tidak pernah 6.12.**
