@@ -1208,6 +1208,40 @@ Menyamakan itu berarti mengganti storage path, bukan menambah modul — dan
 `tc_tfcp_ta` yang baru diport. Semua `tc_ta_device_*` yang ia impor sudah
 tersedia di `tc_ta_class`. Ini kandidat terbaik berikutnya.
 
+### 6.2o Hasil akhir 6 algoritma charging
+
+| modul | ekspor | status |
+|---|---|---|
+| `tc_pe20_algo` | 24 == 24 | IDENTIK |
+| `tc_tc30_algo` | 22 == 22 | IDENTIK |
+| `tc_hvdcp20_algo` | 22 == 22 | IDENTIK |
+| `tc_tfcp_ta` | 2 == 2 | IDENTIK (RE penuh dari `.ko`) |
+| `tc_pep50` | 71 vs 89 | 18 fungsi qc3/rfc/wireless — inert di X6871 |
+| `tc_trancare` | — | butuh `transsion_tranlog` |
+
+Untuk `tc_pep50`: 18 fungsi yang tidak bisa dibangun
+(`pe50_{qc3,rfc,wireless}_algo_*`, `pe50_*_get_ita_lmt`,
+`pe50_is_wireless_online`) tidak ada di source resmi mana pun, tidak diimpor
+satu modul pun di firmware X6871, dan `frag0.dts` tidak punya node
+qc3/wireless/rfc. Jadi bukan gap porting — memang tidak dipakai device ini.
+
+`tc_tfcp_ta` dan `pca_tfcp_ta` adalah dua modul yang **direkonstruksi penuh
+dari firmware `.ko`**, bukan dari source. Yang membuatnya bisa tepat:
+
+1. Keduanya implementasi murni dari interface yang **dipublikasikan** —
+   `struct tc_ta_device_ops` (27 callback) dan `struct tadapter_ops`
+   (19 callback). Fungsi `.ko` cocok 27/27 dan 12/12 dengan slot yang dipakai.
+2. `.ko` tidak di-strip, jadi nama fungsi, call graph (`R_AARCH64_CALL26`),
+   dan isi tabel ops (`R_AARCH64_ABS64` di `.rela.data`) terbaca.
+3. Register map `tc_tfcp_ta` terbaca dari immediate `mov w1, #0x..`
+   (0xa0 verinfo … 0xb3 wdt).
+
+**Pelajaran yang berulang:** versi pertama `tc_tfcp_ta` build hijau tapi tidak
+mendaftarkan apa pun dan memakai `i2c_transfer` biasa; versi pertama
+`pca_tfcp_ta` build hijau tapi punya tabel ops yang salah. Keduanya hanya
+ketahuan dari membandingkan **impor dan tabel relokasi** dengan firmware —
+bukan dari build.
+
 ### 6.3 Kesimpulan Tingkat D
 
 Jangan kerjakan Tingkat D sebelum Phase 3 selesai. Alasannya:
