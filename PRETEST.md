@@ -519,3 +519,70 @@ seluruh set modul sekaligus, CRC antar-modul konsisten di dalam set kita
 
 Tetap disarankan memakai kernel + modul dari satu build: bukan karena ABI,
 tetapi supaya perilaku kode (bukan hanya simbol) konsisten.
+
+## 13. Kelas bug yang paling berbahaya: tabel ber-indeks DT
+
+Boot kedua (`pstore2.txt`) berhenti bukan karena simbol atau CRC, tapi karena
+**nomor power domain bergeser satu**. Pelajarannya berlaku umum untuk semua
+tabel yang diakses DT lewat nomor, bukan lewat nama.
+
+### Gejala
+
+```
+[DEVAPC]: Write Violation
+[DEVAPC]: Vio Addr:0x15000008, High:0x0, Bus ID:0x2508, Dom ID:0x0
+[DEVAPC]: Violation - master: MCU_AP_M access violation slave: IMG_APB_S
+[DEVAPC]: Violation Type: "Decode error or way_en"
+[DEVAPC]: [KE] Device APC Violation Issue/IMG_APB_S
+kernel BUG at ../kernel_device_modules-6.12/drivers/soc/mediatek/devapc/devapc-mtk-multi-ao.c:1049!
+pc : devapc_extra_handler+0x440/0x51c [device_apc_common]
+```
+
+`0x15000008` = CG register `syscon@15000000` (imgsys_main). Penulisnya
+`mtk_smi_common_probe` untuk `smi-img-sub-comm0@15002000`, yang di DT punya
+`power-domains = <&scpsys 7>` + `clocks = <&imgsys_main 0 0xd 0xe 0x11>`.
+Power domain 7 di stock = `isp_main`; di build kita = `isp_vcore`, jadi
+ISP_MAIN tidak pernah nyala sementara clock-nya di-enable → pelanggaran
+DEVAPC → kebijakan KE → `BUG_ON`.
+
+### Cara mendeteksi (tanpa hardware)
+
+Ukuran dan urutan tabel dibaca langsung dari `.ko` stock vs build:
+
+```bash
+aarch64-linux-gnu-nm -S --defined-only stock/mtk-scpsys-mt6895.ko | grep scp_domain_data
+# stock : 0x6ee8 = 28392 byte = 39 entri x 728
+# build : 0x71c0 = 29120 byte = 40 entri x 728     <-- satu entri lebih
+```
+
+Nama tiap entri diambil dari relokasi `R_AARCH64_ABS64` di `.rela.rodata`
+(field pertama setiap entri = pointer ke `.rodata.str1.1`):
+
+```
+stock : 0=md 1=conn 2=adsp_infra 3=audio ... 6=isp_vcore 7=isp_main 8=isp_dip1
+build : 0=md 1=conn 2=ufs0_shutdown 3=adsp_infra ... 7=isp_vcore 8=isp_main
+```
+
+`ufs0_shutdown` disisipkan di indeks 2 (ada di binding header cabang kita,
+tidak ada di build stock), sehingga **semua domain setelah indeks 1 bergeser
++1**.
+
+### Perbaikan
+
+Disamakan dengan stock (39 domain, tanpa `ufs0_shutdown`):
+
+- `include/dt-bindings/power/mt6895-power.h`: entri dihapus, nomor sesudahnya
+  diturunkan satu, `MT6895_POWER_DOMAIN_NR` = 39
+- `drivers/soc/mediatek/mtk-scpsys-mt6895.c`: blok
+  `[MT6895_POWER_DOMAIN_UFS0_SHUTDOWN]` dihapus
+- `drivers/clk/mediatek/mtk-pd-chk-mt6895.c`: 3 referensi dihapus
+- `arch/arm64/boot/dts/mediatek/mt6895.dts`: `power-domains` pada node
+  `ufshci` dihapus — DT stock memang tidak punya properti itu
+
+### Aturan untuk modul berikutnya
+
+Untuk setiap tabel yang dipakai DT lewat indeks (power domain, clock,
+IOMMU bank, GCE), **ukuran tabel di `.ko` build harus sama dengan stock**.
+Selisih ukuran simbol data adalah tanda paling cepat; urutannya diverifikasi
+lewat relokasi string seperti di atas. Tabel yang diakses lewat nama
+(regulator, alias, `of_match`) tidak punya risiko ini.
