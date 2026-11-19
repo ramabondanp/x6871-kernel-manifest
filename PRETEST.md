@@ -223,3 +223,38 @@ python3 tools/ko-preflight.py \
   --json /serverhive1/ramabondanp/tmp/pretest-final.json \
   --markdown /serverhive1/ramabondanp/tmp/PRETEST-final.md
 ```
+
+## 9. Update `tran_fp` — chip id lewat SPI (`29d21b5d018c`)
+
+Modul stock X6871 **tidak** mengimplementasikan ioctl transfer (15/16/17)
+dan tidak punya `write()`; yang dipakai userspace adalah `_IO('t',3)`
+(`TRAN_FP_READ_FP_ID`) dan deteksi chip id saat probe. Port sebelumnya tidak
+punya `spi_sync`, jadi `ic_name`/`vendor_name` kosong. Commit
+`29d21b5d018c` menambahkan jalur itu.
+
+Perbandingan ulang (staging 796 `.ko`, `Module.symvers` vmlinux build yang
+sama):
+
+| Modul | Export asli built/fw | Import built/fw | Impor tak terselesaikan | CRC mismatch |
+|---|---|---|---|---|
+| `tran_extcon_usb` | 0 / 0 | 47 / 47 | 0 | 0 |
+| `tran_fp` | 0 / 2 | **94 / 145** | 0 | 0 |
+| `tnek` | 9 / 9 | 24 / 24 | 0 | 0 |
+| `tkv` | 0 / 0 | 24 / 23 | 0 | 0 |
+
+- Satu grup vermagic untuk 795 modul:
+  `6.12.38-android16-5-g2c4fd33ae6d8-4k ... modversions aarch64` — tidak ada
+  modul `-maybe-dirty`.
+- `tran_fp` sekarang mengimpor `spi_sync`; `fw-only-fn` turun ke 120 (sisa
+  backend vendor yang tidak dipakai di REE).
+- 13 modul lain punya impor tak terselesaikan (`bq2589x_charger`,
+  `bt_drv_connac1x`, `gps_drv_stp`, `mtk_charger_framework`,
+  `mtk_ufcs_adapter`, `wmt_chrdev_wifi`, `ufs-mediatek-mod-ise`,
+  `ise-trusty`, ...). Semuanya modul platform/varian yang memang tidak ada di
+  daftar install customer — bukan regresi dari perubahan ini.
+
+Catatan perintah build (sempat salah dan menyebabkan kegagalan palsu di
+`mrdump`/`tinysys-scmi`): nilai `DEFCONFIG_OVERLAYS` dan `SUPPORT_PLATFORM`
+**wajib** diisi seperti §8. Tanpa `SUPPORT_PLATFORM=mt6895` semua platform
+ikut dibangun; tanpa dua flag `unsafe_headers` header GKI privat hilang di
+sandbox.

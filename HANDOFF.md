@@ -165,7 +165,7 @@ X6871. Jangan port kecuali target perangkat berubah.
 | Modul | Commit | Verifikasi |
 |---|---|---|
 | `tran_extcon_usb` | `3194d4f10237` | ekspor 0/0, impor 47/47, alias/`depends` **identik** |
-| `tran_fp` | `0e527bf7c6f4` | common layer; export asli 0/2 (debug), impor 90/145 |
+| `tran_fp` | `29d21b5d018c` | common layer + chip-id/SPI REE; export asli 0/2 (debug), impor 94/145 |
 | `tnek` | `24b5fe361653` | **9 == 9 ekspor asli**, **24 == 24 impor** |
 | `tkv` | `cb088a63c4b2` | **0 == 0 ekspor asli**, 24/23 impor (+`page_is_ram`) |
 
@@ -181,11 +181,29 @@ impor tak terselesaikan, 0 CRC tak terpenuhi, 0 export ambigu**. Detail di
 - `tran_fp`: source donor 6.1 `tran_common_v2` di
   `drivers/input/fingerprint/tran_common/`, match `tran_fp_legacy`. Modul
   firmware 6.12 membundel backend vendor (`gf_*`, `ff_*`, ...); port ini
-  **hanya common layer**. Ioctl transfer SPI (15/16/17) belum ada dan build
-  tidak mengimpor `spi_sync`, jadi akuisisi gambar fingerprint kemungkinan
-  gagal sampai backend Goodix diport. Power/reset/IRQ/SPI clock/netlink/
-  sysfs tetap ada. Regulator X6871 `mt6368_vfp` fixed 3,3 V; guard menolak
-  regulator variabel/di luar 1,5–3,6 V. **Wajib diuji saat boot**.
+  **common layer + jalur chip-id Goodix**, bukan seluruh backend.
+  Power/reset/IRQ/SPI clock/netlink/sysfs tetap ada. Regulator X6871
+  `mt6368_vfp` fixed 3,3 V; guard menolak regulator variabel/di luar
+  1,5–3,6 V. **Wajib diuji saat boot**.
+  - Sejak `29d21b5d018c` modul mengimpor `spi_sync` dan membaca chip id
+    lewat SPI saat probe (`tran_fp_detect_chip=1`), lalu mengisi `ic_name`
+    + `vendor_name` (`/sys/kernel/tran_fp/vendor_name` → `common_goodix`).
+    Kegagalan deteksi **tidak** menggagalkan probe (stock menggagalkannya).
+  - `TRAN_FP_READ_FP_ID` (`_IO('t',3)`) diimplementasikan seperti stock:
+    deteksi lalu `tran_netlink_send(6)`/`(7)`; dilewati bila
+    `TRAN_FP_OPT_SUPPORT` (`_IO('t',4)`) sudah dipanggil.
+  - `TRAN_IOC_TRANSFER_CMD` (ABI `struct tran_ioc_transfer`: `cmd` 0=baca/
+    1=tulis, `addr` 16-bit big-endian, `len`, `buf`) + `_RAW_CMD` dan
+    `_SPI_INIT_CFG_CMD` (dua yang terakhir tidak dipakai stock; layout
+    didefinisikan di port ini). Buffer user di-bounce ke memori kernel
+    karena SPI bisa DMA.
+  - **Penting**: modul stock tidak punya ioctl transfer sama sekali —
+    akuisisi gambar di X6871 lewat TEE, REE hanya untuk chip id. Jadi kalau
+    HAL gagal, penyebabnya bukan ioctl 15/16/17.
+  - `spi->controller_data` sengaja tidak disentuh: `spi-mt65xx` memilikinya,
+    `BUG_ON()` di `spi_dump_config()` bila field cs timing legacy terisi, dan
+    `kfree()` di `mtk_spi_cleanup()`. `tran_chip_config` statik ala stock
+    tidak bisa dipakai dengan controller driver ini.
 - `tnek`: tidak ada source; direkonstruksi penuh. Node 0x418, pesan user
   0x408, queue 9, `/dev/tnek`. `mcDrvModule` firmware mengimpor
   `tnek_caller_api`; build kita meng-gate impor itu. Export asli 9 == 9.
@@ -211,8 +229,12 @@ impor tak terselesaikan, 0 CRC tak terpenuhi, 0 export ambigu**. Detail di
   Catatan: `tc_charger_framework` dan `tc_water_detect` mengimpor tranlog di
   firmware tapi **tidak** di build kita — jalurnya di-gate saat compile, jadi
   charger inti tidak bergantung padanya.
-- **Goodix fingerprint backend** — diperlukan agar `tran_fp` bisa transfer
-  data SPI; tanpa itu hanya kontrol power/reset/IRQ yang berfungsi.
+- **Goodix fingerprint backend** — hanya bagian yang belum ada: akuisisi
+  gambar bila ternyata dijalankan di REE. Bukti saat ini: modul stock
+  (`tran_fp.ko` X6871) **tidak** punya ioctl transfer dan tidak punya
+  handler `write()`, jadi transfer gambar berjalan di TEE dan REE hanya
+  dipakai untuk chip id (sudah diport di `29d21b5d018c`). Port backend baru
+  diperlukan hanya kalau boot test menunjukkan HAL memakai jalur REE.
 
 ### Storage / UFS — **Opsi A: baseline GKI/MTK** (diputuskan 2026-11-19)
 
