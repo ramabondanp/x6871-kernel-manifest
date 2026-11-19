@@ -934,3 +934,36 @@ Catatan: `dmesg2.txt` berasal dari boot dengan **adaptive-ts stock**
 (terbukti dari string `tran_tp_get_boot_mode`/`flod_main_device_init`
 yang hanya ada di `.ko` stock), jadi log itu tidak menunjukkan perilaku
 driver kita.
+
+### Bus Goodix salah: i2c vs SPI
+
+`dmesg3.txt` menunjukkan retry `adaptive-ts` bekerja (match sukses pada
+percobaan kedua), tetapi `goodix_ts_init` memanggil
+`goodix_i2c_bus_init()`. Akibatnya driver SPI tidak pernah didaftarkan,
+perangkat `goodix,gt9916` di SPI tidak pernah probe, dan match menunggu
+8 detik lalu timeout:
+
+```
+[tran_touch-INFO]match_tp_controller 119:start load controller vendor:goodix ic:gt9916
+[GTP-INF][goodix_i2c_bus_init:255] Goodix i2c driver init
+...
+[tran_touch-ERROR]controller_match_work 289:init controller timeout!
+```
+
+Pemilihan bus dilakukan saat kompilasi:
+
+```c
+#ifdef CONFIG_TOUCHSCREEN_GOODIX_BRL_SPI
+        ret = goodix_spi_bus_init();
+#else
+        ret = goodix_i2c_bus_init();
+#endif
+```
+
+X6871 memakai SPI, jadi target `gt9916_common` harus diberi
+`-DCONFIG_TOUCHSCREEN_GOODIX_BRL_SPI=1`. Setelah rebuild,
+`goodix_ts_init` memanggil `goodix_spi_bus_init` (diverifikasi di
+disassembly `.ko` dalam image).
+
+Gambar uji: `twrp-vendor_boot-hwports3.img`
+(md5 `d7cb32982f3dde01a5cc9d02c5269f07`).
