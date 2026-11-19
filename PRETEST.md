@@ -359,3 +359,115 @@ Satu-satunya jalur yang bisa menulis register dari userspace adalah ioctl
 2. `tran_fp` masih tanpa backend vendor (`fw-only-fn` 120). Akuisisi gambar
    di X6871 berjalan di TEE; ini perlu dibuktikan saat boot, bukan sekarang.
 3. 216 CRC mismatch / 13 unresolved modul lain: pre-existing, di luar scope.
+
+## 11. Audit seluruh pengganti modul stock (`tools/preboot-audit.py`)
+
+§1–§10 membandingkan empat modul fitur. Bagian ini memeriksa **setiap modul
+stock yang digantikan build kita** — satu baris per `.ko` firmware, bukan per
+`.ko` yang kebetulan ikut ter-build. Dijalankan atas staging
+`6.12.38-android16-5-g2c4fd33ae6d8-4k` final.
+
+```bash
+python3 tools/preboot-audit.py \
+  --built <staging>/lib/modules/6.12.38-android16-5-g2c4fd33ae6d8-4k \
+  --fw /serverhive1/ramabondanp/tmp/x6871/vr/root/lib/modules \
+  --symvers <build>/mgk_64_k612_kernel_aarch64.user/Module.symvers \
+  --json /serverhive1/ramabondanp/tmp/preboot-audit.json \
+  --markdown /serverhive1/ramabondanp/tmp/preboot-audit.md
+```
+
+### 11.1 Inventory
+
+| Item | Nilai |
+|---|---|
+| modul stock (`.ko` di firmware) | 237 |
+| punya pengganti di build | 217 |
+| tidak ada di build | 20 (§11.5) |
+| pengganti yang di-load stock (`modules.load`/`.recovery`) | 217 (semua) |
+| vermagic set build | `6.12.38-android16-5-g2c4fd33ae6d8-4k` — **1 grup** |
+| vermagic stock | `6.12.38-android16-5-gcc51d883045d-4k` — 1 grup, **beda commit** |
+| basename duplikat di staging | `mtk-socinfo.ko` (§11.4) |
+
+Karena vermagic stock (`gcc51d883045d`) berbeda dari build kita
+(`g2c4fd33ae6d8`), **kernel image dan seluruh modul harus dari build yang
+sama**. Mencampur `.ko` stock dengan kernel kita tidak akan bisa load.
+
+### 11.2 Simulasi loader pada set pengganti
+
+| Item | Jumlah |
+|---|---|
+| modul dengan impor tak terselesaikan | **0** |
+| CRC mismatch (modversions) | **0** |
+| export duplikat di dalam set | **0** |
+| tabrakan simbol dengan vmlinux | **0** |
+
+Angka ini dihitung hanya dari 217 modul yang menggantikan modul stock, dengan
+`Module.symvers` vmlinux dari build yang sama. Simbol undefined ber-binding
+`WEAK` dikecualikan karena resolve ke 0 dan tidak pernah menggagalkan load
+(contoh: `leds-mtk-disp` → `mtk_drm_gateic_set_backlight`, tidak diekspor oleh
+siapapun, stock maupun build).
+
+### 11.3 Status struktural per modul
+
+`0 fail`, `58 warn`, `159 ok`. Rincian warn:
+
+| Kategori | Jumlah | Arti |
+|---|---|---|
+| `depends` drift | 31 | hampir semua **pengurangan**: stock bergantung pada modul yang tidak diport (`transsion_tranlog`, `thd`, `tran_mmc_block`, `tran-ufshcd-*`, `tran-proc-bootdevice-mod`, `tran_scsi_mod`, `tran_expand_key`, `tran_key_bigdata`). Build kita meng-gate ketergantungan itu saat compile. |
+| export tidak diekspor ulang | 23 | tidak ada satu pun yang diimpor modul lain di set → aman |
+| export baru | 12 | tambahan, tidak menimpa simbol vmlinux (kernel-collisions 0) |
+| **API hardware baru** | 3 | lihat di bawah |
+| license string | 3 | kosmetik (multi-license `GPL`/`GPL v2`), hanya memengaruhi taint flag |
+
+Tiga modul yang menambah akses hardware dibanding stock:
+
+| Modul | API baru | Catatan |
+|---|---|---|
+| `clk-common.ko` | `clk_enable`, `clk_set_rate` | source berbeda (commit stock lain); clock framework MTK, bukan register mentah |
+| `tran_ldo.ko` | `regulator_enable`, `regulator_disable` | modul Transsion hasil port; LDO memang harus enable/disable lewat regulator framework |
+| `tran_usb_ctrl.ko` | `gpio_request` | modul Transsion hasil port; meminta GPIO lewat API standar, bukan menulis register |
+
+Ketiganya memakai API kernel (bukan `ioremap`/`writel` mentah), jadi kegagalan
+akan berupa error probe, bukan akses alamat sembarangan. Tetap dicek di dmesg.
+
+`depends` drift yang **menambah** dependensi hanya dua, keduanya modul yang ada
+di set: `leds-mtk-disp` (+`mtk_panel_ext`) dan `tc_hl7139a` (+`tc_misc_intf`).
+
+### 11.4 `mtk-socinfo.ko` ter-build dua kali
+
+Staging berisi dua salinan:
+
+- `kernel/drivers/soc/mediatek/mtk-socinfo.ko` (dari GKI/kernel image)
+- `extra/kernel_device_modules-6.12/drivers/soc/mediatek/mtk-socinfo.ko`
+  (dari target device `//.../drivers/soc/mediatek:mtk-socinfo`)
+
+Keduanya mengekspor set yang sama (hanya `init_module`/`cleanup_module`) dan
+tanpa `depends`, jadi **bukan penghalang boot**. `depmod` memilih yang GKI
+(`modules.dep: kernel/drivers/soc/mediatek/mtk-socinfo.ko`), salinan `extra/`
+ter-shadow. Kalau tree staging di-flatten dengan urutan copy yang berbeda,
+pemenangnya bisa berbalik — karena itu sebaiknya salah satu dikecualikan
+eksplisit saat packaging.
+
+### 11.5 Dua puluh modul stock tanpa pengganti
+
+Persis daftar yang sudah diputuskan di `HANDOFF.md`, bukan temuan baru:
+
+- 2 panel yang tidak direncanakan + 1 alias panel
+  (`rm69220_..._cl8`, `ili7838e_..._cl9`, `rm69220_..._x6871`)
+- 3 modul MMC/SD (`mtk-mmc-mod`, `tran_mmc_block`, `sd_tray`)
+- 7 fork storage/UFS (`tran-ufshcd-core`, `tran-ufshcd-pltfrm`, `tran_scsi_mod`,
+  `tran_sd_mod`, `tran_block`, `tran-proc-bootdevice-mod`,
+  `low_latency_sched`)
+- 4 modul yang butuh `transsion_tranlog` (`tc_trancare`, `thd`,
+  `tran_key_bigdata`, `transsion_tranlog`)
+- 3 fitur independen (`tkv_recovery`, `tran_rhi`, `tran_expand_key`)
+
+Konsekuensinya terlihat di §11.3: modul stock yang bergantung pada mereka
+kehilangan dependensi itu di build kita, dan itu disengaja.
+
+### 11.6 Kesimpulan audit
+
+Untuk boot test, set pengganti 217 modul bersih di level loader: tidak ada
+simbol menggantung, tidak ada CRC mismatch, tidak ada tabrakan simbol. Sisa
+risiko ada di perilaku runtime, bukan di resolusi simbol — dan semuanya
+tercakup checklist §7.
