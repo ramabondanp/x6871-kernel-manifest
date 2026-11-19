@@ -1080,6 +1080,68 @@ fungsi, dan hanya 3 yang dipakai modul lain.
 
 LED bukan jalur boot, jadi ini sengaja ditunda.
 
+### 6.2m RE 6 algoritma charging: `tc30`/`hvdcp20` = `pe20` dengan prefix diganti
+
+Dugaan bahwa algoritma Transsion adalah fork dari MTK terbukti — tapi bukan
+fork dari yang diduga. Sumber resmi Transsion (`android15_kernel_modules_
+and_devicetree_mt6897.tar.gz`, 1.789.217.399 byte, sudah ada di disk) **tidak
+memuat** `tc30`/`hvdcp20` sama sekali, baik sebagai nama file maupun sebagai
+`CONFIG_MTK_TC30_SUPPORT` di Kconfig. Jadi jalurnya memang RE.
+
+#### Ekstraksi tarball sebelumnya tidak lengkap
+
+`ts61-full` hanya berisi 8.789 dari 30.054 file. Ekstraksi ulang paralel
+(`pigz -dc ... | tar -x`) menunjukkan 52 file `.c/.h` belum pernah diekstrak —
+semuanya `drivers/clk/mediatek` dan `drivers/char/rpmb`, **tidak ada satu pun
+file charger**. `drivers/power/supply` sudah lengkap 201/201. Jadi kesimpulan
+"tidak ada source" tetap sah, tapi sekarang dibuktikan dengan tree yang benar.
+
+Catatan: `tar` gzip satu inti butuh >3 menit dan sempat mati di tengah;
+`pigz` 96 inti menyelesaikan 7.106 file `.c/.h` dalam <60 detik.
+
+#### Hasil RE: ketiga modul adalah satu source
+
+Membandingkan **seluruh fungsi terkompilasi** (bukan hanya ekspor), setelah
+normalisasi prefix `pe20_`/`tc30_`/`hvdcp20_` menjadi `X`:
+
+```
+pe20 = 36 fungsi   tc30 = 34 fungsi   hvdcp20 = 34 fungsi
+
+tc30    − pe20 = { ta_dev_set_usb_ctrl_tc30 }
+pe20    − tc30 = { reset_ta, set_current_pattern, ta_dev_set_usb_ctrl_pe20 }
+
+hvdcp20 − pe20 = { ta_dev_set_usb_ctrl_hvdcp20 }
+pe20    − hvdcp20 = { reset_ta, set_current_pattern, ta_dev_set_usb_ctrl_pe20 }
+```
+
+Selisih `tc30` dan `hvdcp20` satu sama lain hanya **nama satu fungsi**
+(`ta_dev_set_usb_ctrl_{tc30,hvdcp20}`). Artinya ketiganya satu kerangka yang
+sama; `tc30`/`hvdcp20` adalah `pe20` tanpa dua fungsi `reset_ta` /
+`set_current_pattern`, diganti satu fungsi `ta_dev_set_usb_ctrl_*`.
+
+#### Perbedaan perilaku yang nyata (dari string DT)
+
+| | pe20 | tc30 | hvdcp20 |
+|---|---|---|---|
+| `recover_7v5_gap` | – | ✓ | – |
+| `recover_9v_gap` | – | – | ✓ |
+| `usb_control` | – | ✓ | ✓ |
+| `port_burn` | – | ✓ | – |
+
+Ketiganya berbagi `chr_volt`, `chr_volt_mivr`, `chr_volt_input_cur`,
+`chr_volt_chg_cur`, `ta_ichg_level_threshold`, `ta_stop_battery_soc`,
+`vbat_threshold` — persis tujuh properti yang dibaca `tc_pe20.c`.
+
+`tc30`/`hvdcp20` mengganti `charger_dev_reset_ta` /
+`charger_dev_send_ta20_current_pattern` (API MTK) dengan `usb_control`
+(API Transsion, lewat `tran_usb_ctrl`). Itu sebabnya dua fungsi `reset_ta`
+dan `set_current_pattern` hilang: mekanismenya pindah ke `ta_dev_set_usb_ctrl_*`.
+
+**Konsekuensi:** `tc_tc30_algo` dan `tc_hvdcp20_algo` bisa dibangun dari
+`tc_pe20.c` + `tc_pe20_hal.c` dengan prefix diganti dan dua fungsi dihapus,
+lalu `ta_dev_set_usb_ctrl_*` diarahkan ke `usb_control`. Tidak perlu menulis
+~2.000 baris dari nol.
+
 ### 6.3 Kesimpulan Tingkat D
 
 Jangan kerjakan Tingkat D sebelum Phase 3 selesai. Alasannya:
