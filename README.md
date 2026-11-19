@@ -49,6 +49,8 @@ Soc lain: `PLATFORM=mt6991 ./build.sh user` (default `mt6895`).
 | `add-panel-rm69220.sh` | panel X6871: init table + timing hasil ekstrak firmware |
 | `add-tran-ldo.sh` | regulator `tran_ldo` (ET5904) — sumber `TRANLDO26` untuk panel |
 | `add-tc-common-class.sh` | fondasi `tran_device` API — dipakai 19 modul firmware |
+| `add-tc-charger-stack.sh` | fondasi charger Transsion: `tc_charger_class` + `tc_adapter_class` + `tc_algorithm_class` + `tc_misc_intf` |
+| `patch-tc-misc-6.12.sh` | 8 fungsi `tc_misc_intf` tambahan 6.12, rekonstruksi dari `.ko` |
 | `audit-sources.sh` | cocokkan modul firmware -> file source **tanpa** peduli nama file |
 | `PLAN.md` | rencana port driver device lain (X6871) — Tingkat A sudah selesai |
 

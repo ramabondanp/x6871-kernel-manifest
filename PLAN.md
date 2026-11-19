@@ -511,6 +511,91 @@ Patch 6.12 (2):
 2. `class_create(THIS_MODULE, "tran_class")` -> `class_create("tran_class")`
    (6.12 membuang argumen owner).
 
+### 6.2d Fondasi charger Transsion — 4 modul, 3 IDENTIK
+
+**Catatan: Transsion hanya merilis source kernel 6.1, tidak pernah 6.12.**
+Jadi apa pun yang dipakai firmware 6.12 tapi tidak ada di source 6.1 harus
+direkonstruksi dari `.ko`, bukan ditunggu.
+
+Satu paket: `tc_charger_class` + `tc_adapter_class` + `tc_algorithm_class` +
+`tc_misc_intf` (+ `tc_common_class`, §6.2c).
+
+**Kenapa satu paket.** `tc_misc_intf` tidak standalone. Di firmware X6871 ia
+mengimpor dari ketiga modul lain:
+
+| simbol diimpor | penyedia |
+|---|---|
+| `get_charger_by_name`, `charger_dev_get_{adc,vbus,ibus}` | `tc_charger_class` |
+| `get_tadapter_by_name`, `tadapter_dev_get_property` | `tc_adapter_class` |
+| `get_tchg_alg_by_name`, `tchg_alg_get/set_prop` | `tc_algorithm_class` |
+| `mt_boot_finish` | `mtprof:bootprof` |
+
+**`tc_charger_class` menggantikan `charger_class` MTK**, bukan menambah:
+
+- firmware X6871 **tidak mengirim** `charger_class.ko`
+- `tc_charger_class.ko` **mendefinisikan** 115 simbol `charger_dev_*`
+  (bukan mengimpor) — jadi ia implementasi lengkap
+- 80 simbol bertabrakan dengan `charger_class.c` MTK di tree kita
+
+Ini ganti-fondasi: begitu `tc_charger_class` aktif, `charger_class.ko` MTK
+tidak boleh ikut, dan semua pengguna `charger_dev_*` beralih ke versi Transsion.
+
+**Hasil build + verifikasi isi terhadap firmware:**
+
+| modul | ekspor kita/fw | impor kita/fw | status |
+|---|---|---|---|
+| `tc_common_class` | 8 / 8 | 23 / 23 | **IDENTIK** |
+| `tc_adapter_class` | 22 / 22 | 19 / 19 | **IDENTIK** |
+| `tc_algorithm_class` | 17 / 17 | 19 / 19 | **IDENTIK** |
+| `tc_misc_intf` | 50 / 50 | 31 / 41 | ekspor identik, impor beda* |
+| `tc_charger_class` | 127 / 132 | 21 / 21 | kurang 5 |
+
+\* Selisih impor `tc_misc_intf` bukan bug: build DDK meng-optimize habis jalur
+sysfs/DT (dead code elimination). Terbukti modul MTK pun (`charger_class.ko`,
+`mt6375-charger.ko`, `tc_charger_framework.ko`) **tidak** mengimpor
+`sysfs_create_group` di build kita, padahal source-nya memakainya.
+Dialog `tc_misc_sysfs_init()` juga hilang total dari `.ko`. Jadi impor tidak
+bisa dipakai sebagai kriteria untuk modul yang menyentuh sysfs.
+
+**Yang tidak bisa disalin dari source 6.1:**
+
+| modul | kurangan | cara |
+|---|---|---|
+| `tc_misc_intf` | 8 ekspor (`tc_is_si_battery`, `tc_is_support_*`, `tc_get_battery_id`, `tc_is_dts_node_available`) | **direkonstruksi**, lihat di bawah |
+| `tc_charger_class` | 5 ekspor (`charger_dev_get_mivr_gap`, `charger_dev_need_hz_ctrl`, `charger_dev_pd_set_charge/hiz_flag`, `charger_dev_set_boot_volt_times`) | belum |
+
+**Bukti rekonstruksi 8 fungsi `tc_misc_intf` (bukan tebakan):**
+
+1. Pola seragam, terverifikasi per-fungsi di disassembly:
+   ```
+   info = tc_get_misc_info();   /* helper yang memang ada di 6.1 */
+   if (!info) -> error, return 0
+   if (cached) -> return cached
+   np = of_find_compatible_node(NULL, NULL, compatible)
+   cached = of_device_is_available(np)
+   ```
+2. Tabel `dtsi_check_fea_list` (5 entri di `.data`) dipulihkan **lengkap** dari
+   relokasi `R_AARCH64_ABS64`:
+   `tran,otg_fun`, `transsion, charge_transfer`, `tran,battery_manager`,
+   `tc,temp_forecast`, `transsion, adapter_control`
+3. `TRAN_PROP_BATTERY_ID` = 49 di source 6.1, dan firmware memakai
+   `mov w1, #0x32` (50) — enum identik, aman dipakai.
+4. Offset `struct misc_info` di firmware (16/24, 32/40, 48/56, 64/72) memang
+   berbeda dari source 6.1. **Tidak masalah**: struct itu internal modul ini,
+   jadi yang wajib sama adalah nama ekspor + signature + perilaku.
+
+Patch 6.12 yang diperlukan:
+
+1. `class_create(THIS_MODULE, "x")` -> `class_create("x")` (3 file)
+2. `const char *const f(...)` -> `const char *f(...)` (`-Wignored-qualifiers`)
+3. platform `.remove`: `int` -> `void`, buang `return 0;`
+4. `tc_misc_intf.h` butuh rantai header transitif penuh (`tc_charger.h`,
+   `tc_voter.h`, `tc_tcpc.h`, `tc_gauge.h`)
+5. `ko_deps`: 4 modul `tc_*` + `mtprof:bootprof`
+
+Skrip: `add-tc-charger-stack.sh` + `patch-tc-misc-6.12.sh` +
+`patches/tc_misc_intf_6_12_extra.c`, semuanya **reproduksi byte-identik**.
+
 ### 6.3 Kesimpulan Tingkat D
 
 Jangan kerjakan Tingkat D sebelum Phase 3 selesai. Alasannya:
