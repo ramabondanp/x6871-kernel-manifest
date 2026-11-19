@@ -426,13 +426,57 @@ oleh `iris_def.h`**. Yang benar-benar tipe Qualcomm cuma 26 referensi, dan
 
 #### Langkah berikutnya di Phase 3
 
-2. Port panel `rm69220` (VDO + RAMLESS + 144Hz). Basis: `panel-rm692h5-cmd.c`.
-3. Port panel `ili7838e` (CMD+DSC) — paling dekat, ada di donor 6.1 dan w1vo.
-4. Register di `panel/Makefile`, `panel/Kconfig`, `mgk_64.bzl`.
-5. DT: node `panel1@0`, GPIO/regulator sesuai `frag0.dts`.
+**Status 2026-11-19: langkah 2 SELESAI — panel rm69220 ter-build.**
 
-Belum dikerjakan: iris belum pernah dijalankan, dan firmware `iris5.fw` belum
-dipasang ke image.
+`panel-rm69220-vdo-x6871.ko` (631 KB) masuk output, total 1.408 → 1.410 `.ko`.
+Basis: `rm692j0_..._lj9.c` dari donor mt6897 — keluarga RM692xx sama,
+23 dari 27 fungsi cocok dengan `rm69220` di firmware X6871.
+
+Compatible string cocok persis dengan device:
+`rm69220,fhdp,dsi,vdo,dsc,csot,csot,144hz,x6871`
+
+**Data yang di-recover dari firmware** (tidak ada source publik — GitHub code
+search hanya menemukan `panel-raydium-rm69220.c` mainline, bukan MTK):
+
+| Data | Simbol di `.ko` | Hasil |
+|---|---|---|
+| Init table | `lcm_initialization_setting` | 63 entri, format `{u32 cmd; u8 count; u8 para[251]}` |
+| Timing 4 mode | `.rodata` + relokasi `lcm_get_modes` | lihat tabel bawah |
+| DSC params | `ext_params_144hz` | 10bpc, 128bpp, pic 1080×2436, slice 540×12, chunk 540 |
+
+Timing hasil decode (semua 1080×2436):
+
+| Mode | clock | HFP | HSA | HBP | VFP | VSA | VBP | htotal | vtotal |
+|---|---|---|---|---|---|---|---|---|---|
+| 144Hz | 403992 | 24 | 4 | 16 | 40 | 4 | 16 | 1124 | 2496 |
+| 120Hz | 368928 | 120 | 4 | 16 | 64 | 4 | 16 | 1220 | 2520 |
+| 60Hz | 368928 | 120 | 4 | 16 | 2584 | 4 | 16 | 1220 | 5040 |
+| 40Hz | 368732 | 120 | 4 | 16 | 5100 | 4 | 16 | 1220 | 7556 |
+
+Cara decode struct `drm_display_mode` di `.rodata`: cari relokasi
+`R_AARCH64_ADR_PREL_PG_HI21` ke `.rodata` di dalam `lcm_get_modes`
+(offset 0x1d0/0x248/0x2c0/0x338), lalu baca field sebagai **u16** mulai
+offset 4: hdisplay, hsync_start, hsync_end, htotal, (skip), vdisplay,
+vsync_start, vsync_end, vtotal. `clock` = u32 di offset 0.
+
+#### Patch 6.1 → 6.12 untuk panel
+
+| Masalah | Perbaikan |
+|---|---|
+| `{0x11, 0, {0x}}` — brace kosong | `{0}` |
+| `struct tran_panel_driver_params` tidak ada di `mtk_panel_ext.h` 6.12 | definisikan lokal di file panel |
+| `.tran_panel_params` designator tidak ada | dibuang |
+| `.lcm_power_set` callback dihapus di 6.12 | dibuang, fungsi ditandai `__maybe_unused` |
+| `.hbm_set_cmdq_switch` dihapus di 6.12 | dibuang, idem |
+| `struct lcm` tak punya `dsi`/`dcs_write_gce`/`handle` | init table ditulis sebagai `lcm_dcs_write_seq_static()` |
+
+#### Sisa Phase 3
+
+3. Port panel `ili7838e` (CMD+DSC) — ada di donor 6.1 **dan** w1vo 6.12.
+4. DT: node `panel1@0` + GPIO/regulator sesuai `frag0.dts`.
+5. Pasang firmware `iris5.fw` + `pxlw-rm69220_..._x6871.fw` ke image.
+
+Belum: panel belum pernah dijalankan di device.
 
 Catatan mode: `rm692j0` (donor 6.1) itu **CMD 1260x2800**, sedangkan
 `rm69220` X6871 **VDO RAMLESS 1080x2400**. Beda drive mode — jangan pakai
