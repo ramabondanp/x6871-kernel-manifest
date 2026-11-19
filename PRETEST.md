@@ -918,3 +918,19 @@ Tidak ada di DT, jadi tidak perlu di-port: `aw36515_v4l2`, `aw36515`,
 Di TWRP yang bisa diuji: touch, haptic, dan tampilan. Flash (v4l2),
 VCM `aw8601af`, dan `snd-soc-fs1599` tidak bisa diuji di TWRP karena
 butuh userspace kamera/audio; itu menunggu boot ke system.
+
+### Patch urutan match adaptive-ts
+
+`adaptive-ts` dimuat sebelum driver vendor (`gt9916_common`), sedangkan
+controller baru didaftarkan di `module_init` driver vendor. Di boot
+recovery, work `controller_match_work` bisa berjalan sebelum registrasi
+itu sehingga tidak ada controller yang match dan touch mati.
+
+Perbaikan: match diulang sampai 10 kali (200 ms) dan work juga di-queue
+dari `tpd_probe`. Gambar uji: `twrp-vendor_boot-hwports2.img`
+(md5 `71ec1f89a8266182d1711bdd329c6c49`).
+
+Catatan: `dmesg2.txt` berasal dari boot dengan **adaptive-ts stock**
+(terbukti dari string `tran_tp_get_boot_mode`/`flod_main_device_init`
+yang hanya ada di `.ko` stock), jadi log itu tidak menunjukkan perilaku
+driver kita.
