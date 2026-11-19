@@ -16,8 +16,8 @@ Ditulis 2026-11-19 untuk sesi AI berikutnya. Baca ini dulu, lalu `PLAN.md`
 | Build terakhir | sukses, 5 aksi (inkremental) |
 | Runtime | **TWRP boot normal** (lihat §Status per 2026-11-19) |
 
-Repo bersih, semua ter-push: `alps` dan `local`, branch `w1vo36-6.12-port`,
-HEAD `6334ce2b9910`. Manifest `main` mengikuti commit HANDOFF/PLAN/PRETEST
+Repo bersih, semua ter-push: `alps`, branch `w1vo36-6.12-port`,
+HEAD `93b7ebca0841`. Manifest `main` mengikuti commit HANDOFF/PLAN/PRETEST
 terakhir.
 
 ## Objective
