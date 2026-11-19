@@ -727,31 +727,42 @@ mencoba `tc_tcpc`, build gagal karena `tcpm_tran_inquire_remote_cc` tidak ada.
 Ternyata fungsi itu memanggil `tcpc->ops->tran_get_cc_status`, dan field itu
 **tidak ada** di `tcpc_ops` versi kita.
 
-Perbandingan `struct tcpc_ops`:
+Perbandingan `struct tcpc_ops` — **diukur dari `.data` `tcpc_mt6375.ko`
+firmware**, bukan dari header. Slot ditemukan lewat relokasi
+`R_AARCH64_ABS64` ke `.text`; `base` dikalibrasi dari `mt6375_tcpc_init`
+(selalu field 0).
 
-| | jumlah |
+| | jumlah field |
 |---|---|
-| Transsion 6.1 (`tcpci_core.h`) | 32 field |
-| tree kita 6.12 | 32 field |
+| firmware | **37** |
+| kita (dan Transsion 6.1) | 32 |
 
-Jumlahnya kebetulan sama, isinya tidak:
+Firmware menyisipkan **4 field** dan membuang 1:
 
-| idx | Transsion 6.1 | kita 6.12 |
+| idx | firmware | kita |
 |---|---|---|
 | 16 | `get_vbus_voltage` | `get_vbus_voltage` |
 | **17** | **`tran_get_cc_status`** | `set_water_protection` |
-| 18 | `set_water_protection` | `set_cc_hidet` |
-| … | … | … (bergeser) |
-| 23 | `set_force_discharge` | `reset_ctd` |
-| 24 | `set_command` | `set_command` |
+| 18–20 | **3 field tak dikenal** (NULL di `tcpc_mt6375`) | `set_cc_hidet`, `get_cc_hi`, `set_vbus_short_cc` |
+| 21 | `set_water_protection` | `set_low_power_mode` |
+| 22 | `set_cc_hidet` | `set_force_discharge` |
+| 23 | `get_cc_hi` | `reset_ctd` |
+| 24 | `set_vbus_short_cc` | `set_command` |
+| 25 | `set_low_power_mode` | `set_msg_header` |
+| 26 | `set_force_discharge` | `set_rx_enable` |
+| 27 | `reset_ctd` | `get_message` |
+| 28–29 | **2 field tak dikenal** (NULL) | `protocol_reset`, `transmit` |
+| 30 | `set_msg_header` | `set_bist_test_mode` |
+| … | … | … |
 
-Transsion menyisipkan `tran_get_cc_status` di slot 17 dan **membuang**
-`reset_ctd`. Akibatnya 7 field setelahnya bergeser satu slot — persis pola
-yang membuat charger salah panggil di §6.2e.
+Jadi `tcpc_ops` firmware = 32 field 6.1 + 5 sisipan (3 di idx 18–20, 2 di
+idx 28–29) + `tran_get_cc_status` di idx 17 = **37**. Catatan awal saya
+("cuma beda 1 field") **salah** — angka itu datang dari membandingkan dua
+header, bukan dari mengukur `.ko`. Ini persis kesalahan yang §6.2e peringatkan.
 
 **Yang mengisi `tcpc_ops` adalah `tcpc_mt6375.ko`**, bukan `tcpc_class.ko`.
-Jadi modul itu juga harus dibangun dengan header yang sama; kalau tidak,
-`tcpm_tran_inquire_remote_cc()` akan membaca slot yang salah.
+Karena itu modul itu juga harus dibangun dengan header yang sama; kalau tidak,
+`tcpm_tran_inquire_remote_cc()` membaca slot yang salah.
 
 Modul firmware yang memakai `tcpm_*`:
 
@@ -764,13 +775,20 @@ Modul firmware yang memakai `tcpm_*`:
 | `tc_water_detect` | 1 |
 
 **Belum dikerjakan.** Perlu:
-1. tambah `tran_get_cc_status` ke `tcpc_ops`, buang `reset_ctd`
-2. port `tcpm_tran_inquire_remote_cc()` ke `tcpm.c`
-3. pastikan `tcpc_mt6375.ko` (yang mengisi tabel) ikut dibangun dengan header baru
-4. verifikasi slot `tcpc_ops` di `tcpc_mt6375.ko` vs firmware
+1. tambah 5 field baru ke `tcpc_ops` (3 di idx 18, 2 di idx 28) + `tran_get_cc_status` di idx 17
+2. identifikasi nama/signature 5 field tak dikenal itu dari `.ko` lain
+3. port `tcpm_tran_inquire_remote_cc()` ke `tcpm.c`
+4. pastikan `tcpc_mt6375.ko` ikut dibangun dengan header baru
+5. verifikasi slot `tcpc_ops` di `tcpc_mt6375.ko` vs firmware (harus 0 beda)
 
 Sampai itu selesai, `tc_tcpc`, `tc_port_corrosion_prevention`, `tc_pd_adapter`
 dan `tc_water_detect` tidak bisa dipasang.
+
+**Catatan metode.** `tcpc_ops` ada di `.data`, bukan `.rodata`, karena tabel
+itu `static struct` (bukan `const`). Skrip `ops-offsets.sh` yang saya pakai
+untuk `charger_ops` hanya membaca `.rela.rodata`; untuk `tcpc_ops` harus
+`.rela.data`. Alamat prosedur di `.text` untuk modul ini juga di section 14,
+bukan 16.
 
 ### 6.2f Port `tc_*` tambahan (lanjutan 6.2d)
 
