@@ -182,17 +182,39 @@ atau modul yang memang tidak dipakai build ini.
 | `tran_fp` | donor 6.1 | CMD, perlu TEE |
 | `aw8601af` `pca_tfcp_ta` `tran_ldo` `tran-led-core` `rm69220...` | **tidak ada** | Phase 3 / cari donor |
 
-### 5.2 Yang bisa dikerjakan tanpa ganti fondasi
+### 5.2 Yang bisa dikerjakan tanpa ganti fondasi — hasil
 
-Modul yang **mandiri** (tidak menyentuh `charger_class`), jadi aman ditambah:
+Langkah 1 dikerjakan 2026-11-19. Dari 4 kandidat, **3 berhasil, 1 ditolak**.
 
-| Modul | Baris | Konflik simbol | Status port |
+| Modul | Baris | Hasil | Catatan |
 |---|---|---|---|
-| `tran_audio_control` | 628 | 0 (5 simbol `tran_audio_*`) | bersih, 6.12-compatible |
-| `splitswitch-gpio` | 353 | 0 (1 simbol) | bersih |
-| `leds-aw22xxx` | 1818 | 0 | bersih |
-| `hiber` | 967 | 0 | 1× `strlcpy` |
-| `aw36515` | 1101 | 0 | **gagal** — lihat 5.3 |
+| `tran_audio_control` | 716 | ✅ **ter-build** | 1 patch: `.remove` → `void` |
+| `splitswitch-gpio` | 353 | ✅ **ter-build** | 1 patch: `.remove` → `void`; 4 include dibuang |
+| `hiber` | 967 | ✅ **ter-build** | 3 patch: `strlcpy`→`strscpy`, 2 signature tracepoint binder |
+| `leds-aw22xxx` | 1818 | ❌ **ditolak** | butuh framework `tc_led_class` (lihat bawah) |
+
+**Kenapa `leds-aw22xxx` ditolak:** `leds-aw22xxx.c` meng-include
+`tc_led_class.h` dan memakai `tc_led_device_register()`, `tc_led_ops`,
+`tc_led_class`. Itu bagian dari framework LED Transsion
+(`drivers/power/supply/transsion/leds/tc_led.c`), bukan modul mandiri.
+Menambahkannya berarti menyeret fondasi charging/LED Transsion — persis yang
+kita tunda di §5.0. File sudah dikembalikan, tidak ditinggal di tree.
+
+**Patch yang ternyata diperlukan (6.1 → 6.12):**
+
+| Pola | Jumlah | Contoh |
+|---|---|---|
+| `platform_driver.remove` kembali `void` (bukan `int`) | 2 | `splitswitch-gpio.c`, `tran_audio_control.c` |
+| `strlcpy` dihapus → `strscpy` | 1 | `tran_hiber.c` |
+| signature tracepoint vendor hook berubah | 2 | `android_vh_binder_preset` (+`binder_proc *`), `android_vh_binder_alloc_new_buf_locked` (+`bool *should_fail`) |
+
+Catatan `hiber`: ia mengait ke **binder internal** lewat vendor hook. Butuh
+`CONFIG_ANDROID_VENDOR_HOOKS=y` — sudah aktif di build kita, jadi aman.
+
+**Pelajaran untuk modul berikutnya:** sebelum port, cek apakah file
+meng-include header `tc_*` atau memakai `tc_*_register()`. Kalau iya, modul itu
+**bukan** mandiri — tolak dan tunda sampai fondasi Transsion dipasang.
+
 
 Stack audio Transsion (`aw87xxx`, `fs1599`, `oca72xxx`, `elliptic`) sekitar
 70.000 baris, mandiri, tapi butuh `BUILD.bazel` DDK baru untuk tiap codec.
