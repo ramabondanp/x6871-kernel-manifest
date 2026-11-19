@@ -47,8 +47,12 @@ Yang dilakukan skrip, berurutan:
 1. `unpack_bootimg` image stock; parameter header dibaca dari image itu
    sendiri (bukan hardcode).
 2. `vendor_ramdisk00` didekompresi (lz4 legacy) lalu di-`cpio` keluar.
-3. `lib/modules/*.ko` diganti dengan modul build kita (flatten; basename
-   ganda diselesaikan dengan memilih salinan `extra/` = versi device).
+3. `lib/modules/*.ko` diganti dengan modul build kita. Hanya modul yang
+   memang dikirim stock yang dimasukkan (217 dari ~795 `.ko` di staging),
+   basename ganda diselesaikan dengan memilih salinan `extra/` = versi
+   device. Tiap `.ko` di-`strip --strip-debug` supaya ukurannya setara stock
+   (staging menyimpan debug info; tanpa strip ramdisk jadi ~94 MB dan tidak
+   muat di partisi 64 MB).
 4. `modules.dep`, `modules.alias`, `modules.softdep` diregenerasi dari
    `modinfo` tiap `.ko`, formatnya disamakan dengan stock
    (`/lib/modules/x.ko: ...`).
@@ -119,6 +123,11 @@ Ambil `dmesg` penuh setelah boot, lalu periksa:
 - **`mtk-socinfo.ko` ter-build dua kali**; `depmod` memilih salinan GKI.
   Bukan penghalang boot, tapi sebaiknya salah satu dikecualikan saat
   packaging.
+- **Staging berisi ~795 `.ko`, perangkat hanya butuh 217.** Sisanya modul
+  platform lain (mt6858/mt6991/mt6993, varian panel, dsb). Skrip repack
+  memfilter ke daftar modul yang benar-benar dikirim stock; tanpa filter itu
+  ramdisk membengkak jadi 430 MB dan tidak muat di partisi 64 MB.
+  Pakai `--all-modules` hanya kalau memang ingin membawa semuanya.
 - **dtb/dtbo stock** dipakai apa adanya. Kalau ada driver yang mengeluh
   properti DT tidak dikenal, itu konsekuensi langsung dari poin ini.
 - **API hardware baru** di tiga modul: `clk-common`, `tran_ldo`,
@@ -134,3 +143,20 @@ Ambil `dmesg` penuh setelah boot, lalu periksa:
 4. Layar mati tapi sistem hidup → panel/dtb; cek `dmesg | grep -i dsi`.
 5. Ambil `pstore`/`ramoops` (`/sys/fs/pstore`) atau UART untuk panic.
 6. Rollback dengan image stock sebelum mencoba varian berikutnya.
+
+## 7. Artefak yang sudah dibuat
+
+```
+/serverhive1/ramabondanp/tmp/x6871/vendor_boot-new.img
+  ukuran : 67108864 (sama dengan partisi stock)
+  md5    : 9c83483806f8cbbe62b2cbfa9236e34a
+  modul  : 217 (set pengganti stock, sudah di-strip)
+  dtb / bootconfig / vendor_ramdisk01 : identik dengan stock
+  modules.load           : 163 entri, 0 menggantung
+  modules.load.recovery  : 213 entri, 0 menggantung
+  modules.dep            : 0 referensi menggantung
+  vermagic semua modul   : 6.12.38-android16-5-g2c4fd33ae6d8-4k
+```
+
+Uji round-trip (repack tanpa mengganti modul) menghasilkan isi ramdisk dan
+header yang **identik** dengan stock, jadi yang berubah hanya `lib/modules`.

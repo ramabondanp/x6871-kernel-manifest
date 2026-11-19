@@ -24,6 +24,7 @@ STAGING=""
 OUT=""
 WORK=""
 DRYRUN=0
+ALLMODS=0
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 info() { echo "[pack] $*"; }
@@ -35,6 +36,7 @@ while [ $# -gt 0 ]; do
         --out) OUT="$2"; shift 2 ;;
         --work) WORK="$2"; shift 2 ;;
         --dry-run) DRYRUN=1; shift ;;
+        --all-modules) ALLMODS=1; shift ;;
         -h|--help) sed -n '2,20p' "$0"; exit 0 ;;
         *) die "argumen tidak dikenal: $1" ;;
     esac
@@ -48,7 +50,9 @@ done
 
 MKBOOTIMG=${MKBOOTIMG:-/serverhive1/ramabondanp/w1vo/tools/mkbootimg/mkbootimg.py}
 UNPACK=${UNPACK_BOOTIMG:-$(command -v unpack_bootimg || echo /serverhive1/ramabondanp/w1vo/tools/mkbootimg/unpack_bootimg.py)}
+STRIP=${STRIP:-$(command -v llvm-strip || command -v aarch64-linux-gnu-strip || true)}
 for t in lz4 cpio find sort; do command -v "$t" >/dev/null || die "$t tidak ada"; done
+[ -n "$STRIP" ] || die "strip tidak ada (llvm-strip/aarch64-linux-gnu-strip)"
 [ -f "$MKBOOTIMG" ] || die "mkbootimg tidak ada: $MKBOOTIMG"
 [ -f "$UNPACK" ] || die "unpack_bootimg tidak ada: $UNPACK"
 
@@ -85,6 +89,7 @@ lz4 -d -c "$WORK/vb/vendor_ramdisk00" | (cd "$WORK/root" && cpio -idm --quiet)
 
 MODDIR="$WORK/root/lib/modules"
 STOCK_COUNT=$(ls "$MODDIR"/*.ko 2>/dev/null | wc -l)
+(cd "$MODDIR" && ls *.ko 2>/dev/null) > "$WORK/stock-modules.txt"
 info "modul stock di ramdisk: $STOCK_COUNT"
 
 if [ "$DRYRUN" = "1" ]; then
@@ -106,8 +111,26 @@ else
             cp "$f" "$dst"
         fi
     done
+    if [ "$ALLMODS" = "0" ]; then
+        # Hanya modul yang memang dikirim stock: staging berisi ~795 .ko
+        # termasuk modul platform lain yang tidak dipakai X6871.
+        dropped=0
+        for f in "$WORK/newmods"/*.ko; do
+            b=$(basename "$f")
+            if ! grep -qxF "$b" "$WORK/stock-modules.txt"; then
+                rm -f "$f"; dropped=$((dropped+1))
+            fi
+        done
+        info "modul di luar set stock dibuang: $dropped"
+    fi
+    # Staging menyimpan .ko dengan debug info; stock tidak.  Tanpa strip,
+    # ramdisk jadi ~94 MB dan tidak muat di partisi 64 MB.
+    info "strip --strip-debug (samakan dengan stock)"
+    for f in "$WORK/newmods"/*.ko; do
+        "$STRIP" --strip-debug "$f" 2>/dev/null || die "gagal strip $f"
+    done
     NEW_COUNT=$(ls "$WORK/newmods"/*.ko | wc -l)
-    info "modul baru: $NEW_COUNT"
+    info "modul baru: $NEW_COUNT ($(du -cb "$WORK/newmods"/*.ko | tail -1 | cut -f1) byte)"
     [ "$NEW_COUNT" -gt 0 ] || die "tidak ada .ko di staging"
 
     info "ganti lib/modules/*.ko"
