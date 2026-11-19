@@ -227,3 +227,44 @@ seluruh set modul stock, jadi pesan `disagrees about version of symbol ...
 jangan dikejar. Yang menentukan hanya apakah simbolnya ada. Karena itu
 satu-satunya penyebab kegagalan di log pertama adalah `modules.dep` yang
 kehilangan dependensi, bukan beda versi kernel.
+
+## 9. Repack dengan cfig/Android_boot_image_editor
+
+Selain `tools/pack-vendor-boot.sh`, image bisa direpack dengan
+[`cfig/Android_boot_image_editor`](https://github.com/cfig/Android_boot_image_editor)
+(commit `f692aff`) — dipakai untuk uji boot ketiga karena lebih ketat soal
+format ramdisk.
+
+```bash
+cd /serverhive1/ramabondanp/tmp
+git clone --depth 1 https://github.com/cfig/Android_boot_image_editor.git vbwork
+cd vbwork
+cp /path/stock/vendor_boot.img .          # nama harus vendor_boot.img
+./gradlew unpack                          # -> build/unzip_boot/
+
+# ganti modul: root.1 = fragment PLATFORM (tempat lib/modules), root.2 = RECOVERY
+M=build/unzip_boot/root.1/lib/modules
+rm -f $M/*.ko
+cp <staging-217>/*.ko $M/
+cp <staging-217>/modules.{dep,alias,softdep,load,load.recovery} $M/
+
+./gradlew pack                            # menimpa ./vendor_boot.img
+```
+
+Hasil pack sudah dipad sampai ukuran partisi (67.108.864 byte). Yang perlu
+diperiksa setelahnya:
+
+```bash
+unpack_bootimg.py --boot_img vendor_boot.img --out chk
+md5sum chk/dtb chk/bootconfig chk/vendor_ramdisk01     # harus sama dengan stock
+lz4 -d -c chk/vendor_ramdisk00 | cpio -it | wc -l      # 720 entri
+lz4 -d -c chk/vendor_ramdisk00 | cpio -it | grep -c '\.ko$'   # 217
+```
+
+Catatan dari uji ketiga (`pstore3.txt`): kernel berhenti di **0.41 detik**,
+sebelum init, dengan `rootfs image is not initramfs (broken padding)` lalu
+`RAMDISK: incomplete write (-28 != 8388608)` dan panic `VFS: Unable to mount
+root fs`. Artinya initrd ditolak sebagai initramfs sehingga **tidak ada satu
+modul pun yang dimuat** — kegagalan packaging, bukan driver. Repack dengan
+tool ini menghasilkan arsip newc yang sah (diawali entri `adb_keys` seperti
+stock, `TRAILER!!!` + padding nol, magic lz4 legacy `02 21 4c 18`).
