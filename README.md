@@ -36,6 +36,39 @@ Hasil: `1.401 .ko` di
 
 Soc lain: `PLATFORM=mt6991 ./build.sh user` (default `mt6895`).
 
+### Branch port (sudah termasuk semua driver X6871)
+
+`mtk-base-latest` di langkah 3 hanya MTK murni. Semua pekerjaan port
+(Iris, panel rm69220, `tran_ldo`, fondasi charger Transsion) ada di branch
+terpisah, ter-push ke remote `local`:
+
+```bash
+cd kernel_device_modules-6.12
+git fetch local w1vo36-6.12-port
+git checkout -B w1vo36-6.12-port FETCH_HEAD
+
+cd ..
+~/w1vo36-kernel-manifest/setup.sh
+~/w1vo36-kernel-manifest/build.sh user   # 1.422 .ko
+```
+
+Branch itu 6 commit di atas `06079c2` (baseline w1vo36.88-36-7), satu commit
+per fitur:
+
+| commit | isi |
+|---|---|
+| `33d0005` | `tran_audio_control`, `splitswitch-gpio`, `hiber` |
+| `2b880e6` | Iris (34 file, Pixelworks) |
+| `cfb098c` | `tran_ldo` (ET5904) |
+| `381f45e` | panel rm69220 X6871 |
+| `fdc1174` | `tc_common_class` (fondasi `tran_device`) |
+| `618a8c5` | `tc_charger_class`/`adapter`/`algorithm`/`misc_intf` |
+
+Catatan: remote `local` menolak push ke `mtk-base-latest` karena branch itu
+sedang checked-out di working tree-nya (`receive.denyCurrentBranch`), jadi
+hasil port di-push ke branch `w1vo36-6.12-port`.
+
+
 ## File
 
 | File | Isi |
