@@ -801,3 +801,55 @@ tujuh modul USB di atas diganti versi stock, sisanya tetap modul kita. Kalau
 adb hidup dengan image ini, bug ada di salah satu dari tujuh modul itu dan
 biseksi bisa mulai dari `tc_chg_type_det` (DCP + loop 1 detik) lalu
 `tran_extcon_usb` (role switch), baru `mtu3`/`phy-mtk-xsphy`.
+
+## 18. USB mati karena `CONFIG_TC_CHARGER` tidak aktif
+
+Biseksi pada image TWRP: seluruh 40 modul charger/typec dikembalikan ke stock
+→ USB hidup. Lalu hanya 7 modul IC/PMIC (`mt6375-charger`, `mt6375-battery`,
+`mtk_battery_manager`, `pca_tfcp_ta`, `pmic_lbat_service`,
+`pmic_lvsys_notify`, `rt_pd_manager`) dikembalikan ke stock → USB tetap hidup.
+Jadi biangnya di salah satu 7 itu.
+
+Diff per fungsi `mt6375-charger.ko` build vs stock: hanya 3 fungsi beda, dan
+yang menentukan identitas konfigurasi:
+
+| fungsi | build | stock |
+|---|---|---|
+| `mt6375_fl_bc12_dn_handler` | 224 | **148** |
+| `mt6375_chg_get_property` | 1756 | 1732 |
+| `mt6375_get_vbus_gd_stat` | — | 192 |
+
+Sumbernya punya dua implementasi:
+
+```c
+#if IS_ENABLED(CONFIG_TC_CHARGER)
+	... ddata->tc_bc12_dn = true;        /* 148 byte, dipakai stock */
+#else
+	... atomic_read(&ddata->attach[0]);  /* 224 byte, dipakai build kita */
+#endif
+```
+
+`drivers/power/supply/BUILD.bazel` untuk `mt6375-charger` hanya memberi
+`-DCONFIG_TC_CLASS_SUPPORT=1`; `CONFIG_TC_CHARGER` tidak pernah didefinisikan.
+
+Rantai ke USB: handler BC1.2 versi legacy tidak melaporkan D− seperti stock →
+`tc_detect_do_bc12` menyimpulkan **DCP** → `do_bc12_pre_work` mengulang tiap
+1 detik (`check CDP block`) dan memanggil `tcd_set_usbsw()` yang men-set U2
+PHY ke mode BC1.2 → D+ pullup tidak pernah menetap → tidak ada enumerasi,
+walau `gadget (high-speed) pullup D+` sudah dicetak.
+
+Perbaikan: `-DCONFIG_TC_CHARGER=1` untuk target `mt6375-charger` dan
+`tc_hl7139a` (modul terakhir juga memakai makro itu; sebelumnya 16 fungsi
+beda dari stock). Setelah rebuild, `mt6375_fl_bc12_dn_handler` = 148 byte,
+sama dengan stock.
+
+Sisa drift yang diketahui pada modul ini: `mt6375_get_vbus_gd_stat` (192 byte)
+ada di stock tapi tidak ada di sumber cabang ini.
+
+### Pola yang berulang
+
+Ini kasus ketiga setelah `CONFIG_TC_CLASS_SUPPORT` (§14) dan indeks power
+domain (§13). Semuanya lolos dari audit ELF/CRC karena modulnya tetap bisa
+dimuat — yang hilang adalah **perilaku**. Deteksi paling andal: bandingkan
+ukuran/daftar fungsi `.ko` kita dengan stock per modul; fungsi yang hilang
+atau berukuran jauh berbeda menunjuk langsung ke `#if` yang salah cabang.
