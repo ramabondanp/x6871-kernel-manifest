@@ -720,6 +720,42 @@ Patch 6.12 yang diperlukan:
 Skrip: `add-tc-charger-stack.sh` + `patch-tc-misc-6.12.sh` +
 `patches/tc_misc_intf_6_12_extra.c`, semuanya **reproduksi byte-identik**.
 
+### 6.2f Port `tc_*` tambahan (lanjutan 6.2d)
+
+Setelah fondasi charger masuk, 20 dari 61 modul yang masih hilang ternyata
+punya source di donor 6.1. Dua yang pertama sudah selesai:
+
+| modul | ekspor | impor | status |
+|---|---|---|---|
+| `tc_ta_class` | 35 = 35 | 9 = 9 | **IDENTIK** |
+| `tc_hl7139a` | 2 GLOBAL = 2 | beda karena config | **BENAR** |
+
+`tc_ta_class` — kelas device untuk travel adapter, nol dependensi `tc_*`.
+Patch 6.12: `class_create(THIS_MODULE, ...)`.
+
+`tc_hl7139a` — driver Richtek HL7139A, **hardware nyata** di X6871:
+DT punya `hl7139_master@55` (primary_dvchg) dan `hl7139_slave_change@55`
+(secondary_dvchg). Ekspor GLOBAL identik (2 == 2).
+
+Selisih impor di `tc_hl7139a` bukan bug, dan ini **pelajaran baru**:
+
+- `get_charger_by_name` dan `msleep` ada di firmware, tidak di kita → keduanya
+  di dalam `#if IS_ENABLED(CONFIG_TC_WIRELESS_CHARGER)`. DT X6871 **tidak
+  punya node `wireless_manager`**, jadi jalur itu memang harus mati.
+- kita mengimpor `tc_get_alias_type`, firmware tidak → jalur non-wireless
+  memakainya, dan compiler firmware meng-inline-nya.
+- 3 simbol `LOCAL` di firmware (`hl7139a_set_notify`, `hl7139a_parse_dt_bool`,
+  `hl7139a_parse_dt_u32`) tidak diekspor; di build kita mereka ter-inline.
+  **Jangan bandingkan `LOCAL FUNC`** — yang menentukan adalah `GLOBAL`.
+
+Aturan tambahan untuk §6.1b: saat membandingkan simbol, filter dulu ke
+`GLOBAL` (yang benar-benar diekspor). `LOCAL` adalah keputusan inlining
+compiler dan tidak memengaruhi kompatibilitas antar-modul.
+
+Patch 6.12 `tc_hl7139a`: `i2c probe()` kehilangan argumen `i2c_device_id`;
+include `tc_misc_intf.h` dikeluarkan dari guard `CONFIG_TC_CHARGER` (Kconfig
+itu tidak ada di tree ini, sehingga `tc_get_alias_type` hilang).
+
 ### 6.3 Kesimpulan Tingkat D
 
 Jangan kerjakan Tingkat D sebelum Phase 3 selesai. Alasannya:
