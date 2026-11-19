@@ -293,10 +293,6 @@ satu terhadap donor mt6897, donor OPPO 6.12, dan tree w1vo:
 
 **Ringkasan: 6 ada (3 sudah dipasang, 3 butuh fondasi `tc_*`), 19 tidak ada.**
 
-Pencarian dilakukan lewat nama modul (`obj-*` dan `name-objs`, bukan nama
-direktori) **dan** lewat simbol khas isi file (`TRANLDO`, `tran_zram`,
-`tran_scsi`, dst) — nol hasil untuk 19 modul itu. Jadi bukan soal nama beda.
-
 Pola penting: `tran_*` yang tidak ada bukan modul tambahan, tapi **fork dari
 subsistem kernel**. Kalau dipasang, ia **mengganti** modul aslinya
 (`tran_zram` ↔ `zram`, `tran-ufshcd-core` ↔ `ufshcd-core`), sama seperti
@@ -369,6 +365,151 @@ Kalau `dvdd` gagal, driver retry tiap 7 detik **selamanya**. Dengan
 `tran_ldo` ada, retry itu seharusnya tidak terjadi lagi.
 
 
+
+### 6.1b Aturan umum hasil kasus `tran_ldo` — dan audit ulang semua modul
+
+Kasus `tran_ldo` mengajarkan satu hal yang berlaku untuk **semua** modul:
+
+> Nama modul firmware dan nama file source tidak harus sama.
+> `tran_ldo.ko` (compatible `tran,tran_ldo`) berasal dari `drivers/regulator/et5904.c`
+> (compatible `tran,et5904`).
+
+Jadi **jangan cari berdasarkan nama modul**. Cari berdasarkan sidik jari isi
+`.ko`: simbol fungsi yang didefinisikan, lalu cari file source mana pun yang
+mendefinisikan simbol-simbol itu. Alatnya sekarang ada di repo:
+
+```
+./audit-sources.sh <tree-source> <dir-modul-firmware> [modul...]
+```
+
+Skrip itu membaca semua `.ko`, mengindeks semua definisi fungsi di `.c/.h`,
+dan mencetak file sumber terbaik per modul beserta skor `%`.
+
+**Hasil audit ulang (2026-11-19), sumber = tree Transsion 6.1 lengkap
+(7.106 file `.c/.h`, 2 GB, `android15-split`):**
+
+Dari 91 modul gap: **47 ada source**, 13 benar-benar tidak ada, 31 tidak ada
+`.ko` di firmware (jadi bukan gap).
+
+Kelompok `tc_*` — fondasi charger Transsion:
+
+| Modul | Skor | File sumber |
+|---|---|---|
+| `tc_common_class` | 100% | `drivers/power/supply/transsion/tc_common_class.c` |
+| `tc_adapter_class` | 100% | `.../tc_adapter_class.c` |
+| `tc_ta_class` | 100% | `.../tc_ta_class.c` |
+| `tc_audio`, `tc_auto_test`, `tc_hl7139a`, `tc_lcd_notify`, `tc_phy_insert_det`, `tc_pid_chg_algo`, `tc_pmic`, `tc_port_corrosion_prevention`, `tc_tcpc`, `tc_temp_forecast` | 100% | `.../tc_*.c` |
+| `tran_charge_transfer` | 100% | `.../tran_charge_transfer.c` |
+| `tran_usb_ctrl` | 100% | `.../tran_usb_ctrl.c` |
+| `tc_gauge` | 96% | `.../tc_gauge.c` |
+| `tc_charger_class` | 96% | `.../tc_charger_class.c` (menimpa `charger_class`) |
+| `tc_chg_type_det` | 95% | `.../tc_chg_type_det.c` |
+| `tc_algorithm_class` | 95% | `.../tc_algorithm_class.c` |
+| `tc_otg_ctrl` | 92% | `.../tc_otg_ctrl.c` |
+| `tc_pd_adapter` | 88% | `.../tc_pd_adapter.c` |
+| `tc_ambient_temp_det` | 87% | `.../tc_ambient_temp_det.c` |
+| `tc_misc_intf` | 86% | `.../tc_misc_intf.c` |
+| `tc_water_detect` | 86% | `.../tc_water_detect.c` |
+| `leds-aw22xxx` | 76% | `.../leds/leds-aw22xxx/leds-aw22xxx.c` |
+| `nfc_i2c` | 44% | `drivers/nfc/pn560/common.c` |
+
+`tran_ldo` sendiri hanya 50% menurut skrip ini (modul kecil, 4 fungsi), tapi
+terbukti benar — jadi skor rendah untuk modul kecil bukan berarti salah.
+
+**Yang benar-benar tidak ada source di tree 6.1 (13):**
+`pca_tfcp_ta`, `sd_tray`, `tc_hvdcp20_algo`, `tc_tc30_algo`, `tc_tfcp_ta`,
+`tc_trancare`, `tkv`, `tkv_recovery`, `tran-proc-bootdevice-mod`,
+`tran-ufshcd-pltfrm`, `tran_expand_key`, `tran_key_bigdata`, `tran_rhi`.
+
+Catatan: `tran-ufshcd-pltfrm` hanya 5 fungsi dan `tran-ufshcd-core` 22% —
+keduanya fork UFS, jadi tetap masuk kelompok ganti-fondasi.
+
+`tran_fp` (14%) dan `tran-led-core` (10%) ternyata **modul gabungan**: satu
+`.ko` berisi banyak vendor. `tran_fp.ko` memuat kode focaltech + goodix +
+cdfinger + egis + silead + sunwave + fpsensor + chipone sekaligus (164 fungsi).
+Source 6.1 hanya menyediakan inti `tran_fp_*` (39 fungsi). Untuk
+`tran-led-core`, file `tc_led_class.c` hanya menyediakan 4 dari 42 fungsi dan
+tidak ada string `[tlc]` di tree 6.1 — modul ini memang tidak ada.
+
+### 6.1c Koreksi penting: "nama sama" tidak berarti "sudah match"
+
+Cara lama menghitung cakupan (`nama modul ada di output build`) **menyesatkan**.
+Setelah semua `.ko` dibangun, 172 dari 237 nama modul firmware ada di output.
+Tapi setelah membandingkan **simbol yang diimpor** tiap `.ko`, hasilnya:
+
+| | jumlah |
+|---|---|
+| nama sama, isi & impor **sama** | **120** |
+| nama sama, isi **BEDA** | **52** |
+| hanya di firmware | 65 |
+| hanya di kita (modul lain, bukan target) | 483 |
+
+**Cakupan nyata = 120/237 = 51%**, bukan 73% seperti hitungan berbasis nama.
+
+Contoh yang paling merugikan — nama sama, tapi yang kita build versi MTK murni
+sementara firmware versi Transsion:
+
+| Modul | Simbol yang hanya diminta firmware |
+|---|---|
+| `mtk_battery_manager.ko` | `tc_is_si_battery`, `tc_is_support_charge_transfer`, `tran_device_register`, `tran_get_by_name` |
+| `mt6375-battery.ko` | `tc_get_monkey_flag`, `tc_is_support_temp_forecast`, `tran_dev_get_prop` |
+| `tcpc_class.ko` | `tc_get_uisoc`, `tran_get_by_name`, `tran_dev_get_prop` |
+| `rt6160-regulator.ko` | `tran_device_register` |
+| `ufs-mediatek-mod.ko` | `tran_scsi_alloc_request`, `tran_scsi_execute_cmd`, `tran_ufshcd_link_recovery`, `tran_ufs_proc_bootdevice_work` |
+| `monitor_hang.ko`, `aee_hangdet.ko` | `tran_expinfo` |
+| `cache-parity.ko`, `device-apc-common.ko`, `emi-mpu.ko` | `tran_record_devmsg_api` |
+| `mediatek_drm_v1.ko` | `tranlog_local` |
+
+Jadi `mtk_battery_manager.ko` yang kita build **bukan** yang dijalankan
+firmware. Ini persis pola `tran_ldo`: nama tidak menceritakan isinya.
+
+### 6.2c `tc_common_class` — SELESAI, fondasi 19 modul
+
+Nama modul `tc_common_class`, nama file `tc_common_class.c`, tapi maknanya
+bukan "charger class biasa": ia yang menyediakan `tran_device_register` /
+`tran_get_by_name`, dan **19 modul firmware bergantung padanya**:
+
+```
+mt6375-battery, mtk_battery_manager, rt6160-regulator, tc_ambient_temp_det,
+tc_audio, tc_charger_framework, tc_gauge, tc_lcd_notify, tc_misc_intf,
+tc_otg_ctrl, tc_phy_insert_det, tc_pid_chg_algo, tc_pmic, tc_tcpc,
+tc_temp_forecast, tc_trancare, tc_water_detect, tran_charge_transfer,
+tran_usb_ctrl
+```
+
+Sifatnya **aditif**: tree w1vo belum punya `struct tran_device` sama sekali,
+jadi tidak ada simbol bertabrakan (beda dengan `tc_charger_class` yang
+menimpa `charger_class`, 80 simbol kolisi).
+
+Sumber: `drivers/power/supply/transsion/tc_common_class.{c,h}`, 273 + 389 baris,
+hanya memakai header kernel standar (`linux/device.h`, `linux/kernel.h`,
+`linux/mutex.h`, `linux/slab.h`, `linux/string.h`).
+
+**Hasil build:** `tc_common_class.ko` masuk output, 1.412 → 1.414.
+
+Perbandingan `.ko` kita vs firmware — **nol selisih**:
+
+| | kita | firmware |
+|---|---|---|
+| exports | 8 | 8 |
+| imports | 23 | 23 |
+| selisih ekspor | — | — |
+| selisih impor | — | — |
+| description | Switching Charger Class Device | sama |
+| license | GPL v2 | sama |
+
+Ekspor: `tran_device_register`, `tran_device_unregister`,
+`register_tran_device_notifier`, `unregister_tran_device_notifier`,
+`tran_dev_notify`, `tran_get_by_name`, `tran_dev_set_prop`, `tran_dev_get_prop`.
+
+Patch 6.12 (2):
+1. `tc_common_class.h` memakai `#if IS_ENABLED(CONFIG_TC_CLASS_SUPPORT)`.
+   Config itu tidak ada di tree kita -> header jatuh ke `static inline`
+   fallback dan bertabrakan dengan definisi di `.c` (`redefinition of
+   'tran_dev_set_prop'` dkk). Diaktifkan lewat `copts =
+   ["-DCONFIG_TC_CLASS_SUPPORT=1"]`.
+2. `class_create(THIS_MODULE, "tran_class")` -> `class_create("tran_class")`
+   (6.12 membuang argumen owner).
 
 ### 6.3 Kesimpulan Tingkat D
 
