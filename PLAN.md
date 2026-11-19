@@ -869,35 +869,74 @@ modul firmware yang mengimpornya, jadi aman.
 
 Modul hilang: **61 → 51** dari 237. Total `.ko` di staging: 669.
 
-### 6.2i `tc_charger_framework` — modul terpenting yang tidak pernah dirilis
+### 6.2i `tc_charger_framework` — SELESAI, dibangun dari source 6.1
 
-`tc_charger_framework.ko` adalah **inti charging**: 78 ekspor GLOBAL
-(`create_votable`, `enable_primary_charger`, `get_charger_charging_current`,
-`charger_cloud_engine_init`, …). Ia ada di firmware tapi **tidak ada di donor
-6.1 maupun mt6897**.
+**Status 2026-11-19: sudah dibangun (commit `439b840`).**
 
-Yang dirilis Transsion hanya `tc_charger.c` (4.112 baris, hanya 3 ekspor:
-`tchr_get_debug_level`, `_wake_up_charger`, `tc_chg_switch_vbus_ovp`). Ketiga
-fungsi itu **ada di dalam `tc_charger_framework.ko`** di firmware — jadi
-`tc_charger.c` di-compile masuk ke modul itu, bukan jadi modul sendiri.
+Catatan lama saya menyebut modul ini "tidak pernah dirilis". Itu **salah**.
+Komposisinya tertulis jelas di Makefile donor:
 
-**Dampaknya sekarang:** `tc_ambient_temp_det` dan `tc_pid_chg_algo` sudah
-selesai diport tapi **sengaja belum dimasukkan** karena keduanya mengimpor
-`tchr_get_debug_level`. Tanpa modul penyedianya, modprobe akan gagal.
+```make
+obj-$(CONFIG_TC_CHARGER) += tc_charger_framework.o ...
+tc_charger_framework-objs := tc_charger.o tc_charger_intf.o tc_charger_attr.o \
+                             tc_basic_charger.o tc_voter.o
+```
+  `drivers/power/supply/transsion/Makefile`, baris 12
 
-Yang masih bisa diselamatkan: `tchr_get_debug_level` hanyalah 48 byte —
-fungsi pembaca `desc->log_level` dengan fallback 3. Isinya sudah
-terverifikasi identik dengan source 6.1 (offset 760 = `log_level`). Tapi
-membuat modul shim hanya untuk satu fungsi berisiko: begitu
-`tc_charger_framework` asli dipasang, akan ada dua penyedia simbol itu.
+Jadi yang tidak ada hanyalah **file .o terpisah**; kelima sumbernya lengkap
+(8.598 baris). Modulnya cukup dibangun sebagai satu unit.
 
-**Keputusan: tunggu, jangan shim.** Modul ini terlalu sentral untuk ditebak.
-Yang harus dilakukan adalah mencari donor 6.12 Transsion lain (perangkat lain
-dengan MTK 6.12 + Transsion), atau merekonstruksi 78 ekspor itu dari `.ko`.
+#### Kenapa dulu saya menolak, dan kenapa sekarang benar
+
+Kekhawatiran lama: shim akan bertabrakan dengan `tc_charger_framework.ko` asli.
+Begitu **semua modul diganti hasil build dari source**, tidak ada modul asli
+yang tersisa untuk bertabrakan. Jadi ini bukan shim — ini modul yang benar.
+
+#### `tranlog_local` ternyata bukan penghalang
+
+`tc_charger_framework.ko` firmware mengimpor `tranlog_local` dari
+`transsion_tranlog` (yang tidak punya source). Tapi:
+
+- dipanggil **2 kali saja**, keduanya di dalam `charger_routine_thread`
+- murni logging
+- **source 6.1 tidak punya panggilan itu sama sekali** — ditambahkan di 6.12
+
+Jadi build dari source tidak pernah menyentuh `tranlog_local`, dan
+`transsion_tranlog` tidak perlu ada.
+
+#### Hasil verifikasi
+
+| pemeriksaan | hasil |
+|---|---|
+| ekspor GLOBAL | **74 dari 78** |
+| impor `tc_*`/`tran_*` | **29/29 terpenuhi** (tc_misc_intf 24, tc_common_class 5, tc_tcpc 1) |
+| alias DT | `of:N*T*Ctc,charger` — identik dengan firmware |
+| node DT X6871 | ada, `compatible = "tc,charger"` dengan `enable_sw_jeita`, `enable_hv_charging`, `support_allround_bypass` |
+
+Empat ekspor yang belum ada (`charger_cloud_engine_init/exit`,
+`tc_bat_repair_dischg_vote`, `tc_update_bat_self_repair_state`) adalah kode
+6.12 yang tidak ada di source 6.1, dan **tidak diimpor modul firmware mana
+pun**. Bukan penghalang build maupun load.
+
+#### Kenapa layout struct internal tidak masalah
+
+`struct tc_data` kita 3000 byte, firmware minimal 3220 (field terbaca di
+offset 3216). Tapi yang wajib sama hanya yang **melintasi batas modul**:
+
+| struktur | dipakai lintas modul? | kesimpulan |
+|---|---|---|
+| `struct tc_data` | tidak — hanya `tc_charger_framework` | bebas |
+| `struct tc_charger` | ukuran 104 byte, hanya simpan pointer | bebas |
+| `struct votable` | **opaque** (`struct votable;` di header) | bebas |
+| API voter (`vote`, `find_votable`, …) | ya, 7 modul | yang penting signature, bukan layout |
+
+`static inline` di `tc_charger.h` yang menyentuh `data->alg[i]`
+(`tc_chg_alg_notify_call`, `tc_chg_alg_plugout_reset`) tidak dipanggil modul
+lain — sudah diverifikasi dengan `nm -u` terhadap 14 modul.
 
 ### 6.2j Status akhir port `tc_*`
 
-Modul hilang: **61 → 49** dari 237.
+Modul hilang: **61 → 46** dari 237.
 
 Sudah masuk dan terverifikasi identik: `tc_common_class`, `tc_adapter_class`,
 `tc_algorithm_class`, `tc_misc_intf`, `tc_ta_class`, `tc_hl7139a`,
@@ -905,10 +944,10 @@ Sudah masuk dan terverifikasi identik: `tc_common_class`, `tc_adapter_class`,
 `tc_port_corrosion_prevention`, `tc_water_detect`, `tc_pd_adapter`,
 `tc_temp_forecast`, `tc_otg_ctrl`.
 
-Tertunda karena `tc_charger_framework`: `tc_ambient_temp_det`,
-`tc_pid_chg_algo` (source sudah siap, tinggal menunggu fondasi).
+Sudah masuk setelah `tc_charger_framework` dibangun:
+`tc_charger_framework`, `tc_ambient_temp_det`, `tc_pid_chg_algo`.
 
-Belum ada source sama sekali: `tc_charger_framework`, `tc_gauge`,
+Belum ada source sama sekali: `tc_gauge`,
 `tc_chg_type_det`, `tc_auto_test`, `tc_trancare`, `tc_pep50`,
 `tc_pd_algo`, `tc_pe20_algo`, `tc_hvdcp20_algo`, `tc_tc30_algo`,
 `tc_tfcp_ta`, `pca_tfcp_ta`.
