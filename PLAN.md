@@ -995,6 +995,45 @@ Belum ada source sama sekali: `tc_gauge`,
 `tc_pd_algo`, `tc_pe20_algo`, `tc_hvdcp20_algo`, `tc_tc30_algo`,
 `tc_tfcp_ta`, `pca_tfcp_ta`.
 
+### 6.2k 7 modul "hilang" ternyata modul GKI — bukan gap
+
+Menjalankan aturan §6.1b pada sisa modul menemukan 7 yang tidak tercatat:
+`arm_dsu_pmu`, `drm_display_helper`, `drm_dma_helper`,
+`industrialio-triggered-buffer`, `kfifo_buf`, `reboot-mode`,
+`syscon-reboot-mode`.
+
+Semuanya terdaftar di `kernel/kleaf/mgk_modules.bzl`, tapi di
+**`mgk_module_ext_outs`** — dan `ext_outs` dirujuk oleh `user_outs`, bukan oleh
+target yang kita bangun.
+
+Buktinya di `build/bazel_mgk_rules/mgk.bzl:431`:
+
+```python
+kernel_modules_install(
+    name = "{}_customer_modules_install.{}".format(name, build),
+    kernel_modules = [
+    ] + select({ ... "{}".format(m) for m in (kleaf_customer + real_kleaf_device_modules) ...})
+```
+
+`customer_modules_install` hanya memuat `kleaf_customer + kleaf_device_modules`.
+`common_user_modules` (yang berisi `mgk_module_user_outs` ->
+`mgk_module_ext_outs`) masuk ke target `{}_internal_modules_install`, bukan ke
+target device.
+
+Jadi ketujuh modul itu **dibangun oleh GKI build**, bukan oleh
+`kernel_device_modules-6.12`. Tidak ada yang perlu dikerjakan, dan tidak
+seharusnya dihitung sebagai gap.
+
+Catatan: `arm_dsu_pmu` memang di-`remove()` eksplisit untuk beberapa platform
+(`mgk_64.bzl:3424` dan `:4083`), jadi untuk platform itu ia memang tidak
+dipakai sama sekali.
+
+**Pelajaran untuk aturan §6.1b:** langkah 4 (cek `.bzl`) tidak cukup hanya
+mencari namanya. Yang menentukan adalah **daftar mana** ia berada —
+`mgk_module_outs` / `mgk_module_ext_outs` / `mgk_64_module_outs` — karena
+hanya `mgk_64_module_outs` yang masuk target device. Cari namanya di `.bzl`
+lalu periksa daftarnya.
+
 ### 6.3 Kesimpulan Tingkat D
 
 Jangan kerjakan Tingkat D sebelum Phase 3 selesai. Alasannya:
