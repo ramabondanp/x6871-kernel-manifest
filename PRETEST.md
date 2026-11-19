@@ -190,13 +190,20 @@ selama `modules.dep`/`modules.alias` diregenerasi untuk tree staging.
    - tidak ada `Unknown symbol` / `disagrees about version of symbol`
    - `tran_extcon_usb` probe (`tran-extcon-usb`)
    - `tran_fp` probe, `/dev/tran_fp`, `/sys/kernel/tran_fp/{vendor_name,ic_name,fod_location_xy}`
+   - `tran_fp`: `goodix chip id 0x...` + `ic_name=GOODIX_...`; kalau sensor
+     tidak menjawab, probe tetap lanjut dan butuh ±6 s (3 percobaan × 5
+     retry × timeout FIFO 200 ms). Untuk boot cepat:
+     `tran_fp.tran_fp_detect_chip=0`
    - `tkv`: `/proc/tkv` ada; kalau tidak, cari log
      `tkv: ... is not System RAM, refusing to map`
    - `tnek`: `/dev/tnek` ada
 4. Cek USB role switch/uevent (`SWITCH_NAME`/`SWITCH_STATE`) saat colok
    OTG/Type-C.
-5. Fingerprint: uji kontrol power/reset/IRQ dulu; akuisisi gambar baru bisa
-   setelah backend Goodix ditambahkan.
+5. Fingerprint: uji kontrol power/reset/IRQ dulu. `TRAN_IOC_TRANSFER_CMD`
+   (15) dan `_RAW_CMD` (16) mengembalikan `-EOPNOTSUPP` selama
+   `tran_fp_allow_ree_transfer=0` (default) — itu disengaja.
+6. Kalau ternyata HAL memakai jalur REE (bukan TEE), baru aktifkan
+   `tran_fp.allow_ree_transfer=1` untuk uji terbatas.
 
 ## 8. Reproduksi
 
@@ -258,3 +265,97 @@ Catatan perintah build (sempat salah dan menyebabkan kegagalan palsu di
 **wajib** diisi seperti §8. Tanpa `SUPPORT_PLATFORM=mt6895` semua platform
 ikut dibangun; tanpa dua flag `unsafe_headers` header GKI privat hilang di
 sandbox.
+
+## 10. Simulasi ulang sebelum boot — build final `36e0f17945e8`
+
+Dijalankan ulang 2026-11-19 atas staging 795 `.ko` hasil build terakhir
+(`mgk_64_k612_customer_modules_install.user`, mt6895,
+`entry_level_legacy.config`). Sumber angka:
+`/serverhive1/ramabondanp/tmp/pretest-final2.json`.
+
+### 10.1 Hasil loader
+
+| Modul | Export (built/fw) | Import (built/fw) | Impor tak terselesaikan | CRC mismatch |
+|---|---|---|---|---|
+| `tran_extcon_usb` | 0 / 0 | 47 / 47 | 0 | 0 |
+| `tran_fp` | 0 / 2 | 94 / 145 | 0 | 0 |
+| `tnek` | 9 / 9 | 24 / 24 | 0 | 0 |
+| `tkv` | 0 / 0 | 24 / 23 | 0 | 0 |
+
+- **Satu** grup vermagic untuk 795 modul:
+  `6.12.38-android16-5-g2c4fd33ae6d8-4k SMP preempt mod_unload modversions aarch64`.
+- `stack_frames_over_1k` untuk `tran_fp`: kosong (tidak ada array besar di
+  stack kernel).
+- Import yang ada di build kita tapi tidak di firmware:
+  `__check_object_size` (fortify usercopy), `sized_strscpy`, `strcmp`,
+  `mtk_disp_notifier_unregister`. Semuanya benign; `spi_sync` **ada di
+  keduanya**.
+- 216 CRC mismatch dan 13 modul dengan impor tak terselesaikan
+  (`bq2589x_charger`, `bt_drv_connac1x`, `gps_drv_stp`,
+  `mtk_charger_framework`, `mtk_ufcs_adapter`, `wmt_chrdev_wifi`,
+  `ufs-mediatek-mod-ise`, `ise-trusty`, `leds-mtk-disp`, `mtk_em`,
+  `mtk_hvbpc`, `mtk_pep50p`, `fmradio_drv_mt6631_6635`) semuanya modul
+  platform/varian yang tidak ada di daftar install customer. **Tidak satu pun
+  menyentuh empat modul kita.**
+
+### 10.2 Paritas akses SPI dengan stock
+
+| Parameter | Stock (disasm `tran_fp.ko`) | Port ini |
+|---|---|---|
+| Urutan chip id | tulis `0xf0` (len 3), lalu `0xf1` (len 5) | sama |
+| Posisi id | byte 5..8 dari respons kedua | sama |
+| bits per word | 8 | 8 |
+| Speed | 1 MHz (`tran_spi_speed` = 1000000 di `.data`) | 1 MHz (`tran_fp_spi_speed`) |
+| Retry | 5 × `spi_sync` | 5 |
+| Transfer per message | sampai 2 | sampai 2 |
+| Tunggu | busy `udelay` | `msleep` (lebih ringan) |
+| Urutan probe | power → pinctrl spi_default → spi_clk_on → chip id | sama |
+
+### 10.3 `spi->controller_data` — dibuktikan, bukan diasumsikan
+
+- `offsetof(struct spi_device, controller_data)` = **960**, dikonfirmasi dari
+  `spi-mt65xx.ko` hasil build: `mtk_spi_setup` → `str x21,[x19,#960]`,
+  `mtk_spi_cleanup` → `ldr x0,[x0,#960]` lalu `kfree`.
+- Stock `tran_fp_spi_transfer` menulis `str x0,[spi,#960]` dengan
+  `x0 = &tran_chip_config`, jadi stock **menimpa** `controller_data`.
+- `tran_chip_config` stock = **32 byte, seluruhnya nol** (dump `.data`),
+  sehingga `BUG_ON(chip_config->cs_setuptime | cs_holdtime | cs_idletime)`
+  di `spi_dump_config()` tidak menyala. `BUG_ON` itu ada di build kita **dan**
+  di `spi-mt65xx.ko` stock (masing-masing 1 `brk` di
+  `mtk_spi_prepare_message`).
+- Namun `mtk_spi_cleanup()` mem-`kfree()` pointer tersebut → stock menyimpan
+  **invalid free laten** saat device dilepas / modul di-unload.
+- Port ini **tidak** menulis `controller_data`; MTK driver memakai
+  `mtk_chip_config` alokasinya sendiri (cs timing nol = default). Efek
+  fungsional identik dengan stock, tanpa `BUG_ON` dan tanpa invalid free.
+
+### 10.4 Audit API hardware pada diff
+
+`git diff 6334ce2b9910 36e0f17945e8` — seluruh baris tambah hanya menyentuh:
+
+`spi_sync`, `spi_message_init`/`spi_message_add_tail`, `kmalloc`/`kzalloc`/
+`kfree`, `copy_from_user`/`copy_to_user`, `msleep`, `of_find_property`.
+
+Tidak ada `ioremap`, `readl`/`writel`, `regulator_*`, `gpio_*`, `clk_*`,
+`pinctrl_*`, `request_irq`, atau DMA mapping baru.
+
+### 10.5 Batas kemampuan menulis register sensor
+
+Satu-satunya jalur yang bisa menulis register dari userspace adalah ioctl
+15/16, dan sekarang **opt-in**:
+
+- `tran_fp_allow_ree_transfer=0` (default) → `-EOPNOTSUPP`, sensor tidak
+  disentuh.
+- Kalau diaktifkan: `len` ≤ 4096, alamat 16 bit big-endian, `speed_hz` ≤
+  `spi-max-frequency`, payload di-bounce ke memori kernel.
+- Stock tidak punya jalur ini sama sekali, jadi default-off tidak mengurangi
+  fungsi apa pun di X6871.
+
+### 10.6 Sisa risiko
+
+1. Bila sensor tidak menjawab, probe `tran_fp` menambah ±6 s boot
+   (3 percobaan × 5 retry × timeout FIFO 200 ms). Bounded, bukan hang.
+   Matikan dengan `tran_fp.tran_fp_detect_chip=0`.
+2. `tran_fp` masih tanpa backend vendor (`fw-only-fn` 120). Akuisisi gambar
+   di X6871 berjalan di TEE; ini perlu dibuktikan saat boot, bukan sekarang.
+3. 216 CRC mismatch / 13 unresolved modul lain: pre-existing, di luar scope.
