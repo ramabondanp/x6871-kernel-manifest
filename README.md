@@ -92,6 +92,8 @@ hasil port di-push ke branch `w1vo36-6.12-port`.
 | `add-tc-charger-stack.sh` | fondasi charger Transsion: `tc_charger_class` + `tc_adapter_class` + `tc_algorithm_class` + `tc_misc_intf` |
 | `patch-tc-misc-6.12.sh` | 8 fungsi `tc_misc_intf` tambahan 6.12, rekonstruksi dari `.ko` |
 | `audit-sources.sh` | cocokkan modul firmware -> file source **tanpa** peduli nama file |
+| `tools/ko-preflight.py` | bandingkan 4 modul fitur dengan `.ko` stock (export/impor/CRC/call graph) |
+| `tools/preboot-audit.py` | audit **seluruh** modul stock yang digantikan build: 1 baris per `.ko` firmware, plus simulasi loader pada set itu |
 | `PLAN.md` | rencana port driver device lain (X6871) — Tingkat A sudah selesai |
 
 ## Kenapa ada `reproduce-cleanup.sh`
