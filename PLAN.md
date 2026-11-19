@@ -1242,6 +1242,31 @@ mendaftarkan apa pun dan memakai `i2c_transfer` biasa; versi pertama
 ketahuan dari membandingkan **impor dan tabel relokasi** dengan firmware —
 bukan dari build.
 
+### 6.2p `nfc_i2c` selesai — 33 modul sisa
+
+`nfc_i2c` adalah modul gabungan keempat yang tertangkap aturan §6.1b (setelah
+`tc_charger_framework`, `tc_pd_algo`, `tc_pep50`):
+
+```make
+nfc_i2c-objs = common.o common_ese.o i2c_drv.o
+```
+
+1.441 baris source TP. Yang membuatnya layak diprioritaskan: node DT X6871
+memang aktif, dan `common.h` membaca persis properti yang ada di DT —
+`DTS_IRQ_GPIO_STR "nxp,pn544-irq"`, `DTS_VEN_GPIO_STR "nxp,pn544-ven"`.
+Tidak ada tebakan kontrak hardware.
+
+Verifikasi terhadap `.ko` firmware:
+- ekspor GLOBAL **32 == 32 identik**
+- alias DT identik: `of:N*T*Cnxp,pn544` / `of:N*T*Cnxp,pn544C*`
+
+Patch 6.12 (mekanis, bukan perilaku): `class_create(THIS_MODULE, name)` ->
+`class_create(name)`; probe i2c jadi satu argumen (definisi + prototipe
+header); `no_llseek` -> `noop_llseek`.
+
+Sisa: **33 modul** dari 237, dengan pembagian yang sama seperti §6.2n —
+8 bukan gap, 25 tanpa source atau di luar cakupan.
+
 ### 6.3 Kesimpulan Tingkat D
 
 Jangan kerjakan Tingkat D sebelum Phase 3 selesai. Alasannya:
