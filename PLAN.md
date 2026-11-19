@@ -1339,6 +1339,76 @@ disassembly kita dengan firmware, bukan build.
 
 Sisa gap: **32 modul**. `leds-aw22xxx` kini tidak lagi terblokir.
 
+### 6.2r `leds-aw22xxx` selesai — 31 modul sisa
+
+`leds-aw22xxx` adalah modul pertama yang dibangun **di atas** `tran-led-core`.
+Donor 6.1 ada (53 KB), tetapi itu versi lama: masih memakai `tc_led_ops`
+4 slot dan tidak punya jalur cmd/multicolor/chip-type. Firmware X6871
+mengimplementasikan tujuh slot:
+
+| offset | slot | fungsi firmware |
+|---|---|---|
+| 0x18 | `get_chip_type` | `aw22xxx_get_chip_type` |
+| 0x20 | `get_cmd` | `aw22xxx_get_tran_led_cmd` |
+| 0x28 | `set_cmd` | `aw22xxx_set_tran_led_cmd` |
+| 0x38 | `store_tran_led_cmd` | `aw22xxx_ops_store_tran_led_cmd` |
+| 0x40 | `show_tran_led_cmd` | `aw22xxx_ops_show_tran_led_cmd` |
+| 0x58 | `store_tran_multicolor` | `aw22xxx_tran_multicolor_store` |
+| 0x60 | `show_tran_multicolor` | `aw22xxx_tran_multicolor_show` |
+
+Fungsi yang tidak ada di donor direkonstruksi dari `.ko`: `aw22xxx_cover_gain`
+(export), `get_chip_type` (melaporkan 5/6, bukan 0x18/0x27), `get/set_cmd`
+(buffer 32 byte, `cmd[0] == 1`), wrapper ops, dan `multicolor_*`.
+
+#### Data yang harus diambil dari `.data`, bukan dari donor
+
+- `aw22xxx_cfg_name` adalah **206 entri × 64 byte = 13.184 byte**, bukan 33
+  entri. Indeks = nomor effect. `_A` mulai 66, `_B` mulai 132. Array donor
+  tidak bisa dipakai.
+- Tabel music gain default 16 pasangan, dibaca dari `.rodata+0x1b0`.
+- Nama multi-color default `B85`, `E23`, `S30`; DT X6871 memberi
+  `aw22xxx,multi_color_count = <3>` dan
+  `aw22xxx,multi_color_array = "B85\0E23\0S30"`.
+- DT music table X6871 berisi 16 pasangan `(volume_level, music_gain)`;
+  `aw22xxx_cover_gain` mencari gain berdasarkan volume level dan
+  di-export.
+
+#### Perilaku baru yang tidak ada di donor
+
+1. `tran_led_cmd_cfg_2` sekarang menerima tiga argumen
+   `(type, num2, num3)`; `type 0x0A` (audio) memakai `num3` sebagai sub-index
+   di dalam grup, dan `type 0x0D` (performance) menambah tiga effect baru.
+2. `cfg_loaded` menulis tabel berulang kali sambil memeriksa `GCR` dan `PST`,
+   sampai tiga retry; setelah unlock, jika `AUDCTR.bit0` aktif, gain audio
+   diterapkan ulang.
+3. `reset_imax` (properti DT `aw22xxx,reset_imax`) ditulis ulang ke IMAX
+   sebelum request firmware cfg.
+4. Probe mendaftar sebagai `"primary_led"`, membuat kobject `aw22xxx_led`
+   dengan symlink `led`, dan membuat dua atribut di device i2c
+   (`tran_led_cmd`, `tran_multicolor`).
+
+Catatan `dev_get_drvdata`: atribut yang dibuat lewat `sysfs_create_group` pada
+`cdev.dev` mendapat `led_classdev *` dan harus `container_of` ke `aw22xxx`;
+atribut yang dibuat lewat `device_create_file(&i2c->dev)` mendapat `aw22xxx`
+langsung. Dua jalur ini ada di modul yang sama.
+
+#### Verifikasi
+
+| Kriteria | Hasil |
+|---|---|
+| ekspor GLOBAL (fungsi + objek) | **8 == 8 identik** |
+| impor simbol | **58 == 58 identik** |
+| alias DT / i2c | identik (`awinic,aw22xxx_led`, `i2c:aw22xxx_led`) |
+| relokasi tabel ops | **7/7 offset identik** (0x158…0x1a0) |
+| `aw22xxx_cfg_name` | 13.184 byte, **byte-identik** |
+| `imax_name`, `imax_code`, `reg_access`, `attributes` | byte-identik |
+| layout struct | di-assert saat compile; `sizeof == 0x360` |
+
+Build target modul:
+`//kernel_device_modules-6.12/drivers/leds/tran_led:leds-aw22xxx.mgk_64_k612.6.12.user`.
+
+Staging: 688 → **689** `.ko`. Sisa gap: 32 → **31**.
+
 ### 6.3 Kesimpulan Tingkat D
 
 

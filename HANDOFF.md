@@ -1,21 +1,21 @@
 # HANDOFF — W1VO36 / X6871 kernel device modules
 
 Ditulis 2026-11-19 untuk sesi AI berikutnya. Baca ini dulu, lalu `PLAN.md`
-(bagian §6.1b, §6.2k, §6.2m, §6.2n, §6.2o, §6.2p, §6.2q).
+(bagian §6.1b, §6.2k, §6.2m, §6.2n, §6.2o, §6.2p, §6.2q, §6.2r).
 
 ## Status ringkas
 
 | Item | Nilai |
 |---|---|
-| `.ko` di staging | **688** |
+| `.ko` di staging | **689** |
 | Modul di firmware X6871 | 237 |
-| Masih hilang | **32** |
+| Masih hilang | **31** |
 | Build target | `//kernel_device_modules-6.12:mgk_64_k612_customer_modules_install.user` |
 | Build terakhir | sukses, 3 aksi (inkremental) |
 | Runtime | **belum pernah di-boot sama sekali** |
 
 Repo bersih, semua ter-push: `alps` dan `local`, branch `w1vo36-6.12-port`,
-HEAD `39044a9498af`. Manifest `main` di `e312a77`.
+HEAD `54c604b9378e`. Manifest `main` mengikuti commit HANDOFF/PLAN terakhir.
 
 ## Objective
 
@@ -107,11 +107,12 @@ Staging hasil build:
 Tingkat A (overlay `entry_level_legacy.config`), Tingkat C (`tran_audio_control`,
 `splitswitch-gpio`, `hiber`), Iris divendorkan, panel rm69220, `tran_ldo`,
 seluruh fondasi charger `tc_*`, `tc_charger_framework`, 5 algoritma charging,
-`tc_tfcp_ta`, `pca_tfcp_ta`, `nfc_i2c`, dan **`tran-led-core`**.
+`tc_tfcp_ta`, `pca_tfcp_ta`, `nfc_i2c`, `tran-led-core`, dan
+**`leds-aw22xxx`**.
 
 Daftar commit per fitur ada di `git log` branch `w1vo36-6.12-port`.
 
-## Yang tersisa: 32 modul
+## Yang tersisa: 31 modul
 
 ### Bukan gap — dibangun GKI build
 `arm_dsu_pmu`, `drm_display_helper`, `drm_dma_helper`,
@@ -124,12 +125,6 @@ Daftar commit per fitur ada di `git log` branch `w1vo36-6.12-port`.
 Autoload ikut alias, bukan nama berkas.
 
 ### Berikutnya paling siap
-- **`leds-aw22xxx`** — tidak lagi terblokir setelah `tran-led-core`. Source
-  6.1 ada (53 KB) tapi **ketinggalan 10 fungsi / 2.780 byte**
-  (`aw22xxx_cover_gain`, `get_chip_type`, `get_tran_led_cmd`,
-  `set_tran_led_cmd`, `ops_store/show_tran_led_cmd`, `multicolor_store/show`,
-  `tran_multicolor_store/show`) dan tabel ops-nya masih 4 slot, harus diganti
-  13 slot. DT aktif (`awinic,aw22xxx_led`, i2c `0x6a`).
 - 2 panel: `ili7838e_fhdp_dsi_cmd_dsc_tm_tm_120hz_cl9`,
   `rm69220_fhdp_dsi_vdo_dsc_csot_csot_144hz_cl8` — source panel ada di donor.
 - `tc_trancare` — `status = "okay"`, terblokir `transsion_tranlog`.
@@ -180,6 +175,25 @@ Layout sudah diverifikasi dua arah dan di-assert saat compile:
 
 Ekspor `tran-led-core` **20 == 20 identik** dengan firmware. Nama DT
 `tran,led_core`, modinfo `tran_led_core`.
+
+### `leds-aw22xxx` sudah selesai — jangan kembali ke donor 6.1
+
+Alamat: `drivers/leds/tran_led/leds-aw22xxx.c` (+ `.h`, `-reg.h`, `-cfg.h`).
+Commit `54c604b9378e`. Implementasi penuh ada di PLAN.md §6.2r.
+
+- Ekspor/impor/alias **identik**, 7 entri tabel ops mendarat di offset yang
+  sama (`0x158…0x1a0`), `aw22xxx_cfg_name` 13.184 byte byte-identik.
+- Donor 6.1 hanya titik awal: 206 nama cfg, tabel music gain, multi-color
+  `B85/E23/S30`, `_A/_B` shift 66/132, dan tiga argumen `tran_led_cmd_cfg_2`
+  semuanya berasal dari `.ko`.
+- `aw22xxx_cover_gain` dan `aw22xxx_reg_access` di-export; tidak ada modul
+  firmware yang mengimpornya, jadi layout privat tidak bocor ke modul lain.
+- Perhatikan dua jenis `dev_get_drvdata`: atribut pada `cdev.dev` mendapat
+  `led_classdev *` (perlu `container_of` ke `aw22xxx`), sedangkan
+  `tran_led_cmd`/`tran_multicolor` pada device i2c mendapat `aw22xxx *`.
+- `remove` sengaja mengikuti firmware: tidak memanggil
+  `tran_led_device_unregister`, tidak menghapus dua atribut i2c. Modul ini
+  praktis tidak pernah di-unload; kalau nanti diubah, tambahkan cleanup-nya.
 
 ### Pola pasca-6.12 yang sudah dipetakan
 
