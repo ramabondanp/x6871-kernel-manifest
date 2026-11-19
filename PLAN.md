@@ -1474,14 +1474,15 @@ Tiga tidak direncanakan:
 ### 6.2t Empat modul fitur selesai — `tran_extcon_usb`, `tran_fp`, `tnek`, `tkv`
 
 Empat modul prioritas dari kelompok fitur dikerjakan berurutan. Staging
-**689 → 693**; gap **31 → 27**.
+**689 → 693** dan gap **31 → 27** (angka ini sebelum `charger_class` dihapus
+di §6.2u).
 
 | Modul | Commit | Ekspor | Impor | Status verifikasi |
 |---|---|---|---|---|
 | `tran_extcon_usb` | `3194d4f10237` | identik | identik | alias + `depends` identik |
-| `tran_fp` | `0e527bf7c6f4` | parsial (34 vs 136) | parsial | alias `tran_fp_legacy` ada |
-| `tnek` | `24b5fe361653` | **17 == 17** | **25 == 25** | modinfo identik |
-| `tkv` | `cb088a63c4b2` | **11 == 11** | **24 == 24** | modinfo identik |
+| `tran_fp` | `0e527bf7c6f4` | **0 vs 2** (asli) | 90 vs 145 | common layer; alias `tran_fp_legacy` |
+| `tnek` | `24b5fe361653` | **9 == 9** | **24 == 24** | export asli `__ksymtab`; modinfo identik |
+| `tkv` | `cb088a63c4b2` | **0 == 0** | **24 == 23** | +`page_is_ram` pengaman; lihat §6.2u |
 
 #### `tran_extcon_usb`
 
@@ -1507,14 +1508,14 @@ Basis: donor 6.1 `tran_common_v2` (main/ext/cust, 2.440 baris) dipindah ke
 `drivers/input/fingerprint/tran_common/`, lalu disesuaikan ke 6.12 dan ke
 compatible X6871 `tran_fp_legacy`.
 
-Modul firmware 6.12 adalah bundel multi-vendor `tran_common` dengan **136
-ekspor** (`gf_*`, `ff_*`, `anc_*`, `cdf_*`, `egf_*`, ...). Tidak ada modul
-lain yang mengimpor ekspor tersebut; X6871 memakai Goodix dan HAL memakai
-`/dev/tran_fp` untuk kontrol (init, reset, IRQ, power, SPI clock, chip
-info, key event), netlink route 30/29, input, pinctrl/regulator, dan
-`/sys/kernel/tran_fp/vendor_name`. Port ini membawa common layer itu,
-bukan backend vendor lain. Karena itu ekspor/impor **tidak identik** dan
-wajib diuji saat boot.
+Modul firmware 6.12 adalah bundel multi-vendor `tran_common` dengan **129
+simbol GLOBAL** dan hanya **2 export asli** (`tran_fasync_for_lcm_full_HBM`,
+`yxy_test_func`; keduanya tidak diimpor modul lain). X6871 memakai Goodix
+dan HAL memakai `/dev/tran_fp` untuk kontrol (init, reset, IRQ, power, SPI
+clock, chip info, key event), netlink route 30/29, input,
+pinctrl/regulator, dan `/sys/kernel/tran_fp/vendor_name`. Port ini membawa
+common layer itu, bukan backend vendor lain. Karena itu ekspor/impor
+**tidak identik** dan wajib diuji saat boot.
 
 Perubahan 6.12: lookup DT lewat `dev.of_node` (bukan
 `of_find_compatible_node("tran_fp")`), match `tran_fp_legacy`, include
@@ -1530,10 +1531,11 @@ name +0x3f8), pesan user 0x408 byte, queue maksimum 9 node (drop tertua),
 `/dev/tnek` misc device, poll/read/write, empat caller API, `tne_pollwait`
 /`tne_readwait`, dan `strlcpy` ekspor vendor yang sudah tidak ada di 6.12.
 
-Verifikasi: **17 ekspor identik, 25 impor identik**, `depends` kosong
-identik. `mcDrvModule` firmware mengimpor `tnek_caller_api`; build kita
-meng-gate impor itu, tetapi modulnya sekarang tersedia bila jalur TEE
-diaktifkan.
+Verifikasi: **9 ekspor asli identik, 24 impor identik**, `depends` kosong
+identik. Pengecekan awal sempat menghasilkan “17 == 17” karena menghitung
+semua simbol GLOBAL, bukan `__ksymtab`; koreksi dan pengaman ada di §6.2u.
+`mcDrvModule` firmware mengimpor `tnek_caller_api`; build kita meng-gate
+impor itu, tetapi modulnya sekarang tersedia bila jalur TEE diaktifkan.
 
 #### `tkv`
 
@@ -1545,10 +1547,65 @@ disimpan ke `g_tkv` sebagai “lcm invertion”.
 
 Perbedaan yang disengaja: bila `tkv=` tidak ada di bootargs, init berhenti
 dengan log `get_tkv_base fail` dan tidak melakukan `ioremap` alamat 0
-(firmware tetap melanjutkan dan berpotensi memfault).
+(firmware tetap melanjutkan dan berpotensi memfault). Pengaman tambahan:
+region wajib page-aligned dan seluruh page `page_is_ram()`; kalau tidak,
+`/proc/tkv` dilewati (lihat §6.2u).
 
-Verifikasi: **11 ekspor identik, 24 impor identik**, `depends` kosong
-identik.
+Verifikasi: **0 ekspor asli** (firmware juga tidak mengekspor), **24 impor
+identik** ditambah `page_is_ram` sebagai pengaman, `depends` kosong identik.
+
+### 6.2u Pre-flight sebelum boot — simulasi load, ABI, dan keamanan hardware
+
+Sebelum boot pertama, keempat modul dibandingkan ulang dengan `.ko` stock
+dan seluruh staging disimulasikan dengan `depmod`. Laporan lengkap:
+`PRETEST.md`. Commit kernel: `6334ce2b9910`.
+
+Hasil utama:
+
+```
+staging tree (staging/lib/modules/6.12.38-.../) : 796 .ko
+modul stock yang ada di staging               : 217 / 237
+impor tak terselesaikan                        : 0
+CRC modversions tak terpenuhi                  : 0
+export ambigu yang dipakai                     : 0
+duplikat export antar modul yang di-load       : 0
+```
+
+20 nama stock yang tidak ada tetap yang sudah direncanakan: 2 panel tidak
+direncanakan + 1 alias panel X6871, 3 MMC/SD, 7 storage ditunda, 4 terblokir
+`transsion_tranlog`, dan 3 fitur mandiri (`tkv_recovery`, `tran_rhi`,
+`tran_expand_key`).
+
+Koreksi penting:
+
+1. **Export asli ≠ semua simbol GLOBAL.** Firmware `tnek` mengekspor 9
+   (bukan 17), `tkv` mengekspor 0 (bukan 11), `tran_fp` hanya 2 (debug,
+   tanpa importer), `tran_extcon_usb` 0. Export berlebih di `tnek`/`tkv`
+   sudah dihapus; `tnek` sekarang **9 == 9**, `tkv` **0 == 0**.
+2. **`charger_class.ko` dihapus dari daftar install.** Stock X6871 tidak
+   mengirimnya; `tc_charger_class.ko` mengekspor simbol yang sama dengan CRC
+   yang diharapkan `tc_tcpc`/`tc_misc_intf`. Sebelumnya dua exporter membuat
+   depmod bisa memilih CRC yang salah dan memutus rantai USB/charger.
+3. **`tran_fp` regulator guard.** DT X6871 memakai `mt6368_vfp` fixed
+   3,3 V (min == max), jadi jalur normal tidak berubah. Regulator variabel
+   atau di luar 1,5–3,6 V sekarang ditolak, bukan disetel ke `max_uV`.
+4. **`tkv` hanya memetakan RAM.** Region `tkv=` wajib page-aligned dan
+   seluruh page `page_is_ram()`. Kalau tidak, `/proc/tkv` dilewati; firmware
+   memetakan alamat apa pun dan membaca 32 KiB. `tkv` tidak pernah menulis
+   balik ke region.
+5. **Hardening memori.** `tran_fp` netlink copy dibatasi `nlmsg_len`/`skb`;
+   `fod_location_xy` dan `icname[10]` memakai `strscpy`; `tnek`
+   men-NUL-terminasi tag/name/data user dan memperbaiki race `poll_wait`;
+   `tkv` memakai `memchr`.
+
+Risiko fungsional yang **bukan** risiko hardware: `tran_fp` masih common
+layer saja. Ioctl transfer SPI (15/16/17) belum ditangani dan tidak ada
+`spi_sync`; akuisisi gambar fingerprint kemungkinan gagal sampai backend
+Goodix diport. Power/reset/IRQ/netlink/sysfs tetap tersedia.
+
+Prasyarat packaging: image harus memakai `modules.dep`/`modules.alias` yang
+digenerate build dari tree staging, bukan `modules.dep` stock (path flat dan
+masih mencantumkan `transsion_tranlog` untuk `tran_fp`).
 
 ### 6.3 Kesimpulan Tingkat D
 
@@ -1563,9 +1620,14 @@ Untuk kelompok storage, keputusan sudah diambil di §6.2s: **Opsi A** —
 baseline GKI/MTK, fork ditunda, tiga modul MMC/SD tidak direncanakan.
 
 Empat modul fitur sudah selesai di §6.2t (`tran_extcon_usb`, `tran_fp`,
-`tnek`, `tkv`), jadi staging **693** dan gap **27**. Sisa kandidat nyata:
-**14** — 7 storage ditunda, 2 tranlog, dan 5 fitur (`tran_rhi`,
-`tran_expand_key`, `tran_key_bigdata`, `tkv_recovery`, `thd`).
+`tnek`, `tkv`). Pre-flight §6.2u menghapus `charger_class` dari install:
+flat customer **692** `.ko` (27 nama stock hilang, termasuk 7 modul GKI yang
+sebenarnya ada di tree staging), sedangkan tree staging lengkap **796**
+`.ko` dengan **20** nama stock hilang. Dari 20 itu, 6 memang tidak
+direncanakan (2 panel lain + 1 alias panel X6871 + 3 MMC/SD), sehingga
+kandidat nyata tinggal **14** — 7 storage ditunda, 4 terblokir
+`transsion_tranlog`, dan 3 fitur mandiri (`tkv_recovery`, `tran_rhi`,
+`tran_expand_key`).
 
 
 ---

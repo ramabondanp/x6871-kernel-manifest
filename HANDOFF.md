@@ -1,21 +1,24 @@
 # HANDOFF — W1VO36 / X6871 kernel device modules
 
 Ditulis 2026-11-19 untuk sesi AI berikutnya. Baca ini dulu, lalu `PLAN.md`
-(bagian §6.1b, §6.2k, §6.2m, §6.2n, §6.2o, §6.2p, §6.2q, §6.2r, §6.2s, §6.2t).
+(bagian §6.1b, §6.2k, §6.2m, §6.2n, §6.2o, §6.2p, §6.2q, §6.2r, §6.2s,
+§6.2t, §6.2u) dan `PRETEST.md`.
 
 ## Status ringkas
 
 | Item | Nilai |
 |---|---|
-| `.ko` di staging | **693** |
+| `.ko` flat customer install | **692** |
+| `.ko` di tree staging lengkap | **796** |
 | Modul di firmware X6871 | 237 |
-| Masih hilang | **27** |
+| Masih hilang (flat / tree) | **27 / 20** |
 | Build target | `//kernel_device_modules-6.12:mgk_64_k612_customer_modules_install.user` |
-| Build terakhir | sukses, 3 aksi (inkremental) |
+| Build terakhir | sukses, 5 aksi (inkremental) |
 | Runtime | **belum pernah di-boot sama sekali** |
 
 Repo bersih, semua ter-push: `alps` dan `local`, branch `w1vo36-6.12-port`,
-HEAD `cb088a63c4b2`. Manifest `main` mengikuti commit HANDOFF/PLAN terakhir.
+HEAD `6334ce2b9910`. Manifest `main` mengikuti commit HANDOFF/PLAN/PRETEST
+terakhir.
 
 ## Objective
 
@@ -112,16 +115,22 @@ serta empat modul fitur: `tran_extcon_usb`, `tran_fp`, `tnek`, `tkv`.
 
 Daftar commit per fitur ada di `git log` branch `w1vo36-6.12-port`.
 
-## Yang tersisa: 27 modul
+## Yang tersisa: 20 modul di tree staging
 
-Angka 27 masih menghitung nama yang **tidak direncanakan** untuk X6871:
-dua varian panel perangkat lain (`ili7838e...cl9`, `rm69220...cl8`) dan tiga
-modul MMC/SD (`tran_mmc_block`, `mtk-mmc-mod`, `sd_tray`). Panel X6871 sudah
-ada sebagai `panel-rm69220-vdo-x6871.ko`; `mtk-mmc-mod` sudah ada padanannya
-`mtk-mmc.ko`. Lihat bagian "Tidak direncanakan" di bawah.
+Angka 20 adalah nama stock yang tidak ada di **tree staging lengkap**
+(`staging/lib/modules/6.12.38-.../`, 796 `.ko`). Flat customer install
+(692 `.ko`) masih melaporkan 27 karena 7 modul GKI tidak disalin ke flat
+root, tetapi semuanya ada di tree staging. Lihat `PRETEST.md` §3.
 
-Kandidat nyata tinggal **14**: 7 storage yang ditunda (lihat §"Storage / UFS"),
-2 tranlog, dan 5 modul fitur.
+Dari 20 nama itu, 6 memang **tidak direncanakan** untuk X6871: dua varian
+panel perangkat lain (`ili7838e...cl9`, `rm69220...cl8`), satu alias panel
+X6871 (`rm69220...x6871`, dicakup `panel-rm69220-vdo-x6871.ko`), dan tiga
+modul MMC/SD (`tran_mmc_block`, `mtk-mmc-mod`, `sd_tray`). Lihat bagian
+"Tidak direncanakan" di bawah.
+
+Kandidat nyata tinggal **14**: 7 storage yang ditunda (lihat §"Storage /
+UFS"), 4 terblokir `transsion_tranlog`, dan 3 fitur mandiri
+(`tkv_recovery`, `tran_rhi`, `tran_expand_key`).
 
 ### Bukan gap — dibangun GKI build
 `arm_dsu_pmu`, `drm_display_helper`, `drm_dma_helper`,
@@ -155,28 +164,42 @@ X6871. Jangan port kecuali target perangkat berubah.
 
 | Modul | Commit | Verifikasi |
 |---|---|---|
-| `tran_extcon_usb` | `3194d4f10237` | ekspor/impor/alias/`depends` **identik** |
-| `tran_fp` | `0e527bf7c6f4` | common layer; ekspor parsial (34 vs 136) |
-| `tnek` | `24b5fe361653` | **17 == 17 ekspor**, **25 == 25 impor** |
-| `tkv` | `cb088a63c4b2` | **11 == 11 ekspor**, **24 == 24 impor** |
+| `tran_extcon_usb` | `3194d4f10237` | ekspor 0/0, impor 47/47, alias/`depends` **identik** |
+| `tran_fp` | `0e527bf7c6f4` | common layer; export asli 0/2 (debug), impor 90/145 |
+| `tnek` | `24b5fe361653` | **9 == 9 ekspor asli**, **24 == 24 impor** |
+| `tkv` | `cb088a63c4b2` | **0 == 0 ekspor asli**, 24/23 impor (+`page_is_ram`) |
+
+Pre-flight `6334ce2b9910` (§6.2u) mengoreksi hitungan export: yang benar
+adalah `__ksymtab`, bukan semua simbol GLOBAL. Ia juga menghapus
+`charger_class.ko` dari install dan menambahkan pengaman hardware/memori.
+Hasil simulasi load: **217/237 modul stock yang ada + 4 modul kita → 0
+impor tak terselesaikan, 0 CRC tak terpenuhi, 0 export ambigu**. Detail di
+`PRETEST.md`.
 
 - `tran_extcon_usb`: match `transsion,extcon-usb`; `extcon-mtk-usb.ko` tetap
   ada untuk node `mediatek,extcon-usb`. Jangan gabungkan keduanya.
 - `tran_fp`: source donor 6.1 `tran_common_v2` di
   `drivers/input/fingerprint/tran_common/`, match `tran_fp_legacy`. Modul
-  firmware 6.12 membundel banyak backend vendor (`gf_*`, `ff_*`, ...); port
-  ini hanya common layer. **Wajib diuji saat boot**; kalau HAL butuh proc
-  debug atau key-nav vendor, tambahkan backend Goodix saja.
+  firmware 6.12 membundel backend vendor (`gf_*`, `ff_*`, ...); port ini
+  **hanya common layer**. Ioctl transfer SPI (15/16/17) belum ada dan build
+  tidak mengimpor `spi_sync`, jadi akuisisi gambar fingerprint kemungkinan
+  gagal sampai backend Goodix diport. Power/reset/IRQ/SPI clock/netlink/
+  sysfs tetap ada. Regulator X6871 `mt6368_vfp` fixed 3,3 V; guard menolak
+  regulator variabel/di luar 1,5–3,6 V. **Wajib diuji saat boot**.
 - `tnek`: tidak ada source; direkonstruksi penuh. Node 0x418, pesan user
   0x408, queue 9, `/dev/tnek`. `mcDrvModule` firmware mengimpor
-  `tnek_caller_api`; build kita meng-gate impor itu.
+  `tnek_caller_api`; build kita meng-gate impor itu. Export asli 9 == 9.
 - `tkv`: `/proc/tkv`, `g_tkv` (lcm inversion), region 32 KiB dari
   `tkv=<desimal>` di bootargs. Bila bootargs tidak punya `tkv=`, modul
-  berhenti aman (firmware melakukan ioremap alamat 0).
+  berhenti aman. Pengaman baru: region wajib page-aligned dan seluruh page
+  `page_is_ram()`; kalau gagal, `/proc/tkv` dilewati. Tidak pernah menulis
+  balik ke region.
 
 ### Berikutnya paling siap
-- **Boot test baseline storage (Opsi A)** — lihat checklist di bagian
-  "Storage / UFS". Ini yang menentukan apakah 7 modul fork masih diperlukan.
+- **Boot test** memakai checklist `PRETEST.md` §7. Pastikan image memakai
+  `modules.dep`/`modules.alias` hasil build dari tree staging, bukan
+  `modules.dep` stock (stock masih memaksa `transsion_tranlog` untuk
+  `tran_fp`). Ini menentukan apakah 7 modul fork storage masih diperlukan.
 - `tkv_recovery` — sibling `tkv`, 20 KB, 11 ekspor / 24 impor; kandidat
   berikutnya yang paling kecil.
 - `tran_rhi` — health info storage (ECC/erase/suhu), 47 KB, tanpa source.
@@ -188,6 +211,8 @@ X6871. Jangan port kecuali target perangkat berubah.
   Catatan: `tc_charger_framework` dan `tc_water_detect` mengimpor tranlog di
   firmware tapi **tidak** di build kita — jalurnya di-gate saat compile, jadi
   charger inti tidak bergantung padanya.
+- **Goodix fingerprint backend** — diperlukan agar `tran_fp` bisa transfer
+  data SPI; tanpa itu hanya kontrol power/reset/IRQ yang berfungsi.
 
 ### Storage / UFS — **Opsi A: baseline GKI/MTK** (diputuskan 2026-11-19)
 
