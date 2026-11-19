@@ -632,18 +632,26 @@ persis alamat fault di log.
 
 ### Perbaikan
 
-Tambahkan `-DCONFIG_TC_CLASS_SUPPORT=1` ke copts target: `tc_misc_intf`,
-`mtk_battery_manager`, `{}_battery`/`{}-battery` (semua gauge),
-`rt6160-regulator`. Setelah itu modul-modul tersebut mengimpor set simbol
-`tran_*` yang sama dengan stock.
+Tambahkan `-DCONFIG_TC_CLASS_SUPPORT=1` ke copts target `tc_misc_intf`
+(`drivers/power/supply/BUILD.bazel`). Setelah rebuild, `tc_misc_intf.ko`
+mengimpor 4 simbol `tran_*` — **sama dengan stock** — sehingga device
+`tc_misc` benar-benar terdaftar dan jalur `tc_disable_hw_ovp()` tidak lagi
+menyentuh `NULL`.
 
-Sisa selisih yang bukan soal config: `tc_temp_forecast`, `tc_tfcp_ta`,
-`tcpc_class`, `tc_tcpc` memanggil `tran_*` lebih sedikit/banyak daripada
-stock — itu drift sumber, bukan makro.
+Define yang sama juga ditambahkan ke `mtk_battery_manager`,
+`{}_battery`/`{}-battery`, dan `rt6160-regulator`, tapi untuk empat modul itu
+**tidak mengubah apa pun**: sumbernya di cabang ini (`mtk-battery-manager.c`,
+`mtk_battery.c`, `rt6160-regulator.c`) tidak memanggil `tran_*` sama sekali.
+Stock memanggilnya, jadi itu drift sumber, bukan config. Sama untuk
+`tc_temp_forecast`, `tc_tfcp_ta`, `tcpc_class`, `tc_tcpc`.
 
 ### Aturan
 
 Selisih **set simbol impor** terhadap stock adalah cara tercepat menemukan
-fitur yang mati karena config, sebelum menyentuh hardware. Untuk modul
-Transsion, periksa khusus `tran_*`: kalau stock mengimpor dan build tidak,
-berarti ada define yang hilang dan driver itu berjalan dengan stub.
+fitur yang mati, sebelum menyentuh hardware. Untuk modul Transsion, periksa
+khusus `tran_*`:
+
+- stock impor, build tidak, **dan sumber build memang memanggil `tran_*`**
+  → define config hilang (kasus `tc_misc_intf`)
+- stock impor, build tidak, **dan sumber build tidak memanggilnya**
+  → drift sumber; perlu porting kode stock, config tidak menolong
