@@ -303,49 +303,71 @@ subsistem kernel**. Kalau dipasang, ia **mengganti** modul aslinya
 `tc_charger_class` menggantikan `charger_class` (§5.0a). Itu pekerjaan
 ganti-fondasi, bukan salin-file.
 
-### 6.2 `tran_ldo` — penghalang panel yang sesungguhnya
+### 6.2 `tran_ldo` — SELESAI, tidak perlu RE
 
-DT X6871: `dvdd-supply = <&TRANLDO26>;` di node `panel1@0`.
-`TRANLDO26` disediakan `tran_ldo` (`/fragment@5/tran_ldo@28/regulators/`).
-**`tran_ldo` tidak ada di donor mana pun, dan tidak ada di tree w1vo.**
+**Hasil 2026-11-19: source-nya ada, GPL-2.0. RE dibatalkan.**
 
-Alur power di driver panel (hasil baca kode, bukan dugaan):
+Jalan penemuannya (bukan tebakan):
+
+1. `gh search code "i2c_ldo_sclk_mode"` → ketemu
+   `ramabondanp/transsion-kernel_device_modules-6.1/drivers/regulator/et5904.c`
+   (mirror open-source Infinix, `opensource.dev.infinixmobility.com`).
+2. `et5904.c` punya `my_regulator_enable_regmap` + discharge `RDIS` — sama
+   persis dengan `.ko` firmware.
+3. Pola nama: source `"ET5904LDO"#num#i2cid` == format `.ko` `TRANLDO%d%d`.
+4. `et5904_regulators6[]` = LDO 1..4 di i2c bus 6 →
+   `TRANLDO16 / TRANLDO26 / TRANLDO36 / TRANLDO46` == **persis** node DT X6871.
+5. Rentang tegangan cocok DT:
+   VIND `600000 + sel*6000` (600k–2.13M) ⊇ DT 600k–1.8M
+   VINA `1200000 + sel*12500` (1.2M–4.39M) ⊇ DT 1.2M–3.3M
+
+**Hasil build:** `tran_ldo.ko` masuk output, total 1.410 → 1.412.
+Identitas cocok 100% dengan firmware:
+
+| | kita | firmware |
+|---|---|---|
+| name | `tran_ldo` | `tran_ldo` |
+| alias | `of:N*T*Ctran,tran_ldo` | `of:N*T*Ctran,tran_ldo` |
+| description | `Tran 4LDO  driver` | `Tran 4LDO  driver` |
+
+Keempat regulator yang dibutuhkan DT ada di `.ko` hasil build:
+`TRANLDO16`, `TRANLDO26`, `TRANLDO36`, `TRANLDO46`.
+
+Patch 6.x yang diperlukan (hanya 1):
+- `probe(struct i2c_client *, const struct i2c_device_id *)` → `probe(struct i2c_client *)`
+
+Guard `IS_ENABLED(TRAN_AD10)` / `TRAN_AE10` /
+`CONFIG_TRAN_DUAL_INTERNAL_TEMP_PATCH` dibiarkan apa adanya: ketiganya tidak
+didefinisikan, jadi bloknya tidak dikompilasi. Blok itu memanggil
+`regulator_init_complete_mainlcm()` yang tidak ada di tree w1vo.
+
+Catatan: `tran_ldo` memilih tabel `regulatorsN[]` berdasarkan
+**i2c adapter id**, bukan compatible. X6871 pakai bus 6, jadi yang aktif
+`et5904_regulators6[]`. Kalau nanti bus-nya beda, tabelnya harus disesuaikan.
+
+### 6.2b Kenapa ini penting untuk panel
+
+Dengan `tran_ldo` ter-build, `dvdd-supply = <&TRANLDO26>` di DT **sekarang
+bisa di-resolve**. Sebelumnya rantainya putus:
+`panel → dvdd → TRANLDO26 → tran_ldo (tidak ada)`.
+
+Alur power panel (dibaca dari kode):
 
 ```
 lcm_probe()
-  ├─ schedule_delayed_work(&lcm_regulator_work, 3000ms)   <- DVDD, async
-  └─ devm_regulator_get("vci") + regulator_enable()       <- VCI, sinkron
-       └─ kalau gagal -> return ret, probe GAGAL
+  ├─ schedule_delayed_work(3000ms)     DVDD, async
+  └─ devm_regulator_get("vci") + enable
+       └─ gagal → probe GAGAL
 
-lcm_regulator_power_init()                                 <- jalan 3s kemudian
-  ├─ devm_regulator_get("dvdd")  -> kalau gagal: retry tiap 7s, SELAMANYA
+lcm_regulator_power_init()             jalan 3s kemudian
+  ├─ devm_regulator_get("dvdd")        sekarang resolve ke TRANLDO26
   ├─ regulator_set_voltage(1.254V)
   └─ regulator_enable()
 ```
 
-Konsekuensi dengan DT stock + tanpa `tran_ldo`:
+Kalau `dvdd` gagal, driver retry tiap 7 detik **selamanya**. Dengan
+`tran_ldo` ada, retry itu seharusnya tidak terjadi lagi.
 
-- `dvdd` **tidak** menggagalkan probe (async, cuma retry terus).
-- `vci` **menggagalkan** probe kalau `vci-supply` tidak bisa di-resolve.
-  Di DT stock `vci-supply = <0xffffffff>` (placeholder) — perlu dicek apakah
-  regulator itu benar-benar ada di tree w1vo.
-- Tanpa DVDD, panel tidak menyala meski probe sukses.
-
-Tiga jalan keluar, berurut dari paling murah:
-
-1. **Arahkan `dvdd-supply` ke regulator yang sudah ada** di tree w1vo
-   (yang bisa 1.254V). Hanya mengubah DT, tidak menambah driver.
-   Butuh DTB bisa di-rebuild — kalau stock DTB dipakai apa adanya, ini
-   tidak bisa.
-2. **Port `tran_ldo`** — source tidak ada, harus RE atau cari donor lain.
-3. **Ganti ke `devm_regulator_get_optional("dvdd")`** dan anggap selalu-on
-   kalau tidak ada. Menghilangkan retry-loop tapi berisiko: kalau DVDD
-   memang harus di-enable, panel tetap mati.
-
-Catatan penting: `panel_ext_lcm_power_set` (yang di base 6.1 menyalakan
-regulator) **sudah dihapus dari `mtk_panel_funcs` di 6.12** (§7.5), jadi
-fungsi itu sekarang jadi dead code di file kita — jalur power yang aktif
-hanya `lcm_probe` + `lcm_regulator_power_init` di atas.
 
 
 ### 6.3 Kesimpulan Tingkat D

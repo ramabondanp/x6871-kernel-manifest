@@ -47,6 +47,7 @@ Soc lain: `PLATFORM=mt6991 ./build.sh user` (default `mt6895`).
 | `add-transsion.sh` | tambah 3 modul Transsion mandiri dari donor mt6897 |
 | `add-iris.sh` | pasang Pixelworks Iris ke `mediatek_drm_v1` + patch 6.12 |
 | `add-panel-rm69220.sh` | panel X6871: init table + timing hasil ekstrak firmware |
+| `add-tran-ldo.sh` | regulator `tran_ldo` (ET5904) — sumber `TRANLDO26` untuk panel |
 | `PLAN.md` | rencana port driver device lain (X6871) — Tingkat A sudah selesai |
 
 ## Kenapa ada `reproduce-cleanup.sh`
