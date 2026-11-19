@@ -701,3 +701,52 @@ panel X6871 di atas.
   Deteksi BC1.2 menunggu, bukan berarti gadget mati.
 - `deferred probe pending` juga menyebut `odm:rt5133-gpio1/gpio2` yang
   menunggu regulator `rt5133` LDO1.
+
+## 16. Modul build kehilangan ekspor yang dimiliki stock
+
+Boot TWRP (`pstore6.txt`) berhenti di modul ke-40:
+
+```
+tran_expand_key: Unknown symbol Mannual_hang (err -2)
+tran_expand_key: Unknown symbol manual_two_key_hang (err -2)
+init: Failed to insmod '/lib/modules/tran_expand_key.ko'
+init: Loaded 40 modules from /lib/modules
+init: Failed to load kernel modules -> InitFatalReboot
+```
+
+Penyebabnya bukan `tran_expand_key`, tapi `monitor_hang.ko`. Di stock,
+`monitor_hang.ko` mengekspor dua variabel:
+
+```
+B Mannual_hang          (dan __ksymtab_Mannual_hang)
+D manual_two_key_hang
+```
+
+Versi kita tidak punya keduanya — namanya bahkan tidak muncul di `.ko`.
+Selama set kita dipakai sendiri (218 modul), tidak ada yang mengimpor simbol
+itu sehingga aman. Begitu digabung dengan modul stock/TWRP (yang memuat
+`tran_expand_key.ko`), modul itu gagal load dan init abort.
+
+### Cara mendeteksi seluruhnya sekaligus
+
+1. Untuk setiap modul yang kita ganti, hitung `ksymtab(stock) - ksymtab(build)`.
+   Hasilnya 23 modul kehilangan ekspor.
+2. Untuk setiap modul di set gabungan, cari yang mengimpor simbol-simbol itu.
+
+Hasilnya tepat dua modul, dan cocok dengan log:
+
+| modul | simbol hilang | penyedia di stock |
+|---|---|---|
+| `tran_expand_key.ko` | `Mannual_hang`, `manual_two_key_hang` | `monitor_hang.ko` |
+| `ili7838e_...cl9.ko` | `g_lcm_connect_state`, `g_lcm_custom_info` | `mediatek_drm_v1.ko` |
+
+Dua modul itu dibuang dari image TWRP (238 modul,
+`modules.load`/`.recovery` 177/234 entri). `ili7838e` memang panel perangkat
+lain; `tran_expand_key` hanya fitur tombol tambahan.
+
+### Aturan
+
+Set modul kita aman selama dipakai utuh. Begitu dicampur dengan `.ko` stock
+(mis. untuk membangun image TWRP), **ekspor yang hilang berubah jadi
+kegagalan load**. Selalu jalankan langkah 1–2 di atas untuk set campuran;
+jangan hanya membandingkan impor (loader sim) dalam set kita sendiri.
