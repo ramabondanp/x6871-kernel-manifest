@@ -443,21 +443,27 @@ ramdisk stock (dan untuk yang overlap, ukurannya identik — mis.
 khas first-stage (`clk-*`, `aee_*`, `cmdq-*`, `bootprof`, `8250_mtk`, ...) dan
 tidak ada di dlkm.
 
-Cakupan build kita: 255 dari 288 modul dlkm sudah kita produksi. 33 modul
+Cakupan build kita: 263 dari 288 modul dlkm sudah kita produksi. 25 modul
 belum (harus tetap pakai `.ko` stock):
 
-- `vendor_dlkm` (18): `sgm37864_v4l2`, `ocp81375_v4l2`, `aw8601af`, `dw9800k`,
-  `mtk-vcodec-sys-api`, `snd-soc-aw87xxx`, `snd-soc-oca72xxx`, `perf_common_v`,
-  `game`, `task_turbo_v`, `fpsgo`, `thd`, `transsion_tranlog`,
-  `snd-soc-fs1599`, `snd-soc-fs1894`, `elliptic-ultrasound`, `aw36515_v4l2`,
-  `ak7316`.
-- `odm_dlkm` (15): `focaltech_ft3683g`, `adaptive-ts`, `gt9916_common`,
-  `chipsemi_chsc5xxx_old`, `tran_richtap_haptic_hv`, `tran_key_bigdata`,
-  `dw9784ois`, `tran_health_sched`, `tran_mm_collect`, `pages_prefilter`,
-  `tran_zram`, `tc_trancare`, `tran_audio_typec`, `trans_sched`,
-  `tran_perf_util`, `aw36515`, `priority_allocate`.
+- 10 modul hardware yang tidak ada di DT X6871 (sengaja tidak diport):
+  `aw36515`, `ak7316`, `dw9800k`, `dw9784ois`, `focaltech_ft3683g`,
+  `chipsemi_chsc5xxx_old`, `snd-soc-fs1894`, `snd-soc-aw87xxx`,
+  `snd-soc-oca72xxx`, `elliptic-ultrasound`.
+- 15 modul software yang belum punya sumber/port: `fpsgo`, `game`,
+  `pages_prefilter`, `priority_allocate`, `task_turbo_v`, `tc_trancare`,
+  `thd`, `transsion_tranlog`, `tran_audio_typec`, `tran_health_sched`,
+  `tran_key_bigdata`, `tran_mm_collect`, `tran_perf_util`, `trans_sched`,
+  `tran_zram`.
 
-Diff per fungsi (nama + ukuran simbol `.text`) untuk 255 modul itu: **126
+Dua modul software terakhir yang selesai diport: `perf_common_v`
+(memasang `format_sbin_data` ke hook `mtk_perf_common`) dan
+`mtk-vcodec-sys-api` (tabel sys API dengan slot `set_task_priority` ke
+`vip_engine`; `mtk-vcodec-common` sekarang mengekspor
+`mtk_vcodec_set_sys_api_funcs`/`mtk_vcodec_set_task_priority` dan encoder
+memakai jalur itu).
+
+Diff per fungsi (nama + ukuran simbol `.text`) untuk 263 modul itu: **126
 modul berbeda**, 47 di antaranya berbeda berat. Puncaknya drift versi sumber,
 bukan salah config:
 

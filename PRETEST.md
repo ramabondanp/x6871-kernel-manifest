@@ -967,3 +967,50 @@ disassembly `.ko` dalam image).
 
 Gambar uji: `twrp-vendor_boot-hwports3.img`
 (md5 `d7cb32982f3dde01a5cc9d02c5269f07`).
+
+## 20. Modul software: perf_common_v dan mtk-vcodec-sys-api
+
+Dua modul vendor kecil sudah diganti versi sumber dan dibangun dengan
+perintah build yang sama.
+
+### perf_common_v
+
+Modul stock hanya memasang fungsi format ke variabel hook yang
+diekspor `mtk_perf_common`:
+
+```c
+format_sbin_data_hook = format_sbin_data;
+```
+
+`format_sbin_data()` direkonstruksi dari disassembly stock (0xdc byte):
+menulis `ARRAY[`, lalu tiap word 32-bit sebagai empat byte hex
+(`%02x,%02x,%02x,%02x,` dengan urutan byte 0,2,1,3), dan menimpa koma
+terakhir dengan `]`. Fungsi kita 0xd0 byte dengan urutan operasi yang
+sama; satu-satunya perbedaan adalah compiler meng-inline
+`init_perf_common_hook()` ke `init_module`.
+
+### mtk-vcodec-sys-api
+
+Modul stock memasang tabel 5 pointer (`funcs`, 0x28 byte) lewat
+`mtk_vcodec_set_sys_api_funcs(&funcs)`. Hanya slot ke-4
+(`offset 0x18`) yang terisi, yaitu `set_task_priority` dari
+`vip_engine.ko`; empat slot lain NULL. Reimplementasi kita menghasilkan
+layout dan relokasi `.data` yang identik (`R_AARCH64_ABS64` di offset
+0x18 ke `set_task_priority`).
+
+Sisi konsumen juga disamakan dengan stock:
+
+- `mtk-vcodec-common` sekarang mengimplementasikan dan mengekspor
+  `mtk_vcodec_set_sys_api_funcs()` dan
+  `mtk_vcodec_set_task_priority()`. Fallback tanpa hook memakai
+  `sched_setscheduler_nocheck`/`set_user_nice` seperti stock.
+- `mtk-vcodec-enc` memanggil `mtk_vcodec_set_task_priority()` (bukan
+  `set_task_priority` langsung), sehingga dependensi `vip_engine`
+  berpindah dari encoder ke modul sys-api — sama seperti `modules.dep`
+  stock.
+
+Verifikasi: `mtk-vcodec-enc.ko` hanya mengimpor
+`mtk_vcodec_set_task_priority`; `mtk-vcodec-common.ko` mengekspor kedua
+simbol baru; `mtk-vcodec-sys-api.ko` mengimpor
+`mtk_vcodec_set_sys_api_funcs` dan `set_task_priority`, dengan
+`depends=mtk-vcodec-common,vip_engine`.
