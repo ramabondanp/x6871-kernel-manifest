@@ -45,6 +45,7 @@ Soc lain: `PLATFORM=mt6991 ./build.sh user` (default `mt6895`).
 | `setup.sh` | MODULE.bazel, symlink donor + `../vendor/mediatek`, trim label |
 | `build.sh` | build module (`./build.sh user`) |
 | `add-transsion.sh` | tambah 3 modul Transsion mandiri dari donor mt6897 |
+| `add-iris.sh` | pasang Pixelworks Iris ke `mediatek_drm_v1` + patch 6.12 |
 | `PLAN.md` | rencana port driver device lain (X6871) — Tingkat A sudah selesai |
 
 ## Kenapa ada `reproduce-cleanup.sh`

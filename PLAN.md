@@ -391,24 +391,48 @@ GPIO, firmware load, LUT sendiri) dan menyentuh MTK DRM lewat API sempit.
 
 ### 7.5 Langkah Phase 3
 
-1. **Vendor iris** ke
-   `kernel_device_modules-6.12/drivers/gpu/drm/mediatek/mediatek_v2/`,
-   tambahkan ke `mediatek-drm-y` di Makefile. Dengan begini iris ikut
-   ter-compile ke `mediatek_drm_v1` — sama persis dengan layout modul di device.
-2. **Perbaiki drift struct** terhadap `mediatek_v2` 6.12. Ini satu-satunya
-   tugas yang ukurannya belum pasti, tapi terbatas: file-set tetap, API sempit
-   (§7.4).
-3. **Port panel rm69220** (VDO + RAMLESS + 144Hz). Basis struktur:
-   `panel-rm692h5-cmd.c` (sudah native 6.12, keluarga RM692xx sama, 1858 baris).
-   Tabel init diambil dari `.ko` firmware.
-4. **Port panel ili7838e** — ada di donor 6.1
-   (`ili7838e_fhdp_dsi_cmd_tm_tm_120hz_d9300.c`, 2025 baris) **dan** di w1vo
-   6.12 (`panel-ili7838e-dv3-alpha-cmd.c`, 1306 baris). Ini paling dekat:
-   ganti tabel panel + compatible string. CMD+DSC sama dengan varian `cl9`.
-5. **Register di build**: `panel/Makefile`, `panel/Kconfig`, `mgk_64.bzl`.
-6. **DT**: node `panel1@0` dengan
-   `compatible = "rm69220,fhdp,dsi,vdo,dsc,csot,csot,144hz,x6871"`,
-   plus GPIO/regulator sesuai `frag0.dts` hasil ekstrak `dtbo.img`.
+**Status 2026-11-19: langkah 1 SELESAI — Iris sudah ter-compile dan link.**
+
+Iris dimasukkan ke `mediatek_v2/v1/` (tempat `mediatek_drm_v1.ko` dibangun),
+bukan ke `mediatek_v2/`, supaya persis sama dengan layout modul di device.
+16 `.c` + 18 header, masuk daftar `srcs` `mediatek_drm_v1` di BUILD.bazel.
+
+Hasil verifikasi: kesembilan simbol yang dibutuhkan panel
+(`iris_enable`, `iris_disable`, `iris_reset`, `iris_reset_off`,
+`iris_set_valid`, `iris_is_pt_mode`, `iris_panel_cmd_passthrough`,
+`iris_conver_one_panel_cmd`, `iris_loop_back_validate`)
+**semuanya EXPORTED** dari `mediatek_drm_v1.ko` hasil build kita.
+
+#### Patch yang diperlukan (semua terukur, 6 iterasi build)
+
+| # | Masalah | Perbaikan | Jumlah |
+|---|---|---|---|
+| 1 | `strlcpy` dihapus di 6.x | → `strscpy` | 14 |
+| 2 | `PXLW_IRIS` tidak didefinisikan, jadi `iris_uapi.h` kosong → 40+ error `msmfb_*` | `local_defines += CONFIG_PXLW_IRIS=1, PXLW_IRIS5=1` | 1 |
+| 3 | `struct mipi_dsi_msg` OPPO punya `ctrl`+`wait_ms`; kernel 6.12 stock tidak | buang 2 initializer kosong | 64 |
+| 4 | `platform_driver.remove` / `i2c_driver.remove` kembali `void` | ubah tipe + buang `return` | 5 |
+| 5 | `i2c_driver.probe` kehilangan argumen `i2c_device_id` | ubah signature | 2 |
+| 6 | `params->oplus_cmdq_pkt_set_event` field OPPO-only | guard `&& 0` | 3 |
+| 7 | `DISP_SLOT_IRIS_READ_BASE` tidak ada di `mtk_drm_crtc.h` MTK | tambah define (nilai dari OPPO `mtk_drm_crtc.h`) | 1 |
+| 8 | `MIPI_DSI_MSG_LASTCOMMAND` di-comment | aktifkan define | 1 |
+| 9 | `iris_dsi_pre_cmd/pos_cmd` dideklarasikan + dipanggil tapi tak ada definisi | tambah 2 wrapper di `mtk_dsi.c` | 2 |
+| 10 | `vmalloc`/`vzalloc`/`vfree` tidak diekspor ke modul di 6.12 | → `kvmalloc`/`kvzalloc`/`kvfree` (+ `GFP_KERNEL`) | 59 |
+| 11 | `int func()` tanpa void | → `(void)` | 1 |
+
+Catatan penting soal #3: nama `dsi_mode_info`, `dsi_cmd_set_state`,
+`iris_cmd_desc` memang berbau Qualcomm, **tapi semuanya didefinisikan sendiri
+oleh `iris_def.h`**. Yang benar-benar tipe Qualcomm cuma 26 referensi, dan
+**semuanya di dalam `#if 0`** — dead code, tidak perlu disentuh.
+
+#### Langkah berikutnya di Phase 3
+
+2. Port panel `rm69220` (VDO + RAMLESS + 144Hz). Basis: `panel-rm692h5-cmd.c`.
+3. Port panel `ili7838e` (CMD+DSC) — paling dekat, ada di donor 6.1 dan w1vo.
+4. Register di `panel/Makefile`, `panel/Kconfig`, `mgk_64.bzl`.
+5. DT: node `panel1@0`, GPIO/regulator sesuai `frag0.dts`.
+
+Belum dikerjakan: iris belum pernah dijalankan, dan firmware `iris5.fw` belum
+dipasang ke image.
 
 Catatan mode: `rm692j0` (donor 6.1) itu **CMD 1260x2800**, sedangkan
 `rm69220` X6871 **VDO RAMLESS 1080x2400**. Beda drive mode — jangan pakai
