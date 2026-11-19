@@ -783,12 +783,25 @@ dipagari `#if CONFIG_WATER_DETECTION` / `CONFIG_TYPEC_CAP_FORCE_DISCHARGE` /
 header harus dipakai dengan config yang sama di semua modul yang berbagi
 `tcpc_ops`, kalau tidak offset-nya bergeser lagi.
 
-**Belum dikerjakan.** Perlu:
-1. sisipkan 6 field di dua titik itu, buang `set_command`
-2. port `tcpci_get_pdphy_vid/pid/did`, `tcpci_source_vbus`,
-   `tcpci_enable_io_boost`, `tcpm_tran_inquire_remote_cc` ke `tcpci.c`/`tcpm.c`
-3. pastikan `tcpc_mt6375.ko` dan `tcpc_class.ko` dibangun dengan header baru
-4. verifikasi slot `tcpc_ops` di `tcpc_mt6375.ko` vs firmware (harus 0 beda)
+**SUDAH DIKERJAKAN (commit `3351b6c`).** Enam field disisipkan di dua titik
+(slot 17-20 dan 28-29). Hasil verifikasi:
+
+| pemeriksaan | hasil |
+|---|---|
+| slot `tcpc_ops` di `tcpc_mt6375.ko` | **33 == 33, 0 beda** |
+| ekspor `tcpc_class.ko` | 632 vs 635; 3 sisanya tidak diimpor modul mana pun |
+
+Koreksi penting saat mengerjakan: slot 28 **bukan** `source_vbus()` baru,
+melainkan `set_command` yang **dipindah** dari slot 24. Buktinya
+`tcpci_source_vbus` (@0x5f64) dan `tcpci_sink_vbus` (@0x60c8) sama-sama
+membaca `ops+224` dan menaruh konstanta perintah di `w1` — 119/102 untuk
+source, 85/68 untuk sink, persis kontrak `TCPM_CMD_ENABLE/DISABLE_*_VBUS`
+6.1. Pembacaan pertama saya yang mengira itu op baru **salah**, dan
+disassembly pemanggilnya yang membetulkan.
+
+Tiga simbol yang tidak bisa dipulihkan (`tcpci_get_pe50_det_done`,
+`tcpc_retry_enter_low_power_mode`, `tcpm_set_aw_pps_ops`) tidak diimpor
+modul firmware mana pun, jadi tidak memblokir apa pun.
 
 Sampai itu selesai, `tc_tcpc`, `tc_port_corrosion_prevention`, `tc_pd_adapter`
 dan `tc_water_detect` tidak bisa dipasang.
@@ -834,6 +847,27 @@ compiler dan tidak memengaruhi kompatibilitas antar-modul.
 Patch 6.12 `tc_hl7139a`: `i2c probe()` kehilangan argumen `i2c_device_id`;
 include `tc_misc_intf.h` dikeluarkan dari guard `CONFIG_TC_CHARGER` (Kconfig
 itu tidak ada di tree ini, sehingga `tc_get_alias_type` hilang).
+
+### 6.2h Hasil port `tc_*` — ringkasan
+
+| modul | ekspor GLOBAL | impor | status |
+|---|---|---|---|
+| `tc_ta_class` | 35 == 35 | 9 == 9 | **IDENTIK** |
+| `tc_hl7139a` | 2 == 2 | config | **BENAR** |
+| `tc_lcd_notify` | 2 == 2 | ±1 | **IDENTIK** |
+| `tc_pmic` | 5 == 5 | == | **IDENTIK** |
+| `tc_audio` | 2 == 2 | ±1 | **IDENTIK** |
+| `tc_phy_insert_det` | 2 == 2 | ±3 | **IDENTIK** |
+| `tc_tcpc` | 11 vs 10 | 22 vs 18 | `tc_maybe_dock` ekstra* |
+| `tc_port_corrosion_prevention` | 2 == 2 | 7 == 7 | **IDENTIK** |
+| `tc_water_detect` | 3 == 3 | — | **IDENTIK** |
+| `tc_pd_adapter` | 7 == 7 | — | **IDENTIK** |
+
+\* `tc_maybe_dock` tidak ada di firmware sama sekali: struct `tc_tcpc` di sana
+tidak punya field `usb_docking_judge`, jadi jalur itu di-compile-out. Tidak ada
+modul firmware yang mengimpornya, jadi aman.
+
+Modul hilang: **61 → 51** dari 237. Total `.ko` di staging: 669.
 
 ### 6.3 Kesimpulan Tingkat D
 
