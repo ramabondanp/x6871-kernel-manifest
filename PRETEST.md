@@ -750,3 +750,54 @@ Set modul kita aman selama dipakai utuh. Begitu dicampur dengan `.ko` stock
 (mis. untuk membangun image TWRP), **ekspor yang hilang berubah jadi
 kegagalan load**. Selalu jalankan langkah 1–2 di atas untuk set campuran;
 jangan hanya membandingkan impor (loader sim) dalam set kita sendiri.
+
+## 17. TWRP boot bersih; sisa isu USB
+
+`dmesg1.txt` (TWRP + 238 modul kita): **235 modul load, 0 `Unknown symbol`,
+tanpa panic.**
+
+- Layar: `mtk-dsi ... Waiting for bridge or panel driver` berhenti tepat
+  setelah `panel-rm69220-vdo-x6871.ko` dimuat (2,044 s), lalu DSI init dan
+  `mediatek-drm` bind seluruh komponen + CRTC enable.
+- Sentuh: `gt9916` load, firmware PID terbaca.
+
+USB tetap tidak enumerate. Urutan dari log:
+
+```
+9.894  mtu3: ssusb_set_mode device            <- role switch (tran_extcon_usb)
+9.894  mtu3: port on (6)
+9.914  mtu3: ssusb_hwrscs_req timeout, spm_ctrl=0x5f, value=0x1f
+9.917  xsphy: u2/u3 phy power on + set_mode(6)
+9.918  mtu3: gadget (high-speed) pullup D+
+       ... tidak ada event USB apa pun setelah ini (tanpa reset/enumerasi)
+```
+
+Ditambah dari sisi charger:
+
+```
+9.875  tc_detect_do_bc12: usb_type:DCP
+10.00+ do_bc12_pre_work: check CDP block  (berulang tiap 1 detik)
+```
+
+Catatan: mask SPM di mtu3 stock juga `0x5f` (EMI_EN ikut diminta), jadi
+timeout `ssusb_hwrscs_req` bukan drift kita — kemungkinan memang perilaku
+platform.
+
+Yang berbeda dari stock justru hampir seluruh tumpukan USB:
+
+| modul | ukuran build vs stock |
+|---|---|
+| `mtu3` | 271.784 vs 279.360 |
+| `xhci-mtk-hcd-v2` | 544.688 vs 554.536 |
+| `phy-mtk-xsphy` | 89.672 vs 95.296 |
+| `tc_chg_type_det` | 53.520 vs 59.656 |
+| `tran_extcon_usb` | 31.800 vs 31.928 |
+| `usb_dp_selector` | 21.736 vs 21.864 |
+| `tc_tcpc` | 31.904 vs 30.504 |
+| `mux_switch` | sama byte-per-byte |
+
+Karena itu dibuat image pembanding `twrp-vendor_boot-usbstock.img`: 238 modul,
+tujuh modul USB di atas diganti versi stock, sisanya tetap modul kita. Kalau
+adb hidup dengan image ini, bug ada di salah satu dari tujuh modul itu dan
+biseksi bisa mulai dari `tc_chg_type_det` (DCP + loop 1 detik) lalu
+`tran_extcon_usb` (role switch), baru `mtu3`/`phy-mtk-xsphy`.
