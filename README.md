@@ -44,13 +44,20 @@ terpisah, ter-push ke remote `local`:
 
 ```bash
 cd kernel_device_modules-6.12
-git fetch local w1vo36-6.12-port
+git remote add alps https://github.com/ramabondanp/alps-kernel_device_modules-6.12
+git fetch alps w1vo36-6.12-port
 git checkout -B w1vo36-6.12-port FETCH_HEAD
 
 cd ..
 ~/w1vo36-kernel-manifest/setup.sh
 ~/w1vo36-kernel-manifest/build.sh user   # 1.422 .ko
 ```
+
+Branch: <https://github.com/ramabondanp/alps-kernel_device_modules-6.12/tree/w1vo36-6.12-port>
+
+Branch ini dibuat baru (bukan di atas `android16`) supaya riwayat `android16`
+tidak tersentuh. `android16` (`30a0466a`) memang ancestor dari baseline
+w1vo36.88-36-7 (`06079c2`), jadi branch ini juga fast-forward-able ke sana.
 
 Branch itu 6 commit di atas `06079c2` (baseline w1vo36.88-36-7), satu commit
 per fitur:
