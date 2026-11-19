@@ -256,15 +256,106 @@ tapi untuk codec audio/flashlight filenya beda nama dan sudah native.
 
 ---
 
-## 6. Tingkat D — ~55 modul, belum ada source
+## 6. Tingkat D — ~55 modul, belum ada source  ⚠️ AUDIT tran_* SELESAI
 
-Kebanyakan utility Transsion (`tran_zram`, `tran_ldo`, `tran_rhi`,
-`tran-led-core`, `tran_scsi_mod`, `tran-ufshcd-*`, `trans_sched`,
-`priority_allocate`, `low_latency_sched`, dsb).
+### 6.1 Audit lengkap semua driver `tran_*` (2026-11-19)
 
-**Jangan langsung RE.** Yang lebih murah: cari drop Transsion lain di generasi
-kernel yang sama. Repo OPPO/OnePlus sudah kebukti menyimpan banyak dari ini
-(lihat §7). Satu donor 6.12 yang cocok bisa menghapus hampir seluruh tingkat ini.
+Firmware X6871 punya **25 modul** bernama `tran*`/`trans*`. Diperiksa satu per
+satu terhadap donor mt6897, donor OPPO 6.12, dan tree w1vo:
+
+| Modul firmware | Ada di donor? | Sumber / catatan |
+|---|---|---|
+| `tran_audio_control` | ✅ | `sound/soc/transsion/tran_audio_control` — **sudah dipasang & ter-build** |
+| `tran_charge_transfer` | ✅ | `drivers/power/supply/transsion/` — butuh fondasi `tc_*` |
+| `tran_usb_ctrl` | ✅ | `drivers/power/supply/transsion/` — butuh fondasi `tc_*` |
+| `tran_fp` | ✅ (nama beda) | donor: `tran_fp_v2.o` di `drivers/input/fingerprint/tran_common_v2` |
+| `tran-led-core` | ✅ (nama beda) | donor: `tc_pdlc.o` di `drivers/leds/tran_leds_pdlc` |
+| `tran_richtap_haptic_hv` | ✅ (nama beda) | donor: `richtap_haptic_hv/` di `drivers/misc/mediatek/tran_lra` |
+| `tran_zram` | ❌ | **fork** dari `zram` — X6871 kirim `tran_zram.ko`, bukan `zram.ko` |
+| `tran-ufshcd-core` | ❌ | **fork** dari `ufshcd-core` — X6871 kirim ini, bukan `ufshcd-core.ko` |
+| `tran-ufshcd-pltfrm` | ❌ | **fork** dari `ufshcd-pltfrm` |
+| `tran_ldo` | ❌ | **PENTING**: DT pakai `dvdd-supply = <&TRANLDO26>`, lihat §6.2 |
+| `tran_rhi` | ❌ | tidak ada di donor mana pun |
+| `tran_scsi_mod` | ❌ | fork SCSI |
+| `tran_sd_mod` | ❌ | |
+| `tran_block` | ❌ | fork block layer |
+| `trans_sched` | ❌ | fork scheduler; ada `trans_sched.ko` di firmware |
+| `tran_mmc_block` | ❌ | |
+| `tran_audio_typec` | ❌ | |
+| `tran_extcon_usb` | ❌ | |
+| `tran_health_sched` | ❌ | |
+| `tran_expand_key` | ❌ | |
+| `tran_perf_util` | ❌ | |
+| `tran_mm_collect` | ❌ | |
+| `tran_key_bigdata` | ❌ | |
+| `tran-proc-bootdevice-mod` | ❌ | |
+| `transsion_tranlog` | ❌ | |
+
+**Ringkasan: 6 ada (3 sudah dipasang, 3 butuh fondasi `tc_*`), 19 tidak ada.**
+
+Pencarian dilakukan lewat nama modul (`obj-*` dan `name-objs`, bukan nama
+direktori) **dan** lewat simbol khas isi file (`TRANLDO`, `tran_zram`,
+`tran_scsi`, dst) — nol hasil untuk 19 modul itu. Jadi bukan soal nama beda.
+
+Pola penting: `tran_*` yang tidak ada bukan modul tambahan, tapi **fork dari
+subsistem kernel**. Kalau dipasang, ia **mengganti** modul aslinya
+(`tran_zram` ↔ `zram`, `tran-ufshcd-core` ↔ `ufshcd-core`), sama seperti
+`tc_charger_class` menggantikan `charger_class` (§5.0a). Itu pekerjaan
+ganti-fondasi, bukan salin-file.
+
+### 6.2 `tran_ldo` — penghalang panel yang sesungguhnya
+
+DT X6871: `dvdd-supply = <&TRANLDO26>;` di node `panel1@0`.
+`TRANLDO26` disediakan `tran_ldo` (`/fragment@5/tran_ldo@28/regulators/`).
+**`tran_ldo` tidak ada di donor mana pun, dan tidak ada di tree w1vo.**
+
+Alur power di driver panel (hasil baca kode, bukan dugaan):
+
+```
+lcm_probe()
+  ├─ schedule_delayed_work(&lcm_regulator_work, 3000ms)   <- DVDD, async
+  └─ devm_regulator_get("vci") + regulator_enable()       <- VCI, sinkron
+       └─ kalau gagal -> return ret, probe GAGAL
+
+lcm_regulator_power_init()                                 <- jalan 3s kemudian
+  ├─ devm_regulator_get("dvdd")  -> kalau gagal: retry tiap 7s, SELAMANYA
+  ├─ regulator_set_voltage(1.254V)
+  └─ regulator_enable()
+```
+
+Konsekuensi dengan DT stock + tanpa `tran_ldo`:
+
+- `dvdd` **tidak** menggagalkan probe (async, cuma retry terus).
+- `vci` **menggagalkan** probe kalau `vci-supply` tidak bisa di-resolve.
+  Di DT stock `vci-supply = <0xffffffff>` (placeholder) — perlu dicek apakah
+  regulator itu benar-benar ada di tree w1vo.
+- Tanpa DVDD, panel tidak menyala meski probe sukses.
+
+Tiga jalan keluar, berurut dari paling murah:
+
+1. **Arahkan `dvdd-supply` ke regulator yang sudah ada** di tree w1vo
+   (yang bisa 1.254V). Hanya mengubah DT, tidak menambah driver.
+   Butuh DTB bisa di-rebuild — kalau stock DTB dipakai apa adanya, ini
+   tidak bisa.
+2. **Port `tran_ldo`** — source tidak ada, harus RE atau cari donor lain.
+3. **Ganti ke `devm_regulator_get_optional("dvdd")`** dan anggap selalu-on
+   kalau tidak ada. Menghilangkan retry-loop tapi berisiko: kalau DVDD
+   memang harus di-enable, panel tetap mati.
+
+Catatan penting: `panel_ext_lcm_power_set` (yang di base 6.1 menyalakan
+regulator) **sudah dihapus dari `mtk_panel_funcs` di 6.12** (§7.5), jadi
+fungsi itu sekarang jadi dead code di file kita — jalur power yang aktif
+hanya `lcm_probe` + `lcm_regulator_power_init` di atas.
+
+
+### 6.3 Kesimpulan Tingkat D
+
+Jangan kerjakan Tingkat D sebelum Phase 3 selesai. Alasannya:
+`tran-ufshcd-*`, `tran_zram`, `tran_block`, `tran_mmc_block`, `trans_sched`
+semuanya **fork subsistem inti**. Memasangnya berarti mengganti UFS, zram,
+block layer, dan scheduler sekaligus — dan kalau satu saja salah, device
+tidak boot. Itu bukan cara memulai.
+
 
 ---
 

@@ -122,6 +122,13 @@ s = s.replace('//#define MIPI_DSI_MSG_LASTCOMMAND  0x1',
               '#define MIPI_DSI_MSG_LASTCOMMAND  0x1')
 open(p, 'w').write(s)
 
+# --- 6b. compatible string: DT stock X6871 pakai "pixelworks,iris" --------
+#      Source OnePlus pakai "pxlw,iris" -> Iris tidak akan probe.
+p = V + 'iris_lightup.c'
+s = open(p).read()
+s = s.replace('{.compatible = "pxlw,iris"},', '{.compatible = "pixelworks,iris"},')
+open(p, 'w').write(s)
+
 # --- 7. iris_check_abyp_ready() -> (void) --------------------------------
 p = V + 'iris_gpio.c'
 s = open(p).read()
