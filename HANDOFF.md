@@ -14,7 +14,7 @@ Ditulis 2026-11-19 untuk sesi AI berikutnya. Baca ini dulu, lalu `PLAN.md`
 | Masih hilang (flat / tree) | **27 / 20** |
 | Build target | `//kernel_device_modules-6.12:mgk_64_k612_customer_modules_install.user` |
 | Build terakhir | sukses, 5 aksi (inkremental) |
-| Runtime | **belum pernah di-boot sama sekali** |
+| Runtime | **TWRP boot normal** (lihat §Status per 2026-11-19) |
 
 Repo bersih, semua ter-push: `alps` dan `local`, branch `w1vo36-6.12-port`,
 HEAD `6334ce2b9910`. Manifest `main` mengikuti commit HANDOFF/PLAN/PRETEST
@@ -396,3 +396,24 @@ Jalur panel (Iris probe, `tran_ldo` bus i2c 6 / `et5904_regulators6[]`),
 `iris5.fw`, `iris5_ccf1.fw`, `iris5_ccf2.fw`,
 `pxlw-rm69220_..._x6871.fw` ada di `/vendor/firmware` dan belum pernah
 di-dump. Hanya ramdisk `vendor_boot` yang ada di disk.
+
+## Status per 2026-11-19 (akhir sesi)
+
+**TWRP boot normal dan aman dengan modul kita.** Vendor_boot TWRP (ramdisk
+zstd) yang diisi modul build kita memuat 238 modul, tanpa `Unknown symbol`,
+tampilan hidup (mediatek-drm bind + panel `rm69220...x6871`), sentuhan jalan
+(gt9916), dan USB/adb berfungsi.
+
+**System belum diuji dan sengaja belum disentuh.** `vendor_boot` hanya
+membawa `lib/modules`; boot ke system masih memerlukan pembaruan
+`vendor_dlkm` dan `odm_dlkm`, dan itu belum dilakukan.
+
+Artefak terakhir (release `boottest-20261119`):
+
+| Aset | Layout | Modul | md5 |
+|---|---|---|---|
+| `twrp-vendor_boot-fixed.img` | TWRP (zstd) | 238 | `327c4e52a0b81e807d71bba00138f6e5` |
+| `vendor_boot-new.img` | stock (lz4) | 218 | `e65fdcf92e15a1b9ffd2bafcc7b2ae73` |
+
+Commit terakhir: kernel `93b7ebca0841` (define `CONFIG_TC_CHARGER`),
+manifest `c53fce7`.
