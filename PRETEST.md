@@ -586,3 +586,64 @@ IOMMU bank, GCE), **ukuran tabel di `.ko` build harus sama dengan stock**.
 Selisih ukuran simbol data adalah tanda paling cepat; urutannya diverifikasi
 lewat relokasi string seperti di atas. Tabel yang diakses lewat nama
 (regulator, alias, `of_match`) tidak punya risiko ini.
+
+## 14. Stub inline karena `CONFIG_TC_CLASS_SUPPORT` tidak aktif
+
+Boot keempat (`pstore4.txt`) memuat 73 modul, tanpa `Unknown symbol`, lalu
+panic di 1,77 detik:
+
+```
+[misc_intf] tc_misc_probe: register tc_misc device failed
+[misc_intf] tc_get_misc_info: get tc_misc dev fail
+Unable to handle kernel NULL pointer dereference at virtual address 0000000000000020
+pc : tc_disable_hw_ovp+0x24/0x8c [tc_misc_intf]
+```
+
+### Bukti dari binari stock
+
+`tc_common_class.h` memilih implementasi berdasarkan
+`#if IS_ENABLED(CONFIG_TC_CLASS_SUPPORT)`: kalau makro itu tidak ada, semua
+fungsi jadi `static inline` stub (`tran_device_register()` mengembalikan
+`NULL`, `tran_get_by_name()` `NULL`, `tran_dev_set_prop()` `-ERROR_NO_IMPLEMENT`).
+
+Perbandingan simbol impor stock vs build:
+
+| modul | stock | build | hilang di build |
+|---|---|---|---|
+| `tc_misc_intf` | 4 | 0 | `tran_device_register`, `tran_get_by_name`, `tran_dev_set_prop`, `tran_dev_get_prop` |
+| `mtk_battery_manager` | 4 | 0 | idem |
+| `mt6375-battery` | 4 | 0 | idem |
+| `rt6160-regulator` | 1 | 0 | `tran_device_register` |
+| `tc_tfcp_ta` | 2 | 0 | `tran_dev_get_prop`, `tran_get_by_name` |
+| `tcpc_class` | 2 | 0 | `tran_dev_get_prop`, `tran_get_by_name` |
+| `tc_temp_forecast` | 4 | 2 | `tran_dev_get_prop`, `tran_get_by_name` |
+| `tc_tcpc` | 0 | 1 | (build justru lebih banyak) |
+
+Penyebabnya: di `drivers/power/supply/BUILD.bazel`, hampir semua target
+`tc_*` punya `copts = ["-DCONFIG_TC_CLASS_SUPPORT=1"]`, tetapi
+`tc_misc_intf`, `mtk_battery_manager`, dan dua target `*-battery` tidak.
+`drivers/regulator/BUILD.bazel` untuk `rt6160-regulator` juga tidak.
+
+Akibatnya `tc_misc_probe` memanggil `tran_device_register()` versi stub yang
+selalu mengembalikan `NULL`, device `tc_misc` tidak pernah terdaftar, dan
+`tc_disable_hw_ovp()` — yang tidak memeriksa hasil `tc_get_misc_info()` —
+membaca `info->pmic_dev`. `pmic_dev` ada di offset 0x20 `struct misc_info`,
+persis alamat fault di log.
+
+### Perbaikan
+
+Tambahkan `-DCONFIG_TC_CLASS_SUPPORT=1` ke copts target: `tc_misc_intf`,
+`mtk_battery_manager`, `{}_battery`/`{}-battery` (semua gauge),
+`rt6160-regulator`. Setelah itu modul-modul tersebut mengimpor set simbol
+`tran_*` yang sama dengan stock.
+
+Sisa selisih yang bukan soal config: `tc_temp_forecast`, `tc_tfcp_ta`,
+`tcpc_class`, `tc_tcpc` memanggil `tran_*` lebih sedikit/banyak daripada
+stock — itu drift sumber, bukan makro.
+
+### Aturan
+
+Selisih **set simbol impor** terhadap stock adalah cara tercepat menemukan
+fitur yang mati karena config, sebelum menyentuh hardware. Untuk modul
+Transsion, periksa khusus `tran_*`: kalau stock mengimpor dan build tidak,
+berarti ada define yang hilang dan driver itu berjalan dengan stub.
