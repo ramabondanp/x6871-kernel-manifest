@@ -137,47 +137,52 @@ else
     rm -f "$MODDIR"/*.ko
     cp -f "$WORK/newmods"/*.ko "$MODDIR"/
 
-    info "regenerasi modules.dep / modules.alias / modules.softdep"
-    python3 - "$MODDIR" <<'PY'
-import os, subprocess, sys
-moddir = sys.argv[1]
-mods = sorted(f for f in os.listdir(moddir) if f.endswith('.ko'))
+    info "regenerasi modules.dep / modules.alias / modules.softdep (depmod)"
+    # JANGAN pakai `modinfo -F depends`: field itu berisi NAMA MODUL, bukan
+    # nama file.  Contoh nyata: usb_dp_selector butuh "mediatek-drm", tapi
+    # filenya mediatek_drm_v1.ko, jadi dependensi itu hilang dan modul gagal
+    # load dengan "Unknown symbol mtk_dp_*".  depmod menghitung dependensi
+    # dari simbol + CRC, sama seperti yang dipakai init (libmodprobe).
+    VER=$(basename "$STAGING")
+    DEPBASE="$WORK/depmod"
+    rm -rf "$DEPBASE"
+    mkdir -p "$DEPBASE/lib/modules/$VER"
+    cp -f "$WORK/newmods"/*.ko "$DEPBASE/lib/modules/$VER/"
+    depmod -b "$DEPBASE" "$VER" 2>/dev/null || die "depmod gagal"
+    python3 - "$DEPBASE/lib/modules/$VER" "$MODDIR" <<'PY'
+import os, sys
+src, dst = sys.argv[1], sys.argv[2]
 
-def modinfo(path, field):
-    try:
-        out = subprocess.run(['modinfo', '-F', field, path],
-                             capture_output=True, text=True).stdout
-    except Exception:
-        return []
-    return [l.strip() for l in out.splitlines() if l.strip()]
+def flat(p):
+    return '/lib/modules/' + os.path.basename(p)
 
-present = set(mods)
-dep_lines, alias_lines, softdep_lines = [], [], []
-for m in mods:
-    p = os.path.join(moddir, m)
-    deps = []
-    for d in modinfo(p, 'depends'):
-        for one in d.split(','):
-            one = one.strip()
-            if not one:
-                continue
-            name = one if one.endswith('.ko') else one + '.ko'
-            if name in present and name != m:
-                deps.append('/lib/modules/' + name)
-    dep_lines.append('/lib/modules/%s:%s' % (m, ''.join(' ' + d for d in deps)))
-    for a in modinfo(p, 'alias'):
-        alias_lines.append('alias %s %s' % (a, m[:-3]))
-    for s in modinfo(p, 'softdep'):
-        softdep_lines.append('softdep %s %s' % (m[:-3], s))
+dep_lines = []
+for line in open(os.path.join(src, 'modules.dep')):
+    line = line.strip()
+    if not line:
+        continue
+    left, _, right = line.partition(':')
+    deps = ' '.join(flat(d) for d in right.split())
+    dep_lines.append('%s:%s' % (flat(left), (' ' + deps) if deps else ''))
 
-open(os.path.join(moddir, 'modules.dep'), 'w').write('\n'.join(dep_lines) + '\n')
-open(os.path.join(moddir, 'modules.alias'), 'w').write(
-    '# Aliases extracted from modules themselves.\n' + '\n'.join(alias_lines) + '\n')
-open(os.path.join(moddir, 'modules.softdep'), 'w').write(
-    '# Soft dependencies extracted from modules themselves.\n' + '\n'.join(softdep_lines) + '\n')
+open(os.path.join(dst, 'modules.dep'), 'w').write('\n'.join(dep_lines) + '\n')
+
+alias = [l.rstrip('\n') for l in open(os.path.join(src, 'modules.alias'))
+         if l.startswith('alias ')]
+softdep = [l.rstrip('\n') for l in open(os.path.join(src, 'modules.softdep'))
+           if l.startswith('softdep ')]
+open(os.path.join(dst, 'modules.alias'), 'w').write(
+    '# Aliases extracted from modules themselves.\n' + '\n'.join(alias) + '\n')
+open(os.path.join(dst, 'modules.softdep'), 'w').write(
+    '# Soft dependencies extracted from modules themselves.\n' +
+    '\n'.join(softdep) + '\n')
 print('[pack] modules.dep=%d modules.alias=%d modules.softdep=%d'
-      % (len(dep_lines), len(alias_lines), len(softdep_lines)))
+      % (len(dep_lines), len(alias), len(softdep)))
 PY
+
+    # sanity: dependensi yang namanya beda dari nama file harus ada
+    grep -q 'usb_dp_selector\.ko:.*mediatek_drm_v1\.ko' "$MODDIR/modules.dep" \
+        || die "modules.dep: usb_dp_selector tidak bergantung pada mediatek_drm_v1"
 
     info "filter modules.load / modules.load.recovery mengikuti stock"
     python3 - "$MODDIR" "$WORK/vb/../" <<'PY'

@@ -178,3 +178,44 @@ Ambil `dmesg` penuh setelah boot, lalu periksa:
 
 Uji round-trip (repack tanpa mengganti modul) menghasilkan isi ramdisk dan
 header yang **identik** dengan stock, jadi yang berubah hanya `lib/modules`.
+
+## 8. Kalau modul gagal load: cek `modules.dep`
+
+Gejala di `pstore`/`dmesg`:
+
+```
+init: Loading module /lib/modules/usb_dp_selector.ko with args ''
+usb_dp_selector: Unknown symbol mtk_dp_SWInterruptSet (err -2)
+usb_dp_selector: Unknown symbol mtk_dp_aux_swap_enable (err -2)
+usb_dp_selector: Unknown symbol mtk_dp_set_pin_assign (err -2)
+init: Failed to insmod '/lib/modules/usb_dp_selector.ko' with args '': No such file or directory
+init: Loaded 54 modules from /lib/modules
+init: Failed to load kernel modules
+init: InitFatalReboot: signal 6
+reboot: Restarting system with command 'bootloader'
+```
+
+Penyebabnya bukan modulnya, tapi **`modules.dep`**. `usb_dp_selector`
+mengimpor `mtk_dp_*` dari `mediatek_drm_v1.ko` (nama modulnya
+`mediatek-drm`), dan init (libmodprobe) memuat dependensi lebih dulu
+berdasarkan file itu. Kalau dependensi hilang, `mediatek_drm_v1` belum
+ter-load saat `usb_dp_selector` di-insmod → `Unknown symbol` → init abort →
+reboot ke bootloader.
+
+Versi awal `tools/pack-vendor-boot.sh` membuat `modules.dep` dari
+`modinfo -F depends`, dan field itu berisi **nama modul**, bukan nama file
+(`mediatek-drm` vs `mediatek_drm_v1.ko`), sehingga dependensi tersebut
+hilang tanpa peringatan. Sekarang skrip memakai `depmod` (berbasis simbol +
+CRC, sama seperti stock): 318 → 783 dependensi, dan
+`usb_dp_selector.ko: /lib/modules/mediatek_drm_v1.ko ...` kembali ada.
+
+Verifikasi cepat sebelum flash:
+
+```bash
+grep '^/lib/modules/usb_dp_selector.ko:' lib/modules/modules.dep
+# harus memuat /lib/modules/mediatek_drm_v1.ko
+```
+
+`Loaded N modules` yang kecil (mis. 54 dari 163 di `modules.load`) selalu
+berarti init berhenti di modul pertama yang gagal — bukan berarti ramdisk
+hanya berisi N modul.
