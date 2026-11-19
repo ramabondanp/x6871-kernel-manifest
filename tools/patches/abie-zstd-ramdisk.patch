@@ -1,0 +1,143 @@
+diff --git a/bbootimg/src/main/kotlin/bootimg/Common.kt b/bbootimg/src/main/kotlin/bootimg/Common.kt
+index 91ae21f..e375b16 100644
+--- a/bbootimg/src/main/kotlin/bootimg/Common.kt
++++ b/bbootimg/src/main/kotlin/bootimg/Common.kt
+@@ -175,6 +175,16 @@ class Common {
+                     ret = "lz4"
+                 }
+ 
++                ZipHelper.isZstd(s.dumpFile) -> {
++                    log.info("ramdisk is compressed zstd")
++                    Files.move(
++                        Paths.get(s.dumpFile), Paths.get(s.dumpFile + ".zst"),
++                        java.nio.file.StandardCopyOption.REPLACE_EXISTING
++                    )
++                    ZipHelper.zstdcat(s.dumpFile + ".zst", s.dumpFile)
++                    ret = "zst"
++                }
++
+                 ZipHelper.isAndroidCpio(s.dumpFile) -> {
+                     log.info("ramdisk is uncompressed cpio")
+                     Files.copy(
+@@ -267,6 +277,10 @@ class Common {
+                     ZipHelper.lz4(ramdiskGz, ByteArrayInputStream(outputStream.toByteArray()))
+                 }
+ 
++                ramdiskGz.endsWith(".zst") || ramdiskGz.endsWith(".zstd") -> {
++                    ZipHelper.zstd(ramdiskGz, ByteArrayInputStream(outputStream.toByteArray()))
++                }
++
+                 else -> {
+                     throw IllegalArgumentException("$ramdiskGz is not supported")
+                 }
+@@ -297,6 +311,13 @@ class Common {
+                     FileInputStream(f).use { ZipHelper.lzma(ramdiskGz, it) }
+                 }
+ 
++                ramdiskGz.endsWith(".zst") || ramdiskGz.endsWith(".zstd") -> {
++                    val suffix = if (ramdiskGz.endsWith(".zst")) ".zst" else ".zstd"
++                    val f = ramdiskGz.removeSuffix(suffix)
++                    AndroidCpio().pack(root, f, "${f}_filelist.txt")
++                    FileInputStream(f).use { ZipHelper.zstd(ramdiskGz, it) }
++                }
++
+                 ramdiskGz.endsWith(".xz") -> {
+                     val f = ramdiskGz.removeSuffix(".xz")
+                     AndroidCpio().pack(root, f, "${f}_filelist.txt")
+diff --git a/bbootimg/src/main/kotlin/bootimg/cpio/AndroidCpio.kt b/bbootimg/src/main/kotlin/bootimg/cpio/AndroidCpio.kt
+index 4ab7021..aecaf8c 100644
+--- a/bbootimg/src/main/kotlin/bootimg/cpio/AndroidCpio.kt
++++ b/bbootimg/src/main/kotlin/bootimg/cpio/AndroidCpio.kt
+@@ -304,7 +304,12 @@ class AndroidCpio {
+             val bytesRead = cis.bytesRead
+             cis.close()
+             val remaining = FileInputStream(cpioFile).use { fis ->
+-                fis.skip(bytesRead - 128)
++                // ramdisk kosong (mis. fragment "emptyrecovery" 60 byte) membuat
++                // bytesRead < 128; skip() dengan nilai negatif melempar IOException
++                val toSkip = bytesRead - 128
++                if (toSkip > 0) {
++                    fis.skip(toSkip.toLong())
++                }
+                 fis.readBytes()
+             }
+             val foundIndex = String(remaining, Charsets.UTF_8).lastIndexOf("070701")
+diff --git a/helper/src/main/kotlin/cfig/helper/ZipHelper.kt b/helper/src/main/kotlin/cfig/helper/ZipHelper.kt
+index 08da10b..4de3361 100644
+--- a/helper/src/main/kotlin/cfig/helper/ZipHelper.kt
++++ b/helper/src/main/kotlin/cfig/helper/ZipHelper.kt
+@@ -101,6 +101,7 @@ class ZipHelper {
+             get() = System.getProperty("os.name").contains("Windows")
+ 
+         private var lz4prog = ""
++        private var zstdprog = ""
+ 
+         /*
+             unzip(): unzip fileName to outDir
+@@ -490,6 +491,66 @@ class ZipHelper {
+             }
+         }
+ 
++        private fun getZstdProg(): String {
++            if (zstdprog.isBlank()) {
++                zstdprog = "zstd"
++                if (isWindows) {
++                    try {
++                        Runtime.getRuntime().exec(arrayOf("tools/bin/zstd.exe", "--version"), null, null)
++                        zstdprog = "tools/bin/zstd.exe"
++                    } catch (e: Exception) {
++                        log.warn("zstd not installed")
++                    }
++                }
++            }
++            return zstdprog
++        }
++
++        val hasZstd: Boolean
++            get() : Boolean {
++                try {
++                    Runtime.getRuntime().exec(arrayOf(getZstdProg(), "--version"), null, null)
++                    log.debug("zstd available")
++                } catch (e: Exception) {
++                    log.warn("zstd not installed")
++                    return false
++                }
++                return true
++            }
++
++        /* magic number zstd: 28 B5 2F FD */
++        fun isZstd(compressedFile: String): Boolean {
++            return try {
++                Dumpling(compressedFile).readFully(0L..3L).contentEquals(
++                    byteArrayOf(0x28.toByte(), 0xB5.toByte(), 0x2F, 0xFD.toByte())
++                )
++            } catch (e: Exception) {
++                false
++            }
++        }
++
++        fun zstdcat(zstFile: String, outFile: String) {
++            "${getZstdProg()} -d -f -q $zstFile -o $outFile".check_call()
++        }
++
++        fun zstd(zstFile: String, inputStream: InputStream) {
++            FileOutputStream(File(zstFile)).use { fos ->
++                val baosE = ByteArrayOutputStream()
++                DefaultExecutor().let { exec ->
++                    exec.streamHandler = PumpStreamHandler(fos, baosE, inputStream)
++                    // -15: level tinggi tapi masih wajar untuk ramdisk puluhan MB
++                    val cmd = CommandLine.parse("${getZstdProg()} -15 -T0 -q -c")
++                    log.info(cmd.toString())
++                    exec.execute(cmd)
++                }
++                baosE.toByteArray().let {
++                    if (it.isNotEmpty()) {
++                        log.warn(String(it))
++                    }
++                }
++            }
++        }
++
+         fun isAndroidCpio(compressedFile: String): Boolean {
+             return Dumpling(compressedFile).readFully(0L..5)
+                 .contentEquals(byteArrayOf(0x30, 0x37, 0x30, 0x37, 0x30, 0x31))

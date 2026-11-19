@@ -268,3 +268,49 @@ root fs`. Artinya initrd ditolak sebagai initramfs sehingga **tidak ada satu
 modul pun yang dimuat** — kegagalan packaging, bukan driver. Repack dengan
 tool ini menghasilkan arsip newc yang sah (diawali entri `adb_keys` seperti
 stock, `TRAILER!!!` + padding nol, magic lz4 legacy `02 21 4c 18`).
+
+## 10. Ramdisk zstd (TWRP) — tool perlu dipatch
+
+Image TWRP untuk X6871 memakai ramdisk **zstd** (`28 b5 2f fd`), bukan lz4.
+`cfig/Android_boot_image_editor` (commit `f692aff`) belum mengenalnya:
+`./gradlew unpack` berhenti dengan `ramdisk is in unknown format`.
+
+Patch: `tools/patches/abie-zstd-ramdisk.patch` (dibuat terhadap `f692aff`)
+
+```bash
+cd Android_boot_image_editor && git apply /path/tools/patches/abie-zstd-ramdisk.patch
+```
+
+Isinya:
+
+- `helper/.../ZipHelper.kt` — `getZstdProg()`, `hasZstd`, `isZstd()` (deteksi
+  lewat magic, bukan binary), `zstdcat()`, `zstd()` (kompres `-15 -T0`)
+- `bbootimg/.../Common.kt` — cabang `isZstd` di `dumpRamdisk` (suffix `.zst`)
+  dan cabang `.zst`/`.zstd` di kedua `packRootfs`
+- `bbootimg/.../cpio/AndroidCpio.kt` — `fis.skip(bytesRead - 128)` melempar
+  `IOException: Invalid argument` untuk ramdisk kosong (fragment TWRP
+  `emptyrecovery` 60 byte); sekarang di-skip hanya kalau nilainya positif
+
+### Repack TWRP dengan modul kita
+
+```bash
+cd vbwork-twrp           # clone editor + patch, taruh vendor_boot.img
+./gradlew unpack
+# root.1 = fragment PLATFORM (berisi lib/modules), root.2 = emptyrecovery
+M=build/unzip_boot/root.1/lib/modules
+rm -f $M/*.ko
+cp <set-modul>/*.ko $M/ && cp <set-modul>/modules.{dep,alias,softdep,load,load.recovery} $M/
+./gradlew pack
+```
+
+Untuk X6871 hasilnya: 240 modul, `modules.load.recovery` 236 entri,
+ramdisk tetap zstd, `dtb`/`bootconfig` identik TWRP asli, fragment
+`emptyrecovery` isinya sama (hanya ukuran terkompresi 60 → 61 byte), image
+dipad ke 67.108.864 byte.
+
+Catatan komposisi: set TWRP = 237 modul stock + `adaptive-ts`,
+`gt9916_common`, `tran_richtap_haptic_hv`. Modul yang kita build diganti versi
+kita (termasuk panel `panel-rm69220-vdo-x6871.ko` menggantikan
+`rm69220_fhdp_dsi_vdo_dsc_csot_csot_144hz_x6871.ko`), sisanya tetap versi
+TWRP/stock — `adaptive-ts` butuh `cloudengine_*` dari `transsion_tranlog`
+yang tidak kita build, jadi modul itu harus tetap ada agar sentuhan hidup.
