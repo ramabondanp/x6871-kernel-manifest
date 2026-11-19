@@ -869,6 +869,50 @@ modul firmware yang mengimpornya, jadi aman.
 
 Modul hilang: **61 → 51** dari 237. Total `.ko` di staging: 669.
 
+### 6.2i `tc_charger_framework` — modul terpenting yang tidak pernah dirilis
+
+`tc_charger_framework.ko` adalah **inti charging**: 78 ekspor GLOBAL
+(`create_votable`, `enable_primary_charger`, `get_charger_charging_current`,
+`charger_cloud_engine_init`, …). Ia ada di firmware tapi **tidak ada di donor
+6.1 maupun mt6897**.
+
+Yang dirilis Transsion hanya `tc_charger.c` (4.112 baris, hanya 3 ekspor:
+`tchr_get_debug_level`, `_wake_up_charger`, `tc_chg_switch_vbus_ovp`). Ketiga
+fungsi itu **ada di dalam `tc_charger_framework.ko`** di firmware — jadi
+`tc_charger.c` di-compile masuk ke modul itu, bukan jadi modul sendiri.
+
+**Dampaknya sekarang:** `tc_ambient_temp_det` dan `tc_pid_chg_algo` sudah
+selesai diport tapi **sengaja belum dimasukkan** karena keduanya mengimpor
+`tchr_get_debug_level`. Tanpa modul penyedianya, modprobe akan gagal.
+
+Yang masih bisa diselamatkan: `tchr_get_debug_level` hanyalah 48 byte —
+fungsi pembaca `desc->log_level` dengan fallback 3. Isinya sudah
+terverifikasi identik dengan source 6.1 (offset 760 = `log_level`). Tapi
+membuat modul shim hanya untuk satu fungsi berisiko: begitu
+`tc_charger_framework` asli dipasang, akan ada dua penyedia simbol itu.
+
+**Keputusan: tunggu, jangan shim.** Modul ini terlalu sentral untuk ditebak.
+Yang harus dilakukan adalah mencari donor 6.12 Transsion lain (perangkat lain
+dengan MTK 6.12 + Transsion), atau merekonstruksi 78 ekspor itu dari `.ko`.
+
+### 6.2j Status akhir port `tc_*`
+
+Modul hilang: **61 → 49** dari 237.
+
+Sudah masuk dan terverifikasi identik: `tc_common_class`, `tc_adapter_class`,
+`tc_algorithm_class`, `tc_misc_intf`, `tc_ta_class`, `tc_hl7139a`,
+`tc_lcd_notify`, `tc_pmic`, `tc_audio`, `tc_phy_insert_det`, `tc_tcpc`,
+`tc_port_corrosion_prevention`, `tc_water_detect`, `tc_pd_adapter`,
+`tc_temp_forecast`, `tc_otg_ctrl`.
+
+Tertunda karena `tc_charger_framework`: `tc_ambient_temp_det`,
+`tc_pid_chg_algo` (source sudah siap, tinggal menunggu fondasi).
+
+Belum ada source sama sekali: `tc_charger_framework`, `tc_gauge`,
+`tc_chg_type_det`, `tc_auto_test`, `tc_trancare`, `tc_pep50`,
+`tc_pd_algo`, `tc_pe20_algo`, `tc_hvdcp20_algo`, `tc_tc30_algo`,
+`tc_tfcp_ta`, `pca_tfcp_ta`.
+
 ### 6.3 Kesimpulan Tingkat D
 
 Jangan kerjakan Tingkat D sebelum Phase 3 selesai. Alasannya:
