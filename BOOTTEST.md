@@ -219,3 +219,11 @@ grep '^/lib/modules/usb_dp_selector.ko:' lib/modules/modules.dep
 `Loaded N modules` yang kecil (mis. 54 dari 163 di `modules.load`) selalu
 berarti init berhenti di modul pertama yang gagal — bukan berarti ramdisk
 hanya berisi N modul.
+
+Catatan penting dari uji boot pertama: **kernel yang berbeda build bukan
+penghalang.** Kernel uji (`6.12.117-...-Rama982`) berhasil boot dengan
+seluruh set modul stock, jadi pesan `disagrees about version of symbol ...
+(ignoring)` dan `Kernel module BTF mismatch detected` hanya informatif —
+jangan dikejar. Yang menentukan hanya apakah simbolnya ada. Karena itu
+satu-satunya penyebab kegagalan di log pertama adalah `modules.dep` yang
+kehilangan dependensi, bukan beda versi kernel.
