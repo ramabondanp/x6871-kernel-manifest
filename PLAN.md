@@ -1163,7 +1163,9 @@ masuk, sisa gap **35 modul**. Dikelompokkan menurut apakah ada jalan nyata:
   `panel-rm69220-vdo-x6871.ko`, ekspor **3 == 3 identik**, alias DT sama
   persis (`of:N*T*Crm69220,fhdp,dsi,vdo,dsc,csot,csot,144hz,x6871`). Yang beda
   hanya nama file; autoload ikut alias, bukan nama.
-- `rm69220_fhdp_dsi_vdo_dsc_csot_csot_144hz_cl8` — panel CL8, belum diport.
+- `rm69220_fhdp_dsi_vdo_dsc_csot_csot_144hz_cl8` — **tidak direncanakan**.
+  Perangkat target hanya X6871 dan DT `panel1@0` hanya memakai compatible
+  `...144hz,x6871`; CL8 tidak punya node DT di X6871.
 
 #### Satu dependency hilang, tapi dependency-nya di luar cakupan charger
 
@@ -1206,7 +1208,10 @@ Menyamakan itu berarti mengganti storage path, bukan menambah modul — dan
 
 `leds-aw22xxx` (+`tran-led-core`), `nfc_i2c`, `tran_fp`, `tran_rhi`,
 `tran_extcon_usb`, `tran_expand_key`, `tran_key_bigdata`, `tkv`,
-`tkv_recovery`, `tnek`, `thd`, `pca_tfcp_ta`, `ili7838e_*`.
+`tkv_recovery`, `tnek`, `thd`, `pca_tfcp_ta`.
+
+`ili7838e_*` dan `rm69220_..._cl8` **tidak direncanakan**: perangkat target
+hanya X6871, dan DT X6871 hanya punya compatible `...144hz,x6871`.
 
 `pca_tfcp_ta` (20 fungsi, semua LOCAL) adalah lapisan protokol di atas
 `tc_tfcp_ta` yang baru diport. Semua `tc_ta_device_*` yang ia impor sudah
@@ -1423,12 +1428,18 @@ tidak boot. Itu bukan cara memulai.
 
 ## 7. Phase 3 — panel + Iris (INI YANG PALING PENTING)
 
-Panel adalah satu-satunya penghalang boot sungguhan. Tiga modul:
+Panel adalah satu-satunya penghalang boot sungguhan. Perangkat target proyek
+ini **hanya X6871**, dan DT `panel1@0` hanya memakai satu compatible:
 
 ```
 rm69220_fhdp_dsi_vdo_dsc_csot_csot_144hz_x6871   <- panel utama X6871
-rm69220_fhdp_dsi_vdo_dsc_csot_csot_144hz_cl8
-ili7838e_fhdp_dsi_cmd_dsc_tm_tm_120hz_cl9
+```
+
+Dua nama panel lain yang muncul di donor/firmware **tidak direncanakan**:
+
+```
+rm69220_fhdp_dsi_vdo_dsc_csot_csot_144hz_cl8      <- bukan X6871, tanpa DT
+ili7838e_fhdp_dsi_cmd_dsc_tm_tm_120hz_cl9         <- bukan X6871, tanpa DT
 ```
 
 ### 7.1 Framework panel 6.1 == 6.12 (terverifikasi)
@@ -1625,7 +1636,8 @@ vsync_start, vsync_end, vtotal. `clock` = u32 di offset 0.
 
 #### Sisa Phase 3
 
-3. Port panel `ili7838e` (CMD+DSC) — ada di donor 6.1 **dan** w1vo 6.12.
+3. ~~Port panel `ili7838e` dan `rm69220_..._cl8`~~ — **tidak direncanakan**.
+   Perangkat target hanya X6871; keduanya tidak punya node DT di `frag0.dts`.
 4. DT: node `panel1@0` + GPIO/regulator sesuai `frag0.dts`.
 5. Pasang firmware `iris5.fw` + `pxlw-rm69220_..._x6871.fw` ke image.
 

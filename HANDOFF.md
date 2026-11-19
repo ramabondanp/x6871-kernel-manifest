@@ -114,6 +114,11 @@ Daftar commit per fitur ada di `git log` branch `w1vo36-6.12-port`.
 
 ## Yang tersisa: 31 modul
 
+Angka 31 masih menghitung dua varian panel perangkat lain (`ili7838e...cl9`,
+`rm69220...cl8`). Keduanya **tidak direncanakan** untuk X6871 — lihat bagian
+"Tidak direncanakan" di bawah. Panel X6871 sendiri sudah ada sebagai
+`panel-rm69220-vdo-x6871.ko`.
+
 ### Bukan gap — dibangun GKI build
 `arm_dsu_pmu`, `drm_display_helper`, `drm_dma_helper`,
 `industrialio-triggered-buffer`, `kfifo_buf`, `reboot-mode`,
@@ -124,9 +129,25 @@ Daftar commit per fitur ada di `git log` branch `w1vo36-6.12-port`.
 `panel-rm69220-vdo-x6871.ko` ekspornya **3 == 3 identik** dan alias DT sama.
 Autoload ikut alias, bukan nama berkas.
 
+### Tidak direncanakan — varian panel perangkat lain
+
+Perangkat target proyek ini **hanya X6871**. DT X6871 (`frag0.dts`,
+`panel1@0`) hanya memakai compatible:
+
+```
+rm69220,fhdp,dsi,vdo,dsc,csot,csot,144hz,x6871
+```
+
+Modul kita `panel-rm69220-vdo-x6871.ko` sudah melayani alias itu. Dua varian
+berikut **sengaja tidak direncanakan** (bukan blocker, bukan gap yang dikejar):
+
+- `ili7838e_fhdp_dsi_cmd_dsc_tm_tm_120hz_cl9`
+- `rm69220_fhdp_dsi_vdo_dsc_csot_csot_144hz_cl8`
+
+Keduanya untuk konfigurasi/panel perangkat lain; tidak ada node DT-nya di
+X6871. Jangan port kecuali target perangkat berubah.
+
 ### Berikutnya paling siap
-- 2 panel: `ili7838e_fhdp_dsi_cmd_dsc_tm_tm_120hz_cl9`,
-  `rm69220_fhdp_dsi_vdo_dsc_csot_csot_144hz_cl8` — source panel ada di donor.
 - `tc_trancare` — `status = "okay"`, terblokir `transsion_tranlog`.
 - `transsion_tranlog` — 92 fungsi / 108 KB, tanpa source, membawa
   `cloudengine_*`/`athena_*`/`arraylist_*`/`__tran_kfifo_*`. `submit_msg`
