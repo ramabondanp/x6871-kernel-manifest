@@ -1267,7 +1267,76 @@ header); `no_llseek` -> `noop_llseek`.
 Sisa: **33 modul** dari 237, dengan pembagian yang sama seperti §6.2n —
 8 bukan gap, 25 tanpa source atau di luar cakupan.
 
+### 6.2q `tran-led-core` direkonstruksi: layout ops dibuktikan dua `.ko`
+
+`tran-led-core` tidak ada di tarball resmi — dicek lengkap lewat aturan §6.1b:
+tidak ada file, tidak ada entri Makefile, tidak ada simbol Kconfig. Pencarian
+seluruh filesystem juga nihil. Tapi `.ko`-nya masih menyimpan **path source
+aslinya**:
+
+```
+../kernel_device_modules-6.12/drivers/leds/tran_led/core/tran_led_core.c
+../kernel_device_modules-6.12/drivers/leds/tran_led/core/tran_led_class.c
+```
+
+Artinya firmware X6871 dibangun dari tree **6.12**, bukan dari tarball 6.1.
+Diperkuat: 111 modul firmware membawa path build, **semuanya** menyebut
+`kernel_device_modules-6.12`, dan tidak satu pun menyebut `6.1`.
+
+Konsekuensi penting: donor 6.1 punya `tc_led_class.c` + `tc_led.c`, tapi itu
+**versi jauh lebih tua** — 7 ekspor dan `struct ops` 4 slot, sementara
+firmware punya 18 ekspor dan 13 slot. Donor hanya titik awal; layout harus
+dari `.ko`.
+
+#### Layout dibuktikan dua arah, bukan ditebak
+
+Diukur dari dua `.ko` independen, dan kedua pengukuran sepakat:
+
+1. `tran-led-core.ko`: setiap accessor memuat `dev->ops` dari `dev+0x08` lalu
+   slot tetap `0x00 set_i2c_retries … 0x60 show_tran_multicolor`.
+2. `leds-aw22xxx.ko` (konsumen): tabel `const ops` ada di `.rodata+0x140`, dan
+   tujuh entri non-NULL-nya mendarat tepat di `0x158/0x160/0x168/0x178/0x180/
+   0x198/0x1a0` → slot `0x18/0x20/0x28/0x38/0x40/0x58/0x60`.
+
+Keduanya identik, jadi layout ditetapkan oleh bukti, bukan disimpulkan dari
+header donor.
+
+#### Layout struct di-assert saat compile
+
+`tran_led_device`: ops `+0x08`, dev `+0x220`, `dev.driver_data` `+0x2b8`,
+`dev.class` `+0x538`, `sizeof` `0x778`.
+`tran_led_core`: class `+0x120`, `support_pdlc` `+0x128`, `chip_type` `+0x12c`,
+`primary_led` `+0x130`, `second_led` `+0x138`, mutex `+0x140`,
+`log_level` `+0x170`, `sizeof` `0x178`.
+
+#### Hasil verifikasi
+
+| Kriteria | Hasil |
+|---|---|
+| ekspor GLOBAL | **20 == 20 identik** |
+| slot ops | **11/11 offset identik** |
+| alias DT | identik (`tran,led_core`) |
+| `modinfo` name | identik (`tran_led_core`) |
+| atribut sysfs | identik (5 nama) |
+| offset probe | `0x118/0x120/0x128/0x140/0x170` identik |
+| ukuran alokasi | `0x778` dan `0x178` identik |
+
+Sisa beda impor hanya artefak inlining DDK: firmware punya
+`__check_object_size`/`__kmalloc_noprof`/`___ratelimit`, kita punya
+`__fortify_panic`. Pola yang sama sudah muncul di modul lain yang diterima
+(`tc_charger_framework` punya keduanya; `nfc_i2c` punya `__check_object_size`
+di kedua sisi).
+
+**Pelajaran baru:** offset struct adalah hal yang tidak bisa ditangkap build.
+Versi pertama menaruh `dev` di `+0x28`, bukan `+0x220`, dan tetap build hijau
+— padahal `leds-aw22xxx` membaca data privatnya dari `[led+0x2b8]`, jadi
+setiap probe akan rusak. Yang menemukannya adalah membandingkan offset hasil
+disassembly kita dengan firmware, bukan build.
+
+Sisa gap: **32 modul**. `leds-aw22xxx` kini tidak lagi terblokir.
+
 ### 6.3 Kesimpulan Tingkat D
+
 
 Jangan kerjakan Tingkat D sebelum Phase 3 selesai. Alasannya:
 `tran-ufshcd-*`, `tran_zram`, `tran_block`, `tran_mmc_block`, `trans_sched`
