@@ -10,11 +10,25 @@ fitur (`tran_fp`, `tnek`, `tkv`, `tran_extcon_usb`) hanya bagian kecil dari
    `vendor_ramdisk00/lib/modules/` (flat, tanpa direktori versi), bersama
    `modules.dep`, `modules.alias`, `modules.softdep`, `modules.load`,
    `modules.load.recovery`. Tidak ada partisi modul terpisah.
-2. **Vermagic mengikat kernel ke modul.** Stock:
-   `6.12.38-android16-5-gcc51d883045d-4k`. Build kita:
-   `6.12.38-android16-5-g2c4fd33ae6d8-4k`. Modul kita **tidak akan load**
-   di kernel stock, dan sebaliknya. Kalau hanya `vendor_boot` yang di-flash,
-   modul akan gagal dengan `version magic ... should be ...`.
+2. **Kernel dan modul terikat oleh simbol + CRC, bukan release string.**
+   Build ini memakai `CONFIG_MODVERSIONS`, dan `same_magic()` di
+   `kernel/module/version.c` melewati token pertama vermagic saat modul punya
+   CRC (`/* First part is kernel version, which we ignore if module has crcs */`).
+   Yang dibandingkan hanya ` SMP preempt mod_unload modversions aarch64`.
+   Konsekuensinya: release string boleh berbeda (`gcc51d883045d` vs
+   `g2c4fd33ae6d8`) selama simbol dan CRC-nya sama.
+
+   Sudah diverifikasi untuk pasangan ini:
+
+   | Uji | Hasil |
+   |---|---|
+   | simbol kernel yang dipakai kedua build | 2174 |
+   | CRC identik | **2174 / 2174** |
+   | modul build kita yang cocok CRC-nya dengan kernel stock | **795 / 795** |
+
+   Artinya modul kita bisa di-load di kernel stock, dan sebaliknya. Tetap
+   disarankan memakai kernel + modul dari satu build supaya perilaku kode
+   (bukan hanya ABI) konsisten.
 3. **Build kita tidak menghasilkan dtb/dtbo.** Target yang dipakai hanya
    membangun `Image` + modul, jadi `dtb` di dalam `vendor_boot` dan
    `dtbo.img` tetap milik stock. Ini risiko yang harus diamati di dmesg
@@ -135,9 +149,13 @@ Ambil `dmesg` penuh setelah boot, lalu periksa:
 
 ## 6. Kalau boot gagal
 
-1. Cek apakah kernel-nya benar: `uname -r` harus
-   `6.12.38-android16-5-g2c4fd33ae6d8-4k`.
-2. `dmesg | grep -i 'version magic'` → kernel dan modul beda build.
+1. `dmesg | grep -iE 'Unknown symbol|disagrees about version of symbol|no symbol version'`
+   → simbol hilang atau CRC beda. Ini pemeriksaan yang benar; pesan
+   `version magic ... should be` hanya muncul kalau bagian
+   ` SMP preempt mod_unload modversions aarch64` yang berbeda, bukan release.
+2. Cek kernel yang jalan: `uname -r`. Release string boleh berbeda dari build
+   modul (lihat §0.2), tapi kalau bukan kernel kita sama sekali, driver
+   vendor belum tentu ada.
 3. Tidak ada `/dev/block/by-name` → UFS tidak probe; cek
    `dmesg | grep -i ufs` dan `phy-mtk-ufs`.
 4. Layar mati tapi sistem hidup → panel/dtb; cek `dmesg | grep -i dsi`.

@@ -388,9 +388,13 @@ python3 tools/preboot-audit.py \
 | vermagic stock | `6.12.38-android16-5-gcc51d883045d-4k` — 1 grup, **beda commit** |
 | basename duplikat di staging | `mtk-socinfo.ko` (§11.4) |
 
-Karena vermagic stock (`gcc51d883045d`) berbeda dari build kita
-(`g2c4fd33ae6d8`), **kernel image dan seluruh modul harus dari build yang
-sama**. Mencampur `.ko` stock dengan kernel kita tidak akan bisa load.
+Release string vermagic stock (`gcc51d883045d`) berbeda dari build kita
+(`g2c4fd33ae6d8`), tapi itu **bukan** penghalang: dengan
+`CONFIG_MODVERSIONS`, `same_magic()` melewati token pertama vermagic
+(`kernel/module/version.c`: "First part is kernel version, which we ignore if
+module has crcs"). Yang menentukan hanya simbol + CRC. Untuk pasangan build
+ini: 2174 simbol kernel dipakai keduanya, **2174/2174 CRC identik**, dan
+795/795 modul build kita cocok CRC-nya dengan kernel stock.
 
 ### 11.2 Simulasi loader pada set pengganti
 
@@ -471,3 +475,47 @@ Untuk boot test, set pengganti 217 modul bersih di level loader: tidak ada
 simbol menggantung, tidak ada CRC mismatch, tidak ada tabrakan simbol. Sisa
 risiko ada di perilaku runtime, bukan di resolusi simbol — dan semuanya
 tercakup checklist §7.
+
+## 12. KMI / CRC lintas build (koreksi asumsi vermagic)
+
+Asumsi awal yang salah: "release string vermagic berbeda → modul tidak bisa
+load". `same_magic()` di `kernel/module/version.c`:
+
+```c
+/* First part is kernel version, which we ignore if module has crcs. */
+int same_magic(const char *amagic, const char *bmagic, bool has_crcs)
+{
+	if (has_crcs) {                 /* CONFIG_MODVERSIONS + __versions */
+		amagic += strcspn(amagic, " ");
+		bmagic += strcspn(bmagic, " ");
+	}
+	return strcmp(amagic, bmagic) == 0;
+}
+```
+
+Jadi dengan modversions, yang dibandingkan hanya sisa setelah spasi pertama
+(` SMP preempt mod_unload modversions aarch64`). Kompatibilitas nyata
+ditentukan oleh **keberadaan simbol + CRC per simbol**.
+
+Pengukuran untuk build ini:
+
+| Uji | Hasil |
+|---|---|
+| CRC kernel stock, dipanen dari `__versions` 237 modul stock | 3161 simbol |
+| simbol diekspor vmlinux build kita | 18769 |
+| simbol kernel yang dipakai kedua build | 2174 |
+| CRC identik pada irisan itu | **2174 / 2174** |
+| modul build kita yang seluruh impor-kernel-nya cocok CRC dengan stock | **795 / 795** |
+
+Kesimpulan: modul kita dapat di-load pada kernel stock, dan sebaliknya —
+release string tidak menghalangi.
+
+Catatan supaya tidak salah baca: bila dibandingkan **tanpa** menyaring ke
+simbol kernel, 126 modul tampak "CRC beda" (mis. `mtk_panel_ext_create`,
+`cmdq_pkt_create`, `get_charger_by_name`, `tran_led_device_register`). Itu
+simbol yang diekspor **modul lain**, bukan kernel. Karena kita mengganti
+seluruh set modul sekaligus, CRC antar-modul konsisten di dalam set kita
+(§2: 0 CRC mismatch), jadi perbedaan itu tidak relevan untuk boot.
+
+Tetap disarankan memakai kernel + modul dari satu build: bukan karena ABI,
+tetapi supaya perilaku kode (bukan hanya simbol) konsisten.
