@@ -1204,6 +1204,9 @@ memang memakai implementasi UFS berbeda dari yang built-in di tree ini.
 Menyamakan itu berarti mengganti storage path, bukan menambah modul — dan
 `sdcard_hw_reset`/`msdc_*` menyentuh jalur boot.
 
+**Keputusan 2026-11-19:** kelompok ini memakai **Opsi A (baseline GKI/MTK)**.
+Tidak diport. Rincian bukti, inventaris fork, dan rencana ada di §6.2s.
+
 #### Sisanya: fitur, bukan jalur boot
 
 `leds-aw22xxx` (+`tran-led-core`), `nfc_i2c`, `tran_fp`, `tran_rhi`,
@@ -1414,6 +1417,55 @@ Build target modul:
 
 Staging: 688 → **689** `.ko`. Sisa gap: 32 → **31**.
 
+### 6.2s Storage/UFS — Opsi A: baseline GKI/MTK (diputuskan 2026-11-19)
+
+Kelompok 10 modul storage **tidak diport**. Keputusan: pakai stack GKI/MTK
+yang sudah ada, karena (a) source fork tidak tersedia, (b) fork adalah satu
+paket all-or-nothing, dan (c) hardware MMC/SD X6871 disabled.
+
+#### Bukti
+
+| Pemeriksaan | Hasil |
+|---|---|
+| ikconfig boot X6871 | `CONFIG_BLOCK=y`, `CONFIG_SCSI_MOD=y`, `CONFIG_BLK_DEV_SD=y`, `CONFIG_SCSI_UFSHCD=y`, `CONFIG_SCSI_UFSHCD_PLATFORM=y` |
+| base DTB (dari `vendor_boot.img`) | `mmc@11240000` + `mmc@11242000` `status = "disabled"`; tidak ada `/odm/sd_tray` |
+| tarball donor `mt6897-full.tar.gz` (4,7 GB) | tidak ada `fs/atomic_storage`; `kernel/kernel-6.1` kosong; hanya `drivers/ufs/ufs-mediatek*`, `drivers/mmc/host/mtk-mmc.c`/`mtk-sd.c`, `fs/f2fs` |
+| pencarian simbol fork di donor | **0 hit**: `tran_badblocks`, `tran_get_sd_tray_insert_status`, `tran_ufshcd_pltfrm_init`, `tran_ufs_proc_bootdevice`, `blk_busyidle_event_subscribe` |
+| build path di `.ko` firmware | semua fork berasal dari `kernel_device_modules-6.12/fs/atomic_storage/` (67 file `.c`) |
+| vermagic | firmware `...gcc51d883045d`, build kita `...g2c4fd33ae6d8` → binary reuse tidak mungkin |
+
+#### Inventaris fork (`fs/atomic_storage`)
+
+| Modul | File `.c` | Ekspor |
+|---|---:|---:|
+| `tran-ufshcd-core` | 6 | 192 |
+| `tran_scsi_mod` | 10 | 242 |
+| `tran_sd_mod` | 2 | 46 |
+| `tran_block` | 36 | 709 |
+| `low_latency_sched` | 10 | 336 |
+| `tran_mmc_block` | 2 | 41 |
+
+Tujuh modul yang ditunda: 5 core fork (`tran-ufshcd-core`,
+`tran-ufshcd-pltfrm`, `tran_scsi_mod`, `tran_sd_mod`, `tran_block`) +
+`tran-proc-bootdevice-mod` + `low_latency_sched`.
+
+Tiga tidak direncanakan:
+
+- `tran_mmc_block` — MMC disabled di base DTB.
+- `sd_tray` — tidak ada node `/odm/sd_tray`.
+- `mtk-mmc-mod` — sudah dilayani `mtk-mmc.ko` (alias identik, 17/21 ekspor
+  sama; beda hanya empat helper ioctl Transsion). MMC juga disabled.
+
+#### Rencana
+
+1. Boot test baseline: probe `ufshcd`, `sd 0:0:0:0`, mount `/data`, tidak ada
+   `Unknown symbol tran_*`.
+2. Kalau userspace membuka `/proc/bootdevice` dan gagal, tulis shim kecil
+   (`manfid`/`serial`/`fw_version`/`manfdate`/`ffu_support`) — bukan port
+   modul 85 KB.
+3. Kalau storage gagal total, rekonstruksi `fs/atomic_storage` dari upstream
+   6.12.38 + hook sampai ekspor/impor cocok dengan `.ko` firmware.
+
 ### 6.3 Kesimpulan Tingkat D
 
 
@@ -1422,6 +1474,9 @@ Jangan kerjakan Tingkat D sebelum Phase 3 selesai. Alasannya:
 semuanya **fork subsistem inti**. Memasangnya berarti mengganti UFS, zram,
 block layer, dan scheduler sekaligus — dan kalau satu saja salah, device
 tidak boot. Itu bukan cara memulai.
+
+Untuk kelompok storage, keputusan sudah diambil di §6.2s: **Opsi A** —
+baseline GKI/MTK, fork ditunda, tiga modul MMC/SD tidak direncanakan.
 
 
 ---

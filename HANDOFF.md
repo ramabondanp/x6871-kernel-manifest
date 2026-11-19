@@ -1,7 +1,7 @@
 # HANDOFF — W1VO36 / X6871 kernel device modules
 
 Ditulis 2026-11-19 untuk sesi AI berikutnya. Baca ini dulu, lalu `PLAN.md`
-(bagian §6.1b, §6.2k, §6.2m, §6.2n, §6.2o, §6.2p, §6.2q, §6.2r).
+(bagian §6.1b, §6.2k, §6.2m, §6.2n, §6.2o, §6.2p, §6.2q, §6.2r, §6.2s).
 
 ## Status ringkas
 
@@ -114,10 +114,14 @@ Daftar commit per fitur ada di `git log` branch `w1vo36-6.12-port`.
 
 ## Yang tersisa: 31 modul
 
-Angka 31 masih menghitung dua varian panel perangkat lain (`ili7838e...cl9`,
-`rm69220...cl8`). Keduanya **tidak direncanakan** untuk X6871 — lihat bagian
-"Tidak direncanakan" di bawah. Panel X6871 sendiri sudah ada sebagai
-`panel-rm69220-vdo-x6871.ko`.
+Angka 31 masih menghitung nama yang **tidak direncanakan** untuk X6871:
+dua varian panel perangkat lain (`ili7838e...cl9`, `rm69220...cl8`) dan tiga
+modul MMC/SD (`tran_mmc_block`, `mtk-mmc-mod`, `sd_tray`). Panel X6871 sudah
+ada sebagai `panel-rm69220-vdo-x6871.ko`; `mtk-mmc-mod` sudah ada padanannya
+`mtk-mmc.ko`. Lihat bagian "Tidak direncanakan" di bawah.
+
+Kandidat nyata tinggal **18**: 7 storage yang ditunda (lihat §"Storage / UFS"),
+2 tranlog, dan 9 modul fitur.
 
 ### Bukan gap — dibangun GKI build
 `arm_dsu_pmu`, `drm_display_helper`, `drm_dma_helper`,
@@ -148,6 +152,8 @@ Keduanya untuk konfigurasi/panel perangkat lain; tidak ada node DT-nya di
 X6871. Jangan port kecuali target perangkat berubah.
 
 ### Berikutnya paling siap
+- **Boot test baseline storage (Opsi A)** — lihat checklist di bagian
+  "Storage / UFS". Ini yang menentukan apakah 7 modul fork masih diperlukan.
 - `tc_trancare` — `status = "okay"`, terblokir `transsion_tranlog`.
 - `transsion_tranlog` — 92 fungsi / 108 KB, tanpa source, membawa
   `cloudengine_*`/`athena_*`/`arraylist_*`/`__tran_kfifo_*`. `submit_msg`
@@ -156,14 +162,47 @@ X6871. Jangan port kecuali target perangkat berubah.
   firmware tapi **tidak** di build kita — jalurnya di-gate saat compile, jadi
   charger inti tidak bergantung padanya.
 
-### Storage / UFS — beda arsitektur, bukan modul lepas
-`tran-ufshcd-core`, `tran-ufshcd-pltfrm`, `tran_scsi_mod`, `tran_mmc_block`,
-`mtk-mmc-mod`, `sd_tray`, `tran_block`, `tran_sd_mod`,
-`tran-proc-bootdevice-mod`, `low_latency_sched`
+### Storage / UFS — **Opsi A: baseline GKI/MTK** (diputuskan 2026-11-19)
 
-`CONFIG_SCSI_UFSHCD=y` (built-in) dan vmlinux kita tidak punya
-`tran_ufshcd_*`, sedangkan firmware mengirim `ufs-mediatek-mod.ko` +
-`tran-ufshcd-core.ko` sebagai modul. Menyamakan = mengganti jalur storage.
+Kelompok storage **tidak diport sebagai fork**. Stack yang dipakai adalah
+yang sudah dibangun:
+
+- GKI builtin: `CONFIG_BLOCK=y`, `CONFIG_SCSI_MOD=y`, `CONFIG_BLK_DEV_SD=y`,
+  `CONFIG_SCSI_UFSHCD=y` (dibaca dari ikconfig boot X6871)
+- `ufs-mediatek-mod.ko`, `phy-mtk-ufs.ko`, `ufs-mediatek-dbg.ko`,
+  `blocktag.ko`, `rpmb.ko`, `rpmb-mtk.ko`, `cqhci.ko`
+
+#### Tidak direncanakan — hardware tidak ada (3)
+
+- `tran_mmc_block` — MMC block; kedua node `mmc@11240000` dan
+  `mmc@11242000` di base DTB X6871 berstatus `disabled`.
+- `sd_tray` — tidak ada node `/odm/sd_tray` di base DTB.
+- `mtk-mmc-mod` — sudah dilayani `mtk-mmc.ko`: alias identik, 17/21 ekspor
+  sama; beda hanya empat helper ioctl Transsion. MMC juga disabled.
+
+#### Ditunda sampai boot test (7)
+
+`tran-ufshcd-core`, `tran-ufshcd-pltfrm`, `tran_scsi_mod`, `tran_sd_mod`,
+`tran_block`, `tran-proc-bootdevice-mod`, `low_latency_sched`.
+
+Semuanya satu paket fork `fs/atomic_storage/` (67 file `.c`, ~2,9 MB `.ko`)
+yang saling impor `tran_*`. `ufs-mediatek-mod.ko` versi firmware juga
+di-patch untuk memanggil `tran_scsi_*` / `tran_ufshcd_*`, jadi tidak bisa
+diambil sebagian.
+
+Source tidak tersedia: tarball donor MT6897 6.1 (4,7 GB) tidak punya
+`fs/atomic_storage`, `tran_block`, `sd_tray`, `low_latency`, maupun
+`drivers/bootdevice`. Tidak ada tarball X6871 6.12 di workspace.
+
+Rencana:
+
+1. Boot test dengan baseline. Cek probe `ufshcd`, `sd 0:0:0:0`, mount
+   `/data`, dan tidak ada `Unknown symbol tran_*`.
+2. Kalau userspace membuka `/proc/bootdevice` dan gagal, tulis shim kecil
+   (`manfid`/`serial`/`fw_version`/`manfdate`/`ffu_support`) — bukan port
+   modul 85 KB.
+3. Kalau storage gagal total, baru eskalasi ke rekonstruksi
+   `fs/atomic_storage` dari upstream 6.12.38 + hook firmware.
 
 ### Fitur
 `tran_fp`, `tran_rhi`, `tran_extcon_usb`, `tran_expand_key`,
