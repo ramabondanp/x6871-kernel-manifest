@@ -1,9 +1,13 @@
 # PLAN — Port driver ke sumber X6871 (Infinix GT 20 Pro)
 
-Dokumen ini rencana kerja. `README.md` = cara build yang sudah jalan,
-`HANDOFF.md` = status build + jebakan. Dokumen ini = apa yang belum jalan.
+`HANDOFF.md` = mulai dari sini: status, aturan, lingkungan, yang sudah dan
+belum selesai, pengetahuan kritis. `README.md` = cara build. `PLAN.md` =
+catatan teknis lengkap per temuan (§6.x), termasuk bukti tiap keputusan.
 
-Status per 2026-11-18. Semua angka di bawah hasil pengukuran, bukan perkiraan.
+Status per 2026-11-19. Semua angka di bawah hasil pengukuran, bukan perkiraan.
+
+Ringkas: **688 `.ko` di staging, 32 modul firmware masih hilang** (dari 237).
+Untuk memulai sesi baru, baca `HANDOFF.md` lebih dulu.
 
 ---
 

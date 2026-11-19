@@ -1,87 +1,244 @@
-# HANDOFF — W1VO36.88-36-7 kernel build
+# HANDOFF — W1VO36 / X6871 kernel device modules
 
-Status per 2026-11-18: **`modules_install.user` berhasil**, 1.401 `.ko`,
-0 error. Target ABI tidak bisa lulus (lihat bawah).
+Ditulis 2026-11-19 untuk sesi AI berikutnya. Baca ini dulu, lalu `PLAN.md`
+(bagian §6.1b, §6.2k, §6.2m, §6.2n, §6.2o, §6.2p, §6.2q).
 
-## Hasil build
+## Status ringkas
 
-```
-target   : //kernel_device_modules-6.12:mgk_64_k612_customer_modules_install.user
-platform : mt6895        variant: user
-result   : Build completed successfully, 2011 actions, 800s
-output   : 1.401 file .ko
-```
+| Item | Nilai |
+|---|---|
+| `.ko` di staging | **688** |
+| Modul di firmware X6871 | 237 |
+| Masih hilang | **32** |
+| Build target | `//kernel_device_modules-6.12:mgk_64_k612_customer_modules_install.user` |
+| Build terakhir | sukses, 3 aksi (inkremental) |
+| Runtime | **belum pernah di-boot sama sekali** |
 
-Perintahnya ada di `build.sh`. Tiga flag yang wajib:
+Repo bersih, semua ter-push: `alps` dan `local`, branch `w1vo36-6.12-port`,
+HEAD `39044a9498af`. Manifest `main` di `e312a77`.
+
+## Objective
+
+Bangun modul device untuk X6871 (mt6895, kernel 6.12.38-android16-5) yang
+tidak punya source vendor, mulai dari tree W1VO36.88-36-7 / mt6895 yang sudah
+bisa build. Vendor sumber GPL resmi lebih diutamakan daripada RE; RE dipakai
+kalau memang tidak ada source.
+
+## Aturan keras
+
+1. **Jangan pakai `/tmp`** — pakai `/serverhive1/ramabondanp/tmp`.
+2. **Selalu commit + push setelah setiap perubahan, tanpa bertanya.**
+   Push ke `alps` dan `local` (branch `w1vo36-6.12-port`).
+3. Commit di tree 6.12 harus **bahasa Inggris**.
+4. Jangan satu commit untuk semua perubahan; satu commit per fitur.
+5. Repo manifest harus tetap ramping.
+6. **Cocokkan modul lewat fingerprint isi `.ko`, jangan lewat nama.**
+7. **Aturan §6.1b: "tidak ada `<nama>.c`" ≠ "tidak ada source".** Modul
+   gabungan tidak punya `.c` senama; namanya hanya ada di `Makefile` sebagai
+   `<module>-objs`. Periksa 5 hal berurutan: (1) `.c` senama, (2) entri
+   `Makefile`/`Kbuild`, (3) entri `Kconfig`, (4) **daftar mana** di `*.bzl`
+   (hanya `mgk_64_module_outs` yang sampai ke target device), (5) fingerprint
+   simbol.
+8. Perbandingan simbol **harus difilter `GLOBAL`**. `LOCAL FUNC` hanya
+   mencerminkan inlining.
+9. Perbandingan modul = himpunan simbol `GLOBAL` ekspor **dan** impor vs
+   firmware (`readelf -sW`).
+10. Layout struct **diukur dari `.ko`**, bukan didiff dari header.
+11. Perbedaan jumlah impor pada modul yang menyentuh sysfs bukan bug — build
+    DDK mengoptimalkan jalur sysfs/DT.
+12. **Build hijau bukan bukti isi benar.** Semua bug besar di sesi lalu
+    (kebocoran simbol panel, `charger_ops`/`tcpc_ops` meleset, `tc_tfcp_ta`
+    tidak mendaftarkan apa pun, tabel ops `pca_tfcp_ta` salah, `dev` di
+    offset salah) lolos dari build dan hanya ketahuan dari diff
+    ekspor/impor/relokasi.
+13. `tc_charger_class` **menggantikan** `charger_class` MTK (firmware tidak
+    mengirim `charger_class.ko`).
+14. 7 modul GKI (`arm_dsu_pmu`, `drm_display_helper`, `drm_dma_helper`,
+    `industrialio-triggered-buffer`, `kfifo_buf`, `reboot-mode`,
+    `syscon-reboot-mode`) **bukan gap** — ada di `mgk_module_ext_outs`.
+
+## Lingkungan
+
+- Workspace: `/serverhive1/ramabondanp/w1vo`
+- Manifest: `/serverhive1/ramabondanp/w1vo36-kernel-manifest`
+- Oracle firmware (237 `.ko`): `/serverhive1/ramabondanp/tmp/x6871/vr/root/lib/modules/`
+- DTBO otoritatif: `/serverhive1/ramabondanp/tmp/x6871/frag0.dts`
+- Konfigurasi kernel device: `/serverhive1/ramabondanp/tmp/bootRE_ikconfig`
+- Source donor 6.1 lengkap: `/serverhive1/ramabondanp/tmp/ts61-src/kernel/kernel_device_modules-6.1/`
+- Tarball resmi (donor, **6.1, jangan pernah jadi basis build**):
+  `/serverhive1/ramabondanp/tmp/mt6897-full.tar.gz`
+
+### Perintah build
 
 ```bash
---allow_ddk_unsafe_headers=1
---user_ddk_unsafe_headers=//kernel_device_modules-6.12:mtk_use_gki_unsafe_headers
---repo_env=SUPPORT_PLATFORM=mt6895
+cd /serverhive1/ramabondanp/w1vo
+TMPDIR=/serverhive1/ramabondanp/tmp BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1 \
+./tools/bazel --output_user_root="$PWD/out_bazel" build --config=stamp \
+  --repo_manifest="$PWD/kernel_device_modules-6.12/fake_manifest.xml" \
+  --experimental_writable_outputs --allow_ddk_unsafe_headers=1 \
+  --user_ddk_unsafe_headers=//kernel_device_modules-6.12:mtk_use_gki_unsafe_headers \
+  --repo_env=KERNEL_VERSION=kernel-6.12 --repo_env=KERNEL_BUILD_VARIANT=user \
+  --repo_env=DEFCONFIG_OVERLAYS=entry_level_legacy.config \
+  --repo_env=SUPPORT_PLATFORM=mt6895 --repo_env=SOURCE_DATE_EPOCH=0 \
+  --//build/bazel_mgk_rules:kernel_version=6.12 \
+  "//kernel_device_modules-6.12:mgk_64_k612_customer_modules_install.user"
 ```
 
-`mtk_use_gki_unsafe_headers` (di `kernel_device_modules-6.12/BUILD.bazel`,
-isi 4.187 header dari `ack_headers.bzl`) adalah kunci yang lama hilang. Tanpa
-itu puluhan module gagal `fatal error: file not found` karena sandbox DDK
-hanya berisi header yang dideklarasikan.
+Staging hasil build:
+`out_bazel/ad3c7b30a704e8551ed600a0d11ef0f0/execroot/_main/bazel-out/k8-fastbuild/bin/kernel_device_modules-6.12/mgk_64_k612_customer_modules_install.user/`
 
-## Target ABI: gagal, bukan karena KMI
+### Jebakan build
 
-`mgk_64_k612.user_customer_abi` gagal di `stg merge`, sebelum sempat
-membandingkan simbol dengan `gki/aarch64/abi.stg`:
+- `--user_ddk_unsafe_headers=...mtk_use_gki_unsafe_headers` **wajib**; tanpa
+  itu puluhan header hilang.
+- Target ABI `user_customer_abi` **tidak bisa lulus** (328 simbol duplikat
+  dari driver multi-varian). Referensi MTK/Samsung juga tidak menjalankannya.
+- Label `//kernel_device_modules-{}` **wajib** diikuti
+  `.format(kernel_version)` — generator sempat menjatuhkannya 4 kali.
+- Komentar Bazel adalah `#`, bukan `/* */`.
+- `ko_deps` harus memuat **setiap** penyedia simbol yang diimpor, kalau tidak
+  `modpost: "<sym>" undefined!`.
+- `v1/BUILD.bazel` ber-CRLF; pertahankan atau diff meledak.
+- `tar` gzip satu inti mati di tengah (>3 menit). Pakai
+  `pigz -dc file.tar.gz | tar -x -C dir` — 7.106 file <60 s.
 
+## Yang sudah selesai
+
+Tingkat A (overlay `entry_level_legacy.config`), Tingkat C (`tran_audio_control`,
+`splitswitch-gpio`, `hiber`), Iris divendorkan, panel rm69220, `tran_ldo`,
+seluruh fondasi charger `tc_*`, `tc_charger_framework`, 5 algoritma charging,
+`tc_tfcp_ta`, `pca_tfcp_ta`, `nfc_i2c`, dan **`tran-led-core`**.
+
+Daftar commit per fitur ada di `git log` branch `w1vo36-6.12-port`.
+
+## Yang tersisa: 32 modul
+
+### Bukan gap — dibangun GKI build
+`arm_dsu_pmu`, `drm_display_helper`, `drm_dma_helper`,
+`industrialio-triggered-buffer`, `kfifo_buf`, `reboot-mode`,
+`syscon-reboot-mode`
+
+### Sudah ada, hanya beda nama berkas
+`rm69220_fhdp_dsi_vdo_dsc_csot_csot_144hz_x6871` — modul kita
+`panel-rm69220-vdo-x6871.ko` ekspornya **3 == 3 identik** dan alias DT sama.
+Autoload ikut alias, bukan nama berkas.
+
+### Berikutnya paling siap
+- **`leds-aw22xxx`** — tidak lagi terblokir setelah `tran-led-core`. Source
+  6.1 ada (53 KB) tapi **ketinggalan 10 fungsi / 2.780 byte**
+  (`aw22xxx_cover_gain`, `get_chip_type`, `get_tran_led_cmd`,
+  `set_tran_led_cmd`, `ops_store/show_tran_led_cmd`, `multicolor_store/show`,
+  `tran_multicolor_store/show`) dan tabel ops-nya masih 4 slot, harus diganti
+  13 slot. DT aktif (`awinic,aw22xxx_led`, i2c `0x6a`).
+- 2 panel: `ili7838e_fhdp_dsi_cmd_dsc_tm_tm_120hz_cl9`,
+  `rm69220_fhdp_dsi_vdo_dsc_csot_csot_144hz_cl8` — source panel ada di donor.
+- `tc_trancare` — `status = "okay"`, terblokir `transsion_tranlog`.
+- `transsion_tranlog` — 92 fungsi / 108 KB, tanpa source, membawa
+  `cloudengine_*`/`athena_*`/`arraylist_*`/`__tran_kfifo_*`. `submit_msg`
+  mem-parse format string (`strlen`/`memcpy`/`kstrtoll`/`kstrtoint`).
+  Catatan: `tc_charger_framework` dan `tc_water_detect` mengimpor tranlog di
+  firmware tapi **tidak** di build kita — jalurnya di-gate saat compile, jadi
+  charger inti tidak bergantung padanya.
+
+### Storage / UFS — beda arsitektur, bukan modul lepas
+`tran-ufshcd-core`, `tran-ufshcd-pltfrm`, `tran_scsi_mod`, `tran_mmc_block`,
+`mtk-mmc-mod`, `sd_tray`, `tran_block`, `tran_sd_mod`,
+`tran-proc-bootdevice-mod`, `low_latency_sched`
+
+`CONFIG_SCSI_UFSHCD=y` (built-in) dan vmlinux kita tidak punya
+`tran_ufshcd_*`, sedangkan firmware mengirim `ufs-mediatek-mod.ko` +
+`tran-ufshcd-core.ko` sebagai modul. Menyamakan = mengganti jalur storage.
+
+### Fitur
+`tran_fp`, `tran_rhi`, `tran_extcon_usb`, `tran_expand_key`,
+`tran_key_bigdata`, `tkv`, `tkv_recovery`, `tnek`, `thd`
+
+## Pengetahuan kritis
+
+### `tran-led-core` sudah selesai — pakai layout ini, jangan ukur ulang
+
+Alamat: `drivers/leds/tran_led/` (`tran_led_class.c`, `tran_led_core.c`,
+`tran_led_class.h`, `BUILD.bazel`). Commit `39044a9498af`.
+
+Firmware dibangun dari tree **6.12**; `.ko` menyimpan path aslinya dan 111
+modul ber-path semuanya menyebut 6.12. Donor 6.1 hanya punya leluhur jauh
+lebih tua (`tc_led_class.c`, 7 ekspor, 4 slot ops).
+
+Layout sudah diverifikasi dua arah dan di-assert saat compile:
+
+- `struct tran_led_device`: ops `+0x08`, dev `+0x220`, `dev.driver_data`
+  `+0x2b8`, `dev.class` `+0x538`, `sizeof` `0x778`
+- `struct tran_led_core`: class `+0x120`, `support_pdlc` `+0x128`,
+  `chip_type` `+0x12c`, `primary_led` `+0x130`, `second_led` `+0x138`,
+  mutex `+0x140`, `log_level` `+0x170`, `sizeof` `0x178`
+- `struct tran_led_ops` 13 slot: `0x00` set_i2c_retries, `0x08`
+  set_i2c_timeout, `0x10` rw_i2c_data, `0x18` get_chip_type, `0x20` get_cmd,
+  `0x28` set_cmd, `0x30` tidak terdokumentasi (hanya jalur ioctl), `0x38`
+  store_tran_led_cmd, `0x40` show_tran_led_cmd, `0x48` store_tran_led_check,
+  `0x50` show_tran_led_check, `0x58` store_tran_multicolor, `0x60`
+  show_tran_multicolor
+
+Ekspor `tran-led-core` **20 == 20 identik** dengan firmware. Nama DT
+`tran,led_core`, modinfo `tran_led_core`.
+
+### Pola pasca-6.12 yang sudah dipetakan
+
+`platform_driver.remove` mengembalikan `void`; `class_create(THIS_MODULE,n)`
+→ `class_create(n)`; probe i2c kehilangan argumen `i2c_device_id` (definisi
+**dan** prototipe header); `no_llseek` → `noop_llseek`; `crc8()` 4 argumen
+(perlu `CRC8_INIT_VALUE`); `usb_types` bitmask `u32`, `num_usb_types` hilang;
+`<linux/pinctrl/consumer.h>` harus di-include eksplisit.
+
+Catatan: `tran-led-core` **tidak** memakai `noop_llseek` — firmware tidak
+mengimpornya, jadi `.llseek` dibiarkan NULL.
+
+### Kalau ada sumber tanpa spec: pakai interface yang dipublikasikan
+
+Cara yang terbukti pada `tc_tfcp_ta` (27/27 `tc_ta_device_ops`) dan
+`pca_tfcp_ta` (tabel 12 entri di `.data+0x108`): kalau `.ko` tidak di-strip
+dan modul mengimplementasikan interface yang sudah ada di header, signature
+diberikan oleh interface, dan peta register/callback dibaca dari immediate
+`mov w1, #0x..` serta relokasi `R_AARCH64_ABS64`.
+
+### Buat ulang generator
+
+`/serverhive1/ramabondanp/tmp/gen-tc30-hvdcp20.py` — menghasilkan
+`tc_tc30.*`/`tc_hvdcp20.*` dari `tc_pe20` dengan tukar prefix.
+`/serverhive1/ramabondanp/tmp/forkmatch.py` — mencocokkan himpunan fungsi
+`.ko` firmware dengan kandidat source MTK.
+
+### Skrip porting
+
+`port-tc-module.sh` — menyalin modul + menerapkan 6 patch 6.12
+(remove→void, class_create, probe i2c).
+
+## Resep verifikasi
+
+```bash
+B=<staging di atas>; F=/serverhive1/ramabondanp/tmp/x6871/vr/root/lib/modules
+# ekspor
+diff <(readelf -sW $B/<m>.ko | awk '$4=="FUNC"&&$7!="UND"&&$5=="GLOBAL"&&$8!=""{print $8}' | sort -u) \
+     <(readelf -sW $F/<m>.ko | awk '$4=="FUNC"&&$7!="UND"&&$5=="GLOBAL"&&$8!=""{print $8}' | sort -u)
+# impor
+diff <(readelf -sW $B/<m>.ko | awk '$7=="UND"{print $8}' | sort -u) \
+     <(readelf -sW $F/<m>.ko | awk '$7=="UND"{print $8}' | sort -u)
+# alias DT
+diff <(strings -a $B/<m>.ko | grep '^alias=' | sort) \
+     <(strings -a $F/<m>.ko | grep '^alias=' | sort)
 ```
-346x warning: duplicate symbol during merge: <nama>
-merge failed
-```
 
-328 simbol bentrok karena beberapa varian driver dibangun bersamaan:
+Untuk layout struct: cari `ldr x8,[x0,#0x8]` lalu `ldr x8,[x8,#N]`; `N/8`
+adalah indeks field. Bandingkan dengan firmware. Tambahkan `_Static_assert`
+agar build gagal kalau offset bergeser.
 
-| Simbol | Bentrok antara |
-|---|---|
-| `eara2fbt_*`, `fpsgo_*` | `performance/fpsgo_v3` + `fpsgo_v8` |
-| `DAL_SetColor`, `disp_*` | `drm/mediatek/mediatek_v2` + `mediatek_v2/v1` |
-| `display_enter_tui` | `tee/gud/{510,600,610,700}/TlcTui` |
-| `btmtk_set_country_code_from_wifi` | `bt/mt66xx` + `bt/linux_v2` |
+## Wajib diuji saat boot
 
-Untuk lulus, `mgk_64.bzl` harus dipersempit ke satu varian per driver.
-Build referensi MTK/Samsung tidak menjalankan target ini sama sekali —
-`build_kernel.sh` mereka hanya `modules_install` + `_dist`.
+Jalur panel (Iris probe, `tran_ldo` bus i2c 6 / `et5904_regulators6[]`),
+`tc_charger_framework` pada `tc,charger`, `nfc_i2c` pada `nxp,pn544`,
+`leds-aw22xxx` pada `awinic,aw22xxx_led`.
 
-## Jebakan yang sudah ditemukan
+## Blocker yang perlu dump image vendor/super
 
-| Gejala | Penyebab | Fix |
-|---|---|---|
-| `fatal error: '<header>' file not found` (puluhan module) | sandbox DDK hanya berisi header yang dideklarasikan; header privat kernel tidak ikut | `--user_ddk_unsafe_headers=...:mtk_use_gki_unsafe_headers` |
-| `--allow_ddk_unsafe_headers` tidak menolong | daftar unsafe bawaan AOSP tidak memuat header MTK | pakai target MTK di atas |
-| build sangat lambat / gagal di module platform lain | `SUPPORT_PLATFORM` kosong -> 14 platform ikut dibangun | `--repo_env=SUPPORT_PLATFORM=mt6895` |
-| `fatal error: '../virt-dma.h'` | commit Moto `917d6d689d69` hapus 73.548 file "identik ACK" | ikut tertutup flag di atas |
-| `duplicate default in manifest` | `<default>` kedua di local manifest | tulis `remote`/`revision` per project |
-| `use_repo(kernel_toolchain_info) already used` | root `MODULE.bazel` AOSP + MGK | pakai `mgk.MODULE.bazel` utuh |
-| `//build/bazel_common_rules/dist:dist.bzl` tidak ada | tidak ada di manifest AOSP | tambah repo `kernel_platform-build-bazel_common_rules` |
-| `key "KERNEL_VERSION" not found` | `export` tidak sampai ke module extension | `--repo_env=KERNEL_VERSION=...` |
-| `.../vendor/mediatek does not exist` | `mgk_repo.MODULE.bazel` pakai `path="../vendor/mediatek"` | symlink satu level di atas workspace |
-| `repo sync` gagal `Missing Cookiefile` | build `repo` di server ini wajib `http.cookiefile` | `git config --global http.cookiefile <file-kosong-format-Netscape>` |
-| `reproduce-cleanup.sh` berhenti "konflik tak terduga" | server bersih tanpa `user.name`/`user.email`; git lapor `Committer identity unknown` | script sekarang set identitas lokal otomatis |
-
-## Catatan server
-
-- Build ini multi-tenant: load average sering >400 di 96 core. Build 2011
-  action butuh ~13 menit; ABI target (~7.386 action) ~13 menit juga.
-- Jangan taruh `TMPDIR` di `/tmp` kalau server melarang. Bazel sendiri pakai
-  `<workspace>/out_bazel/.../javatmp`, tapi `mktemp`/`git`/`make` ikut TMPDIR.
-- Butuh ~60 GB disk untuk workspace + output.
-
-## Yang belum diuji
-
-- Runtime: campuran module Moto + donor OPPO belum pernah di-boot.
-- `mt6991` / `mt6993` (platform lain) belum dibangun; hanya `mgk_64.bzl` yang
-  menyebutnya.
-- 49 label module yang dihapus `setup.sh` (lihat README) — kalau nanti perlu,
-  cari donor lain.
-
-## Rencana lanjutan
-
-`PLAN.md` berisi rencana port driver untuk device tanpa source vendor
-(Infinix X6871 / mt6895 / kernel 6.12.38-android16-5 — SoC dan KMI sama
-dengan tree ini), termasuk Phase 3 panel + Pixelworks Iris.
+`iris5.fw`, `iris5_ccf1.fw`, `iris5_ccf2.fw`,
+`pxlw-rm69220_..._x6871.fw` ada di `/vendor/firmware` dan belum pernah
+di-dump. Hanya ramdisk `vendor_boot` yang ada di disk.
