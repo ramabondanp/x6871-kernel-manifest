@@ -417,3 +417,61 @@ Artefak terakhir (release `boottest-20261119`):
 
 Commit terakhir: kernel `93b7ebca0841` (define `CONFIG_TC_CHARGER`),
 manifest `c53fce7`.
+
+### Sumber stock `vendor_dlkm` dan `odm_dlkm`
+
+Dump firmware X6871 menyimpan partisi dlkm sebagai **tree file**, bukan image
+(tidak ada `super.img`/`vendor_dlkm.img`/`odm_dlkm.img`), tapi bisa diunduh
+per-partisi lewat parameter `path=` pada URL archive GitLab:
+
+```bash
+B="https://gitlab.com/rama-firmware-dumps/infinix/Infinix-X6871/-/archive/X6871-16.3.0.155SP20(OP008PF001AZ)/Infinix-X6871-X6871-16.3.0.155SP20(OP008PF001AZ).zip"
+curl -LO "$B?ref_type=heads&path=vendor_dlkm"   # 16 MB
+curl -LO "$B?ref_type=heads&path=odm_dlkm"      # 2.6 MB
+```
+
+Hasil ekstrak ada di `/serverhive1/ramabondanp/tmp/stock-dlkm/`:
+
+| Partisi | `.ko` | Ukuran | modules.load |
+|---|---|---|---|
+| `vendor_dlkm` | 219 | 54 MB | 201 entri |
+| `odm_dlkm` | 71 | 11 MB | 71 entri |
+
+Gabungan unik 288 modul; hanya 60 di antaranya juga ada di vendor_boot
+ramdisk stock (dan untuk yang overlap, ukurannya identik — mis.
+`mt6375-charger.ko` 127336 byte di kedua tempat). 177 modul ramdisk memang
+khas first-stage (`clk-*`, `aee_*`, `cmdq-*`, `bootprof`, `8250_mtk`, ...) dan
+tidak ada di dlkm.
+
+Cakupan build kita: 255 dari 288 modul dlkm sudah kita produksi. 33 modul
+belum (harus tetap pakai `.ko` stock):
+
+- `vendor_dlkm` (18): `sgm37864_v4l2`, `ocp81375_v4l2`, `aw8601af`, `dw9800k`,
+  `mtk-vcodec-sys-api`, `snd-soc-aw87xxx`, `snd-soc-oca72xxx`, `perf_common_v`,
+  `game`, `task_turbo_v`, `fpsgo`, `thd`, `transsion_tranlog`,
+  `snd-soc-fs1599`, `snd-soc-fs1894`, `elliptic-ultrasound`, `aw36515_v4l2`,
+  `ak7316`.
+- `odm_dlkm` (15): `focaltech_ft3683g`, `adaptive-ts`, `gt9916_common`,
+  `chipsemi_chsc5xxx_old`, `tran_richtap_haptic_hv`, `tran_key_bigdata`,
+  `dw9784ois`, `tran_health_sched`, `tran_mm_collect`, `pages_prefilter`,
+  `tran_zram`, `tc_trancare`, `tran_audio_typec`, `trans_sched`,
+  `tran_perf_util`, `aw36515`, `priority_allocate`.
+
+Diff per fungsi (nama + ukuran simbol `.text`) untuk 255 modul itu: **126
+modul berbeda**, 47 di antaranya berbeda berat. Puncaknya drift versi sumber,
+bukan salah config:
+
+| modul | fungsi kita/stock | hilang | ekstra | beda ukuran |
+|---|---|---|---|---|
+| `wlan_drv_gen4m_6895` | 6262/6644 | 412 | 30 | 457 |
+| `conninfra` | 1389/1704 | 315 | 0 | 24 |
+| `apusys` | 2253/2300 | 49 | 2 | 35 |
+| `imgsensor` (dua partisi) | 597/568 | 33 | 62 | 22 |
+| `tc_charger_framework` | 221/249 | 29 | 1 | 34 |
+
+Data lengkap: `/serverhive1/ramabondanp/tmp/dlkm-diff.json`.
+
+Catatan: karena dump hanya berisi tree, mengganti isi partisi dlkm berarti
+membuat image `erofs`/`ext4` sendiri lalu memasukkannya ke logical partition
+(`super`) + AVB — belum dikerjakan, dan boot ke system belum diuji.
+
