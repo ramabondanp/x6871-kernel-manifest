@@ -655,3 +655,49 @@ khusus `tran_*`:
   → define config hilang (kasus `tc_misc_intf`)
 - stock impor, build tidak, **dan sumber build tidak memanggilnya**
   → drift sumber; perlu porting kode stock, config tidak menolong
+
+## 15. Modul yang namanya beda dari stock ikut terbuang filter
+
+Boot kelima (`pstore5.txt`) berhasil memuat **214 modul** tanpa `NULL
+dereference`, tetapi layar mati dan USB tidak siap. Penyebab layar:
+
+```
+mtk-dsi 14017000.dsi: Waiting for bridge or panel driver
+platform 14017000.dsi: deferred probe pending: (reason unknown)
+```
+
+Panel untuk X6871 **ada** di build kita, hanya namanya berbeda dari stock
+sehingga terbuang oleh filter "hanya modul yang dikirim stock":
+
+| | nama file |
+|---|---|
+| stock | `rm69220_fhdp_dsi_vdo_dsc_csot_csot_144hz_x6871.ko` |
+| build | `panel-rm69220-vdo-x6871.ko` |
+
+Keduanya driver yang sama — alias-nya identik:
+`of:N*T*Crm69220,fhdp,dsi,vdo,dsc,csot,csot,144hz,x6871`. Karena
+`modules.load` stock menyebut nama stock, entri itu juga dibuang, jadi panel
+tidak pernah dimuat dan DSI menunggu selamanya.
+
+Perbaikan di `tools/pack-vendor-boot.sh`: peta `RENAME_MAP` yang menyebut
+pasangan nama stock → nama build. Modul dengan padanan dipertahankan, dan
+entri `modules.load`/`modules.load.recovery` milik stock diterjemahkan ke
+nama file kita (posisi urutan tetap). Hasil: 218 modul,
+`modules.load` 164 entri, `modules.load.recovery` 214 entri, panel ada di
+keduanya.
+
+Cara menemukan pasangan yang hilang tanpa hardware: bandingkan alias `of:`
+dari `modinfo -F alias` antara `.ko` stock dan set build. Untuk 20 modul
+stock yang tidak punya kembaran nama, hanya satu yang punya padanan alias —
+panel X6871 di atas.
+
+### Sisa masalah di log yang sama
+
+- `ssusb_hwrscs_req timeout, spm_ctrl=0x5f, value=0x1f` — SPM tidak
+  meng-ack bit `SSUSB_SPM_EMI_EN` (BIT 6). Muncul di semua boot (termasuk
+  sebelum perbaikan apa pun), jadi bukan regresi dari modul kita.
+- `is_usb_rdy: usb ready = 0` berulang — node USB di DT stock memang punya
+  properti `cdp-block` (base.dts:9002), jadi `ready = !cdp-block` selalu 0.
+  Deteksi BC1.2 menunggu, bukan berarti gadget mati.
+- `deferred probe pending` juga menyebut `odm:rt5133-gpio1/gpio2` yang
+  menunggu regulator `rt5133` LDO1.

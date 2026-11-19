@@ -87,6 +87,13 @@ mkdir -p "$WORK/root"
 lz4 -d -c "$WORK/vb/vendor_ramdisk00" | (cd "$WORK/root" && cpio -idm --quiet)
 [ -d "$WORK/root/lib/modules" ] || die "lib/modules tidak ada di ramdisk"
 
+# Sebagian modul stock punya nama file berbeda di build kita (driver sama,
+# alias of: sama).  Tanpa pemetaan ini modulnya terbuang oleh filter dan
+# perangkatnya mati, mis. panel X6871:
+#   stock  rm69220_fhdp_dsi_vdo_dsc_csot_csot_144hz_x6871.ko
+#   build  panel-rm69220-vdo-x6871.ko
+RENAME_MAP="rm69220_fhdp_dsi_vdo_dsc_csot_csot_144hz_x6871.ko=panel-rm69220-vdo-x6871.ko"
+
 MODDIR="$WORK/root/lib/modules"
 STOCK_COUNT=$(ls "$MODDIR"/*.ko 2>/dev/null | wc -l)
 (cd "$MODDIR" && ls *.ko 2>/dev/null) > "$WORK/stock-modules.txt"
@@ -115,12 +122,26 @@ else
         # Hanya modul yang memang dikirim stock: staging berisi ~795 .ko
         # termasuk modul platform lain yang tidak dipakai X6871.
         dropped=0
+        renamed=0
         for f in "$WORK/newmods"/*.ko; do
             b=$(basename "$f")
-            if ! grep -qxF "$b" "$WORK/stock-modules.txt"; then
+            if grep -qxF "$b" "$WORK/stock-modules.txt"; then
+                continue
+            fi
+            # modul yang cuma beda nama file dari versi stock tetap dipakai
+            target=""
+            for pair in $RENAME_MAP; do
+                case "$pair" in
+                    *=*) [ "${pair#*=}" = "$b" ] && target="${pair%%=*}" ;;
+                esac
+            done
+            if [ -n "$target" ]; then
+                renamed=$((renamed+1))
+            else
                 rm -f "$f"; dropped=$((dropped+1))
             fi
         done
+        [ "$renamed" = "0" ] || info "modul dengan nama stock: $renamed (lihat RENAME_MAP)"
         info "modul di luar set stock dibuang: $dropped"
     fi
     # Staging menyimpan .ko dengan debug info; stock tidak.  Tanpa strip,
@@ -185,9 +206,14 @@ PY
         || die "modules.dep: usb_dp_selector tidak bergantung pada mediatek_drm_v1"
 
     info "filter modules.load / modules.load.recovery mengikuti stock"
-    python3 - "$MODDIR" "$WORK/vb/../" <<'PY'
+    python3 - "$MODDIR" "$RENAME_MAP" <<'PY'
 import os, sys
 moddir = sys.argv[1]
+ren = {}
+for pair in sys.argv[2].split():
+    if '=' in pair:
+        a, b = pair.split('=', 1)
+        ren[a] = b
 stock_dir = '/serverhive1/ramabondanp/tmp/x6871/vr/root/lib/modules'
 present = {f for f in os.listdir(moddir) if f.endswith('.ko')}
 for name in ('modules.load', 'modules.load.recovery'):
@@ -199,6 +225,7 @@ for name in ('modules.load', 'modules.load.recovery'):
         line = line.strip()
         if not line or line.startswith('#'):
             continue
+        line = ren.get(line, line)          # stock -> nama .ko kita
         (keep if line in present else drop).append(line)
     open(os.path.join(moddir, name), 'w').write('\n'.join(keep) + '\n')
     print('[pack] %s: %d dipertahankan, %d dibuang (tidak ada di build)'
