@@ -853,3 +853,54 @@ domain (§13). Semuanya lolos dari audit ELF/CRC karena modulnya tetap bisa
 dimuat — yang hilang adalah **perilaku**. Deteksi paling andal: bandingkan
 ukuran/daftar fungsi `.ko` kita dengan stock per modul; fungsi yang hilang
 atau berukuran jauh berbeda menunjuk langsung ke `#if` yang salah cabang.
+
+## 19. Trim modul dlkm berdasarkan DT X6871
+
+Sebelum mem-port 35 modul dlkm yang belum kita build, daftar itu dipangkas
+memakai DT stock (`base.dtb` + satu fragmen `dtbo.img`). Caranya: ambil
+`compatible` dari semua node, lalu cocokkan dengan alias `of:` tiap `.ko`.
+
+Modul hardware yang benar-benar ada di board:
+
+| Modul | Node DT | Sumber |
+|---|---|---|
+| `sgm37864_v4l2` | `sgm37864_v4l2@64` | donor 6.1 (sudah di-port) |
+| `ocp81375_v4l2` | `ocp81375_v4l2@41` | donor 6.1 (sudah di-port) |
+| `aw8601af` | `camera_af_main@0C` | ditulis ulang (lihat di bawah) |
+| `snd-soc-fs1599` | `fs15xx_pa@34`, `@35` | donor 6.1 (sudah di-port) |
+| `gt9916_common` | `goodix,gt9916` | donor 6.1 (sudah di-port) |
+| `adaptive-ts` | core touch | donor 6.1 (sudah di-port) |
+| `tran_richtap_haptic_hv` | `haptic_hv@5A` | donor 6.1 (sudah di-port) |
+
+Tidak ada di DT, jadi tidak perlu di-port: `aw36515_v4l2`, `aw36515`,
+`ak7316`, `dw9800k`, `dw9784ois`, `focaltech_ft3683g`,
+`chipsemi_chsc5xxx_old`, `snd-soc-fs1894`, `snd-soc-aw87xxx`,
+`snd-soc-oca72xxx`, `elliptic-ultrasound`.
+
+17 modul software tidak punya alias/DT sama sekali dan dimuat lewat
+`modules.load`: `thd`, `transsion_tranlog`, `tran_zram`, `trans_sched`,
+`pages_prefilter`, `priority_allocate`, `tran_mm_collect`,
+`tran_perf_util`, `tran_health_sched`, `tran_key_bigdata`,
+`tran_audio_typec`, `tc_trancare`, `perf_common_v`, `game`,
+`task_turbo_v`, `fpsgo`, `mtk-vcodec-sys-api`. `transsion_tranlog` dan
+`thd` tetap wajib karena menjadi dependency `adaptive-ts`.
+
+### Catatan port
+
+- `snd-soc-fs1599`: perlu `-DCONFIG_SND_SOC_FS1599=1`, `ko_deps` ke
+  `mtk-sp-spk-amp`, dan `no_llseek` -> `noop_llseek`. Daftar fungsi sama
+  persis dengan stock (152/152).
+- `tran_richtap_haptic_hv`: `probe` 6.12 dan `GPIOF_DIR_IN` -> `GPIOD_IN`.
+  Daftar fungsi sama persis dengan stock (430/430).
+- `aw8601af`: tidak ada sumber di donor. Driver v4l2 ditulis ulang dari
+  disassembly stock: regulator `vin`/`vdd`, pinctrl `vcamaf_on`/`off`,
+  alamat i2c `0x0c`, init `0x02=01, 0x02=00, 0x02=02, 0x06=40, 0x07=7b,
+  0x03=01, 0x04=77`, posisi fokus ditulis ke reg `0x03` sebagai word
+  byte-swapped, range 0..1023. `aw8601af_set_ctrl` sama ukuran dengan
+  stock (0xa4).
+- `adaptive-ts`/`gt9916_common`: donor 6.1 lebih kecil dari build stock
+  X6871 (17 vs 189 dan 105 vs 186 fungsi). Fitur Transsion seperti
+  bigdata, mistouch, dan edge restrain belum ada. Perlu penyesuaian
+  6.12: `probe` i2c, `remove` platform mengembalikan void,
+  `asm/unaligned.h` -> `linux/unaligned.h`, `strlcpy` -> `strscpy`, dan
+  nilai enum `TRAN_DISP_BLANK_AOD_*` di `mtk_disp_notify.h`.
