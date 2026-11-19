@@ -1034,6 +1034,52 @@ mencari namanya. Yang menentukan adalah **daftar mana** ia berada —
 hanya `mgk_64_module_outs` yang masuk target device. Cari namanya di `.bzl`
 lalu periksa daftarnya.
 
+### 6.2l Hasil port tahap terakhir + bug panel yang ditemukan
+
+Modul hilang: **49 → 40** dari 237. Total `.ko` di staging: 680.
+
+Ditambahkan dan terverifikasi:
+
+| modul | ekspor | status |
+|---|---|---|
+| `tc_pd_algo` (gabungan `tc_pd.o` + `tc_pd_hal.o`) | 29 == 29 | IDENTIK |
+| `tc_auto_test` | 3 == 3 | IDENTIK |
+| `tc_gauge` | 32 vs 33 | `gauge_get_battery_id` 6.12-only, tak dipakai |
+| `tc_chg_type_det` | 2 == 2 | IDENTIK |
+| `tran_charge_transfer` | 4 vs 6 | 2 fungsi 6.12-only, tak dipakai |
+| `tran_usb_ctrl` | 2 == 2 | IDENTIK |
+
+#### Bug panel: dua simbol warisan donor yang bocor jadi GLOBAL
+
+`panel-rm69220-vdo-x6871.c` berasal dari donor mt6897. Dua fungsi
+(`mtk_get_res_switch_type`, `mtk_scaling_mode_mapping`) ikut terbawa, dan
+karena tidak diberi `static` keduanya menjadi **GLOBAL dan diekspor**.
+
+Panel firmware X6871 **tidak punya kedua simbol itu sama sekali** — bukan
+LOCAL, memang tidak ada. Sementara di tree ini ada **9 modul panel lain** yang
+mendefinisikan nama yang sama (`panel-alpha-jdi-nt36672e-*`,
+`panel-nt37801-*`, `panel-rm692h5-*`). Jadi build punya definisi global ganda.
+
+Keduanya hanya dipakai lewat tabel ops panel, tidak pernah dipanggil modul
+lain, jadi `static` adalah linkage yang benar.
+
+Setelah diperbaiki: **3 == 3 identik** (`get_mode_by_id`, `init_module`,
+`cleanup_module`), persis seperti firmware.
+
+**Pelajaran:** "berhasil build" bukan bukti isi benar. Bug ini hanya ketahuan
+karena membandingkan ekspor `.ko` kita dengan `.ko` firmware — modulnya
+sendiri berfungsi normal, yang rusak adalah namespace global bersama.
+
+#### `tran-led-core` — satu-satunya sisa yang memblokir modul ber-source
+
+`leds-aw22xxx` (1.818 baris, source tersedia) butuh
+`tran_led_device_register` / `tran_led_device_unregister` dari
+`tran-led-core`. Modul itu **tidak punya source** di donor mana pun (sudah
+diperiksa lewat Makefile, Kconfig, dan `.bzl` sesuai §6.1b). Ekspornya 19
+fungsi, dan hanya 3 yang dipakai modul lain.
+
+LED bukan jalur boot, jadi ini sengaja ditunda.
+
 ### 6.3 Kesimpulan Tingkat D
 
 Jangan kerjakan Tingkat D sebelum Phase 3 selesai. Alasannya:
