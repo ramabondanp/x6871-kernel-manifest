@@ -720,6 +720,58 @@ Patch 6.12 yang diperlukan:
 Skrip: `add-tc-charger-stack.sh` + `patch-tc-misc-6.12.sh` +
 `patches/tc_misc_intf_6_12_extra.c`, semuanya **reproduksi byte-identik**.
 
+### 6.2g TEMUAN: `struct tcpc_ops` juga drift — belum diperbaiki
+
+Pola yang sama seperti §6.2e muncul lagi, kali ini di `tcpc_class`. Saat
+mencoba `tc_tcpc`, build gagal karena `tcpm_tran_inquire_remote_cc` tidak ada.
+Ternyata fungsi itu memanggil `tcpc->ops->tran_get_cc_status`, dan field itu
+**tidak ada** di `tcpc_ops` versi kita.
+
+Perbandingan `struct tcpc_ops`:
+
+| | jumlah |
+|---|---|
+| Transsion 6.1 (`tcpci_core.h`) | 32 field |
+| tree kita 6.12 | 32 field |
+
+Jumlahnya kebetulan sama, isinya tidak:
+
+| idx | Transsion 6.1 | kita 6.12 |
+|---|---|---|
+| 16 | `get_vbus_voltage` | `get_vbus_voltage` |
+| **17** | **`tran_get_cc_status`** | `set_water_protection` |
+| 18 | `set_water_protection` | `set_cc_hidet` |
+| … | … | … (bergeser) |
+| 23 | `set_force_discharge` | `reset_ctd` |
+| 24 | `set_command` | `set_command` |
+
+Transsion menyisipkan `tran_get_cc_status` di slot 17 dan **membuang**
+`reset_ctd`. Akibatnya 7 field setelahnya bergeser satu slot — persis pola
+yang membuat charger salah panggil di §6.2e.
+
+**Yang mengisi `tcpc_ops` adalah `tcpc_mt6375.ko`**, bukan `tcpc_class.ko`.
+Jadi modul itu juga harus dibangun dengan header yang sama; kalau tidak,
+`tcpm_tran_inquire_remote_cc()` akan membaca slot yang salah.
+
+Modul firmware yang memakai `tcpm_*`:
+
+| modul | simbol `tcpm_*` |
+|---|---|
+| `tc_pd_adapter` | 13 |
+| `rt_pd_manager` | 11 |
+| `tcpc_mt6375` | 4 |
+| `tc_tcpc` | 3 |
+| `tc_water_detect` | 1 |
+
+**Belum dikerjakan.** Perlu:
+1. tambah `tran_get_cc_status` ke `tcpc_ops`, buang `reset_ctd`
+2. port `tcpm_tran_inquire_remote_cc()` ke `tcpm.c`
+3. pastikan `tcpc_mt6375.ko` (yang mengisi tabel) ikut dibangun dengan header baru
+4. verifikasi slot `tcpc_ops` di `tcpc_mt6375.ko` vs firmware
+
+Sampai itu selesai, `tc_tcpc`, `tc_port_corrosion_prevention`, `tc_pd_adapter`
+dan `tc_water_detect` tidak bisa dipasang.
+
 ### 6.2f Port `tc_*` tambahan (lanjutan 6.2d)
 
 Setelah fondasi charger masuk, 20 dari 61 modul yang masih hilang ternyata
