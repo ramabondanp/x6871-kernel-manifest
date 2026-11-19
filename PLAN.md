@@ -1434,6 +1434,11 @@ paket all-or-nothing, dan (c) hardware MMC/SD X6871 disabled.
 | build path di `.ko` firmware | semua fork berasal dari `kernel_device_modules-6.12/fs/atomic_storage/` (67 file `.c`) |
 | vermagic | firmware `...gcc51d883045d`, build kita `...g2c4fd33ae6d8` → binary reuse tidak mungkin |
 
+Closure baseline (2026-11-19): seluruh impor dari modul `ufs-mediatek-mod`,
+`phy-mtk-ufs`, `blocktag`, `rpmb`, `rpmb-mtk`, `cqhci`, `ufs-mediatek-dbg`,
+dan `mtk-mmc` disediakan oleh vmlinux atau `.ko` lain di staging —
+**0 simbol benar-benar hilang**.
+
 #### Inventaris fork (`fs/atomic_storage`)
 
 | Modul | File `.c` | Ekspor |

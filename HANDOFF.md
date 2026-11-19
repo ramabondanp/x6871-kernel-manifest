@@ -172,6 +172,9 @@ yang sudah dibangun:
 - `ufs-mediatek-mod.ko`, `phy-mtk-ufs.ko`, `ufs-mediatek-dbg.ko`,
   `blocktag.ko`, `rpmb.ko`, `rpmb-mtk.ko`, `cqhci.ko`
 
+Closure sudah dicek: seluruh impor kedelapan modul di atas disediakan oleh
+vmlinux atau `.ko` lain di staging — **0 simbol benar-benar hilang**.
+
 #### Tidak direncanakan — hardware tidak ada (3)
 
 - `tran_mmc_block` — MMC block; kedua node `mmc@11240000` dan
