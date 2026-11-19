@@ -1142,6 +1142,72 @@ dan `set_current_pattern` hilang: mekanismenya pindah ke `ta_dev_set_usb_ctrl_*`
 lalu `ta_dev_set_usb_ctrl_*` diarahkan ke `usb_control`. Tidak perlu menulis
 ~2.000 baris dari nol.
 
+### 6.2n Sisa 35 modul: apa yang benar-benar bisa dikerjakan
+
+Setelah `tc_pe20_algo`/`tc_tc30_algo`/`tc_hvdcp20_algo`/`tc_pep50`/`tc_tfcp_ta`
+masuk, sisa gap **35 modul**. Dikelompokkan menurut apakah ada jalan nyata:
+
+#### Bukan gap — dibangun GKI (§6.2k)
+
+`arm_dsu_pmu`, `drm_display_helper`, `drm_dma_helper`,
+`industrialio-triggered-buffer`, `kfifo_buf`, `reboot-mode`,
+`syscon-reboot-mode`. Ketujuhnya di `mgk_module_ext_outs`.
+
+#### Sudah ada, tinggal alias/nama
+
+- `rm69220_fhdp_dsi_vdo_dsc_csot_csot_144hz_x6871` — modul kita
+  `panel-rm69220-vdo-x6871.ko`, ekspor **3 == 3 identik**, alias DT sama
+  persis (`of:N*T*Crm69220,fhdp,dsi,vdo,dsc,csot,csot,144hz,x6871`). Yang beda
+  hanya nama file; autoload ikut alias, bukan nama.
+- `rm69220_fhdp_dsi_vdo_dsc_csot_csot_144hz_cl8` — panel CL8, belum diport.
+
+#### Satu dependency hilang, tapi dependency-nya di luar cakupan charger
+
+`tc_trancare` (`status = "okay"` di DT, jadi aktif). Ekspornya hanya satu
+fungsi (`tc_upload_tranlog_chgic_check`) dan **tidak diimpor modul mana pun**.
+Blocker-nya `transsion_tranlog` — **92 fungsi, 108 KB**, tanpa source di
+tarball resmi (sudah diperiksa lewat file, Makefile, dan Kconfig).
+
+`transsion_tranlog` bukan modul charger: ia membawa `cloudengine_*`,
+`athena_*`, `arraylist_*`, dan `__tran_kfifo_*` — satu stack telemetri
+lengkap. Enam fungsi yang dipakai `tc_trancare` (`alloc_msg`, `free_msg`,
+`msg_put_int`, `msg_put_string`, `submit_msg`, `tranlog_local`) hanya ~2,6 KB,
+tapi `submit_msg` sendirian memanggil `strlen`/`memcpy`/`kstrtoll`/`kstrtoint`
+/`simple_strtol` untuk mem-parse format string. Merekonstruksinya berarti
+menulis parser format sendiri tanpa spesifikasi.
+
+Catatan penting: `tc_charger_framework` dan `tc_water_detect` — yang **sudah
+diport dan build bersih** — sama-sama mengimpor `transsion_tranlog` di
+firmware, tapi build kita tidak: jalur itu di-gate saat compile. Jadi charger
+inti tidak bergantung pada tranlog.
+
+#### Storage path — beda arsitektur, bukan modul lepas
+
+`tran-ufshcd-core` (145 ekspor), `tran-ufshcd-pltfrm`, `tran_scsi_mod`,
+`tran_mmc_block`, `mtk-mmc-mod`, `sd_tray`, `tran_block`, `tran_sd_mod`,
+`tran-proc-bootdevice-mod`, `low_latency_sched`.
+
+Ini **bukan** tambahan kecil: `tran-ufshcd-core` adalah fork penuh `ufshcd.c`
+dengan hook (`scsi_host_alloc_hook`, `ufshcd_lba_tag_release_hook`,
+`ufshcd_queuecommand_first_hook`, `ufshcd_transsion_mq_init`).
+
+Yang menentukan: di device config, `CONFIG_SCSI_UFSHCD=y` — **built-in**.
+`tran_ufshcd_*` tidak ada di vmlinux kita, dan firmware mengirim
+`ufs-mediatek-mod.ko` + `tran-ufshcd-core.ko` sebagai modul. Jadi firmware
+memang memakai implementasi UFS berbeda dari yang built-in di tree ini.
+Menyamakan itu berarti mengganti storage path, bukan menambah modul — dan
+`sdcard_hw_reset`/`msdc_*` menyentuh jalur boot.
+
+#### Sisanya: fitur, bukan jalur boot
+
+`leds-aw22xxx` (+`tran-led-core`), `nfc_i2c`, `tran_fp`, `tran_rhi`,
+`tran_extcon_usb`, `tran_expand_key`, `tran_key_bigdata`, `tkv`,
+`tkv_recovery`, `tnek`, `thd`, `pca_tfcp_ta`, `ili7838e_*`.
+
+`pca_tfcp_ta` (20 fungsi, semua LOCAL) adalah lapisan protokol di atas
+`tc_tfcp_ta` yang baru diport. Semua `tc_ta_device_*` yang ia impor sudah
+tersedia di `tc_ta_class`. Ini kandidat terbaik berikutnya.
+
 ### 6.3 Kesimpulan Tingkat D
 
 Jangan kerjakan Tingkat D sebelum Phase 3 selesai. Alasannya:
