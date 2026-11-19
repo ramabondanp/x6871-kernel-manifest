@@ -904,3 +904,17 @@ Tidak ada di DT, jadi tidak perlu di-port: `aw36515_v4l2`, `aw36515`,
   6.12: `probe` i2c, `remove` platform mengembalikan void,
   `asm/unaligned.h` -> `linux/unaligned.h`, `strlcpy` -> `strscpy`, dan
   nilai enum `TRAN_DISP_BLANK_AOD_*` di `mtk_disp_notify.h`.
+
+### Gambar uji TWRP untuk port hardware
+
+`twrp-vendor_boot-hwports.img` (release `boottest-20261119`, md5
+`cee1e5ad2716dd9ac6a5f0227d946b9e`) memakai set TWRP yang sama dengan
+`twrp-vendor_boot-fixed.img`, tetapi tiga modul diganti hasil build kita:
+
+- `adaptive-ts` (core touch, 39 simbol `.text` setelah strip)
+- `gt9916_common` (Goodix, 109 simbol)
+- `tran_richtap_haptic_hv` (AWINIC, 469 simbol)
+
+Di TWRP yang bisa diuji: touch, haptic, dan tampilan. Flash (v4l2),
+VCM `aw8601af`, dan `snd-soc-fs1599` tidak bisa diuji di TWRP karena
+butuh userspace kamera/audio; itu menunggu boot ke system.
