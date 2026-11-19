@@ -1,21 +1,21 @@
 # HANDOFF — W1VO36 / X6871 kernel device modules
 
 Ditulis 2026-11-19 untuk sesi AI berikutnya. Baca ini dulu, lalu `PLAN.md`
-(bagian §6.1b, §6.2k, §6.2m, §6.2n, §6.2o, §6.2p, §6.2q, §6.2r, §6.2s).
+(bagian §6.1b, §6.2k, §6.2m, §6.2n, §6.2o, §6.2p, §6.2q, §6.2r, §6.2s, §6.2t).
 
 ## Status ringkas
 
 | Item | Nilai |
 |---|---|
-| `.ko` di staging | **689** |
+| `.ko` di staging | **693** |
 | Modul di firmware X6871 | 237 |
-| Masih hilang | **31** |
+| Masih hilang | **27** |
 | Build target | `//kernel_device_modules-6.12:mgk_64_k612_customer_modules_install.user` |
 | Build terakhir | sukses, 3 aksi (inkremental) |
 | Runtime | **belum pernah di-boot sama sekali** |
 
 Repo bersih, semua ter-push: `alps` dan `local`, branch `w1vo36-6.12-port`,
-HEAD `54c604b9378e`. Manifest `main` mengikuti commit HANDOFF/PLAN terakhir.
+HEAD `cb088a63c4b2`. Manifest `main` mengikuti commit HANDOFF/PLAN terakhir.
 
 ## Objective
 
@@ -107,21 +107,21 @@ Staging hasil build:
 Tingkat A (overlay `entry_level_legacy.config`), Tingkat C (`tran_audio_control`,
 `splitswitch-gpio`, `hiber`), Iris divendorkan, panel rm69220, `tran_ldo`,
 seluruh fondasi charger `tc_*`, `tc_charger_framework`, 5 algoritma charging,
-`tc_tfcp_ta`, `pca_tfcp_ta`, `nfc_i2c`, `tran-led-core`, dan
-**`leds-aw22xxx`**.
+`tc_tfcp_ta`, `pca_tfcp_ta`, `nfc_i2c`, `tran-led-core`, `leds-aw22xxx`,
+serta empat modul fitur: `tran_extcon_usb`, `tran_fp`, `tnek`, `tkv`.
 
 Daftar commit per fitur ada di `git log` branch `w1vo36-6.12-port`.
 
-## Yang tersisa: 31 modul
+## Yang tersisa: 27 modul
 
-Angka 31 masih menghitung nama yang **tidak direncanakan** untuk X6871:
+Angka 27 masih menghitung nama yang **tidak direncanakan** untuk X6871:
 dua varian panel perangkat lain (`ili7838e...cl9`, `rm69220...cl8`) dan tiga
 modul MMC/SD (`tran_mmc_block`, `mtk-mmc-mod`, `sd_tray`). Panel X6871 sudah
 ada sebagai `panel-rm69220-vdo-x6871.ko`; `mtk-mmc-mod` sudah ada padanannya
 `mtk-mmc.ko`. Lihat bagian "Tidak direncanakan" di bawah.
 
-Kandidat nyata tinggal **18**: 7 storage yang ditunda (lihat §"Storage / UFS"),
-2 tranlog, dan 9 modul fitur.
+Kandidat nyata tinggal **14**: 7 storage yang ditunda (lihat §"Storage / UFS"),
+2 tranlog, dan 5 modul fitur.
 
 ### Bukan gap — dibangun GKI build
 `arm_dsu_pmu`, `drm_display_helper`, `drm_dma_helper`,
@@ -151,9 +151,36 @@ berikut **sengaja tidak direncanakan** (bukan blocker, bukan gap yang dikejar):
 Keduanya untuk konfigurasi/panel perangkat lain; tidak ada node DT-nya di
 X6871. Jangan port kecuali target perangkat berubah.
 
+### Empat modul fitur selesai — jangan port ulang
+
+| Modul | Commit | Verifikasi |
+|---|---|---|
+| `tran_extcon_usb` | `3194d4f10237` | ekspor/impor/alias/`depends` **identik** |
+| `tran_fp` | `0e527bf7c6f4` | common layer; ekspor parsial (34 vs 136) |
+| `tnek` | `24b5fe361653` | **17 == 17 ekspor**, **25 == 25 impor** |
+| `tkv` | `cb088a63c4b2` | **11 == 11 ekspor**, **24 == 24 impor** |
+
+- `tran_extcon_usb`: match `transsion,extcon-usb`; `extcon-mtk-usb.ko` tetap
+  ada untuk node `mediatek,extcon-usb`. Jangan gabungkan keduanya.
+- `tran_fp`: source donor 6.1 `tran_common_v2` di
+  `drivers/input/fingerprint/tran_common/`, match `tran_fp_legacy`. Modul
+  firmware 6.12 membundel banyak backend vendor (`gf_*`, `ff_*`, ...); port
+  ini hanya common layer. **Wajib diuji saat boot**; kalau HAL butuh proc
+  debug atau key-nav vendor, tambahkan backend Goodix saja.
+- `tnek`: tidak ada source; direkonstruksi penuh. Node 0x418, pesan user
+  0x408, queue 9, `/dev/tnek`. `mcDrvModule` firmware mengimpor
+  `tnek_caller_api`; build kita meng-gate impor itu.
+- `tkv`: `/proc/tkv`, `g_tkv` (lcm inversion), region 32 KiB dari
+  `tkv=<desimal>` di bootargs. Bila bootargs tidak punya `tkv=`, modul
+  berhenti aman (firmware melakukan ioremap alamat 0).
+
 ### Berikutnya paling siap
 - **Boot test baseline storage (Opsi A)** — lihat checklist di bagian
   "Storage / UFS". Ini yang menentukan apakah 7 modul fork masih diperlukan.
+- `tkv_recovery` — sibling `tkv`, 20 KB, 11 ekspor / 24 impor; kandidat
+  berikutnya yang paling kecil.
+- `tran_rhi` — health info storage (ECC/erase/suhu), 47 KB, tanpa source.
+- `tran_expand_key` — dump manual volup+voldown 10 detik, 19 KB, 9 ekspor.
 - `tc_trancare` — `status = "okay"`, terblokir `transsion_tranlog`.
 - `transsion_tranlog` — 92 fungsi / 108 KB, tanpa source, membawa
   `cloudengine_*`/`athena_*`/`arraylist_*`/`__tran_kfifo_*`. `submit_msg`
@@ -208,8 +235,11 @@ Rencana:
    `fs/atomic_storage` dari upstream 6.12.38 + hook firmware.
 
 ### Fitur
-`tran_fp`, `tran_rhi`, `tran_extcon_usb`, `tran_expand_key`,
-`tran_key_bigdata`, `tkv`, `tkv_recovery`, `tnek`, `thd`
+`tran_rhi`, `tran_expand_key`, `tran_key_bigdata`, `tkv_recovery`, `thd`
+
+Catatan: `tran_key_bigdata` dan `thd` sama-sama bergantung pada
+`transsion_tranlog`, jadi keduanya tetap terblokir. `tran_rhi`,
+`tran_expand_key`, dan `tkv_recovery` mandiri.
 
 ## Pengetahuan kritis
 

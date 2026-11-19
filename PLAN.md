@@ -1471,6 +1471,85 @@ Tiga tidak direncanakan:
 3. Kalau storage gagal total, rekonstruksi `fs/atomic_storage` dari upstream
    6.12.38 + hook sampai ekspor/impor cocok dengan `.ko` firmware.
 
+### 6.2t Empat modul fitur selesai — `tran_extcon_usb`, `tran_fp`, `tnek`, `tkv`
+
+Empat modul prioritas dari kelompok fitur dikerjakan berurutan. Staging
+**689 → 693**; gap **31 → 27**.
+
+| Modul | Commit | Ekspor | Impor | Status verifikasi |
+|---|---|---|---|---|
+| `tran_extcon_usb` | `3194d4f10237` | identik | identik | alias + `depends` identik |
+| `tran_fp` | `0e527bf7c6f4` | parsial (34 vs 136) | parsial | alias `tran_fp_legacy` ada |
+| `tnek` | `24b5fe361653` | **17 == 17** | **25 == 25** | modinfo identik |
+| `tkv` | `cb088a63c4b2` | **11 == 11** | **24 == 24** | modinfo identik |
+
+#### `tran_extcon_usb`
+
+Firmware hanya mengirim modul ini, bukan `extcon-mtk-usb.ko`, dan DTBO
+mengganti compatible `mediatek,extcon-usb` menjadi `transsion,extcon-usb`.
+Modul kita tetap mempertahankan `extcon-mtk-usb.ko` untuk node
+`mediatek,extcon-usb` yang tersisa; modul baru hanya match compatible
+Transsion, jadi tidak ada rebutan.
+
+Perilaku yang direkonstruksi: `register_tc_tcpc_notifier` dan event
+`tc_tcpc` (OTG/audio plug, PD source/sink swap), debounce swap tiga kali
+500 ms, power supply dari phandle `charger` dengan fallback `primary_chg`,
+proc `/proc/mtk_typec/smt_u2_cc_mode` lewat `TRAN_PROP_TYPE_CC_SMT`, flag
+`mediatek,bypss-typec-sink`, dan uevent `SWITCH_NAME`/`SWITCH_STATE` pada
+perubahan `EXTCON_USB_HOST`.
+
+Verifikasi: ekspor/impor **identik**, alias **identik**
+(`transsion,extcon-usb`), `depends` **identik** (`tc_tcpc,tc_common_class`).
+
+#### `tran_fp`
+
+Basis: donor 6.1 `tran_common_v2` (main/ext/cust, 2.440 baris) dipindah ke
+`drivers/input/fingerprint/tran_common/`, lalu disesuaikan ke 6.12 dan ke
+compatible X6871 `tran_fp_legacy`.
+
+Modul firmware 6.12 adalah bundel multi-vendor `tran_common` dengan **136
+ekspor** (`gf_*`, `ff_*`, `anc_*`, `cdf_*`, `egf_*`, ...). Tidak ada modul
+lain yang mengimpor ekspor tersebut; X6871 memakai Goodix dan HAL memakai
+`/dev/tran_fp` untuk kontrol (init, reset, IRQ, power, SPI clock, chip
+info, key event), netlink route 30/29, input, pinctrl/regulator, dan
+`/sys/kernel/tran_fp/vendor_name`. Port ini membawa common layer itu,
+bukan backend vendor lain. Karena itu ekspor/impor **tidak identik** dan
+wajib diuji saat boot.
+
+Perubahan 6.12: lookup DT lewat `dev.of_node` (bukan
+`of_find_compatible_node("tran_fp")`), match `tran_fp_legacy`, include
+`pinctrl/consumer.h` + `regulator/driver.h`/`internal.h`,
+`gpiod_set_debounce`, `KEY_F28 = KEY_ENTER` (tabel firmware memetakan F28
+ke 28), dan buang include TEE/power yang tidak dipakai.
+
+#### `tnek`
+
+Tidak ada source di donor maupun tarball. Direkonstruksi penuh dari `.ko`:
+node 0x418 byte (list +0x00, tag +0x10, api +0x30, type +0x38, data +0x3c,
+name +0x3f8), pesan user 0x408 byte, queue maksimum 9 node (drop tertua),
+`/dev/tnek` misc device, poll/read/write, empat caller API, `tne_pollwait`
+/`tne_readwait`, dan `strlcpy` ekspor vendor yang sudah tidak ada di 6.12.
+
+Verifikasi: **17 ekspor identik, 25 impor identik**, `depends` kosong
+identik. `mcDrvModule` firmware mengimpor `tnek_caller_api`; build kita
+meng-gate impor itu, tetapi modulnya sekarang tersedia bila jalur TEE
+diaktifkan.
+
+#### `tkv`
+
+Direkonstruksi dari `.ko`. Membaca `/chosen` → `bootargs` → `tkv=<desimal>`,
+memetakan region 32 KiB dengan `ioremap_prot`, menyalin ke `tkv_value`,
+membuat `/proc/tkv` untuk membaca pasangan `key=value` (batas 90 byte,
+melewati `ro.bootimage.build.fingerprint`), dan menerima tulis desimal yang
+disimpan ke `g_tkv` sebagai “lcm invertion”.
+
+Perbedaan yang disengaja: bila `tkv=` tidak ada di bootargs, init berhenti
+dengan log `get_tkv_base fail` dan tidak melakukan `ioremap` alamat 0
+(firmware tetap melanjutkan dan berpotensi memfault).
+
+Verifikasi: **11 ekspor identik, 24 impor identik**, `depends` kosong
+identik.
+
 ### 6.3 Kesimpulan Tingkat D
 
 
@@ -1482,6 +1561,11 @@ tidak boot. Itu bukan cara memulai.
 
 Untuk kelompok storage, keputusan sudah diambil di §6.2s: **Opsi A** —
 baseline GKI/MTK, fork ditunda, tiga modul MMC/SD tidak direncanakan.
+
+Empat modul fitur sudah selesai di §6.2t (`tran_extcon_usb`, `tran_fp`,
+`tnek`, `tkv`), jadi staging **693** dan gap **27**. Sisa kandidat nyata:
+**14** — 7 storage ditunda, 2 tranlog, dan 5 fitur (`tran_rhi`,
+`tran_expand_key`, `tran_key_bigdata`, `tkv_recovery`, `thd`).
 
 
 ---
