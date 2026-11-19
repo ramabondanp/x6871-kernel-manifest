@@ -385,6 +385,49 @@ mendefinisikan simbol-simbol itu. Alatnya sekarang ada di repo:
 Skrip itu membaca semua `.ko`, mengindeks semua definisi fungsi di `.c/.h`,
 dan mencetak file sumber terbaik per modul beserta skor `%`.
 
+#### ATURAN WAJIB: "tidak ada `<nama>.c`" BUKAN berarti "tidak ada source"
+
+Ini kesalahan yang sudah dua kali saya buat, dan akibatnya modul penting
+sempat saya nyatakan mustahil padahal sourcenya lengkap:
+
+> `find . -name 'tc_charger_framework.c'` mengembalikan kosong, jadi saya
+> menulis "Transsion tidak pernah merilis modul ini". Kenyataannya kelima
+> komponennya ada dan Makefile donor menyebutkan komposisinya secara
+> eksplisit.
+
+Modul gabungan (compound module) di kernel **tidak punya file `.c` bernama
+sama dengan modulnya**. Namanya hanya ada di `Makefile` sebagai
+`<modul>-objs`. Karena itu, sebelum menyimpulkan "tidak ada source", wajib
+menempuh urutan berikut:
+
+| # | Periksa | Perintah |
+|---|---|---|
+| 1 | file `.c` bernama sama | `find $SRC -name "<modul>.c"` |
+| 2 | **entri `Makefile`** | `grep -rn "<modul>" $SRC --include=Makefile --include=Kbuild` |
+| 3 | **entri `Kconfig`** | `grep -rn "<modul>" $SRC --include=Kconfig*` |
+| 4 | **daftar modul bazel** | `grep -rn "<modul>" $SRC --include='*.bzl' --include=BUILD.bazel` |
+| 5 | sidik jari simbol | `./audit-sources.sh` (§6.1b) |
+
+Langkah 2 yang menjawab kasus `tc_charger_framework`:
+
+```make
+tc_charger_framework-objs := tc_charger.o tc_charger_intf.o tc_charger_attr.o \
+                             tc_basic_charger.o tc_voter.o
+```
+
+Modul gabungan juga sering muncul di daftar `.bzl` Kleaf. `tc_charger_framework`
+tercatat di `kernel/kleaf/mgk_64_k61.bzl` baris 587 — itu bukti tambahan yang
+juga terlewat saat saya memeriksa.
+
+**Konsekuensi praktis:** untuk modul gabungan, cara membangunnya bukan mencari
+satu `.c`, tapi mendaftar semua `<modul>-objs` sebagai `srcs` dalam satu
+`define_mgk_ddk_ko()`. Itulah yang dipakai untuk `tc_charger_framework`
+(commit `439b840`).
+
+Aturan ini juga berlaku untuk `hiber` (compound: `tran_hiber` +
+`tran_netfilter` + `hiber_help`) yang sudah lebih dulu diport — di sana
+kebetulan namanya cocok sehingga tidak terasa.
+
 **Hasil audit ulang (2026-11-19), sumber = tree Transsion 6.1 lengkap
 (7.106 file `.c/.h`, 2 GB, `android15-split`):**
 
