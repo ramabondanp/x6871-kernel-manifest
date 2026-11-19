@@ -730,56 +730,65 @@ Ternyata fungsi itu memanggil `tcpc->ops->tran_get_cc_status`, dan field itu
 Perbandingan `struct tcpc_ops` — **diukur dari `.data` `tcpc_mt6375.ko`
 firmware**, bukan dari header. Slot ditemukan lewat relokasi
 `R_AARCH64_ABS64` ke `.text`; `base` dikalibrasi dari `mt6375_tcpc_init`
-(selalu field 0).
+(selalu field 0, di 0x130).
 
 | | jumlah field |
 |---|---|
 | firmware | **37** |
 | kita (dan Transsion 6.1) | 32 |
 
-Firmware menyisipkan **4 field** dan membuang 1:
+Pemetaan lengkap hasil ukur (yang terisi di `tcpc_mt6375.ko`):
 
 | idx | firmware | kita |
 |---|---|---|
-| 16 | `get_vbus_voltage` | `get_vbus_voltage` |
+| 0–16 | sama | sama |
 | **17** | **`tran_get_cc_status`** | `set_water_protection` |
-| 18–20 | **3 field tak dikenal** (NULL di `tcpc_mt6375`) | `set_cc_hidet`, `get_cc_hi`, `set_vbus_short_cc` |
+| **18** | **`get_pdphy_vid`** | `set_cc_hidet` |
+| **19** | **`get_pdphy_pid`** | `get_cc_hi` |
+| **20** | **`get_pdphy_did`** | `set_vbus_short_cc` |
 | 21 | `set_water_protection` | `set_low_power_mode` |
 | 22 | `set_cc_hidet` | `set_force_discharge` |
 | 23 | `get_cc_hi` | `reset_ctd` |
-| 24 | `set_vbus_short_cc` | `set_command` |
+| 24 | `set_vbus_short_cc` | **`set_command`** ← dibuang di firmware |
 | 25 | `set_low_power_mode` | `set_msg_header` |
 | 26 | `set_force_discharge` | `set_rx_enable` |
 | 27 | `reset_ctd` | `get_message` |
-| 28–29 | **2 field tak dikenal** (NULL) | `protocol_reset`, `transmit` |
+| **28** | **`source_vbus`** | `protocol_reset` |
+| **29** | **`enable_io_boost`** | `transmit` |
 | 30 | `set_msg_header` | `set_bist_test_mode` |
-| … | … | … |
+| 31 | `set_rx_enable` | `retransmit` |
+| 32–36 | `get_message`, `protocol_reset`, `transmit`, `set_bist_test_mode`, `retransmit` | — |
 
-Jadi `tcpc_ops` firmware = 32 field 6.1 + 5 sisipan (3 di idx 18–20, 2 di
-idx 28–29) + `tran_get_cc_status` di idx 17 = **37**. Catatan awal saya
-("cuma beda 1 field") **salah** — angka itu datang dari membandingkan dua
-header, bukan dari mengukur `.ko`. Ini persis kesalahan yang §6.2e peringatkan.
+Jadi: firmware = 32 field 6.1 **+ 6 field baru − `set_command` = 37**.
+Enam field baru itu disisipkan di dua titik (4 sesudah `get_vbus_voltage`,
+2 sesudah `reset_ctd`), jadi semua field sesudahnya bergeser.
 
-**Yang mengisi `tcpc_ops` adalah `tcpc_mt6375.ko`**, bukan `tcpc_class.ko`.
-Karena itu modul itu juga harus dibangun dengan header yang sama; kalau tidak,
-`tcpm_tran_inquire_remote_cc()` membaca slot yang salah.
+Nama kelima field baru dibaca dari fungsi yang mengaksesnya di
+`tcpc_class.ko` firmware, bukan ditebak:
 
-Modul firmware yang memakai `tcpm_*`:
+| slot | offset akses | fungsi pemakai | signature |
+|---|---|---|---|
+| 18 | `[x8,#144]` @0x4b44 | `tcpci_get_pdphy_vid` | `(tcpc, u16 *vid)` |
+| 19 | `[x8,#152]` @0x4b90 | `tcpci_get_pdphy_pid` | `(tcpc, u16 *pid)` |
+| 20 | `[x8,#160]` @0x4bdc | `tcpci_get_pdphy_did` | `(tcpc, u16 *did)` |
+| 28 | `[x8,#224]` @0x5f64 | `tcpci_source_vbus` | `(tcpc, u8 type, int mv, int ma)` |
+| 29 | `[x8,#232]` @0x63bc | `tcpci_enable_io_boost` | `(tcpc, bool en)` |
 
-| modul | simbol `tcpm_*` |
-|---|---|
-| `tc_pd_adapter` | 13 |
-| `rt_pd_manager` | 11 |
-| `tcpc_mt6375` | 4 |
-| `tc_tcpc` | 3 |
-| `tc_water_detect` | 1 |
+Slot 17 (`tran_get_cc_status`) signature-nya `(tcpc, int *cc1, int *cc2)`,
+dari `tcpm_tran_inquire_remote_cc()` di `tcpm.c` 6.1.
+
+Catatan penting: `set_water_protection`, `set_force_discharge`, dan `reset_ctd`
+dipagari `#if CONFIG_WATER_DETECTION` / `CONFIG_TYPEC_CAP_FORCE_DISCHARGE` /
+`CONFIG_CABLE_TYPE_DETECTION`. **Layout struct ini bergantung config.** Jadi
+header harus dipakai dengan config yang sama di semua modul yang berbagi
+`tcpc_ops`, kalau tidak offset-nya bergeser lagi.
 
 **Belum dikerjakan.** Perlu:
-1. tambah 5 field baru ke `tcpc_ops` (3 di idx 18, 2 di idx 28) + `tran_get_cc_status` di idx 17
-2. identifikasi nama/signature 5 field tak dikenal itu dari `.ko` lain
-3. port `tcpm_tran_inquire_remote_cc()` ke `tcpm.c`
-4. pastikan `tcpc_mt6375.ko` ikut dibangun dengan header baru
-5. verifikasi slot `tcpc_ops` di `tcpc_mt6375.ko` vs firmware (harus 0 beda)
+1. sisipkan 6 field di dua titik itu, buang `set_command`
+2. port `tcpci_get_pdphy_vid/pid/did`, `tcpci_source_vbus`,
+   `tcpci_enable_io_boost`, `tcpm_tran_inquire_remote_cc` ke `tcpci.c`/`tcpm.c`
+3. pastikan `tcpc_mt6375.ko` dan `tcpc_class.ko` dibangun dengan header baru
+4. verifikasi slot `tcpc_ops` di `tcpc_mt6375.ko` vs firmware (harus 0 beda)
 
 Sampai itu selesai, `tc_tcpc`, `tc_port_corrosion_prevention`, `tc_pd_adapter`
 dan `tc_water_detect` tidak bisa dipasang.
