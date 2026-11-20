@@ -35,8 +35,8 @@ STOCK_DIRS = [
 
 GROUPS = [
     ("Storage / UFS / MMC", r"ufs|scsi|cqhci|msdc|mmc|sdhci"),
-    ("USB / Type-C / Charging", r"usb|typec|tcpc|charger|chg|battery|gauge|extcon|mtu3|xhci|otg|rfc|pd-|ucsi|mux|switch"),
-    ("Display / Touch / LED", r"disp|drm|dsi|mipi_tx|panel|lcm|backlight|led|pwm|touch|gt9|hx83|ft3|ili|focal"),
+    ("USB / Type-C / Charging", r"usb|typec|tcpc|charger|chg|battery|gauge|extcon|mtu3|xhci|otg|rfc|pd-|ucsi|mux|switch|^tc,|/tc_|tran_ldo|hl7139|tfcp|pca_|ambient_detect|temp_forecast"),
+    ("Display / Touch / LED", r"disp|drm|dsi|mipi_tx|panel|lcm|backlight|led|pwm|touch|gt9|hx83|ft3|ili|focal|pixelworks"),
     ("Kamera / Flash", r"cam|imgsensor|eeprom|vcm|af-|flash|imgsys|seninf|camsv|mraw|dip"),
     ("Audio", r"audio|sound|snd|codec|amp|accdet|headset|jack|dmic|i2s|fs15|aw87|aw88|spk|vow|adsp|fsm|tfa"),
     ("Connectivity (WiFi/BT/GPS/NFC/FM)", r"wifi|wlan|bluetooth|bt-|conn|gps|gnss|nfc|pn5|fm-|wmt|consys|epda|hbt|fmradio"),
@@ -148,10 +148,23 @@ def short(path):
     return path
 
 
+def load_base_compat(path):
+    """Kumpulan compatible yang sudah ada di base DTB (untuk kolom penanda)."""
+    out = set()
+    if not path or not os.path.exists(path):
+        return out
+    for parts in read_tsv(path):
+        if len(parts) >= 2:
+            for c in parts[1].split("|"):
+                out.add(canon(c))
+    return out
+
+
 def main(dev_tsv, map_tsv, src_tsv, srcmod_tsv, dtsi_tsv=None, only=None):
     cmap_src = load_map(map_tsv, SRC_DIRS)
     cmap_stock = load_map(map_tsv, STOCK_DIRS)
     dmap = load_src(dtsi_tsv) if dtsi_tsv else {}
+    base_compat = load_base_compat(os.environ.get("BASE_TSV", ""))
     smap = load_src(src_tsv)
     smod = load_srcmod(srcmod_tsv)
     have_src = ko_names(SRC_DIRS)
@@ -249,9 +262,17 @@ def main(dev_tsv, map_tsv, src_tsv, srcmod_tsv, dtsi_tsv=None, only=None):
         if grp != cur:
             cur = grp
             print(f"\n### {grp}\n")
-            print("| Node | compatible | Driver | Asal |")
-            print("|---|---|---|---|")
-        print(f"| `{path}` | `{comps}` | {driver} | {label[kind]} |")
+            if base_compat:
+                print("| Node | compatible | Driver | Asal | juga di base |")
+                print("|---|---|---|---|---|")
+            else:
+                print("| Node | compatible | Driver | Asal |")
+                print("|---|---|---|---|")
+        if base_compat:
+            juga = "ya" if any(canon(c) in base_compat for c in comps.split("|")) else "**tidak**"
+            print(f"| `{path}` | `{comps}` | {driver} | {label[kind]} | {juga} |")
+        else:
+            print(f"| `{path}` | `{comps}` | {driver} | {label[kind]} |")
 
 
 if __name__ == "__main__":
