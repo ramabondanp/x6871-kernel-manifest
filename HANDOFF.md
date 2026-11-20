@@ -38,6 +38,12 @@ ada `.ko` stock di ramdisk. Rincian di `PRETEST.md` §23.
   unresolved symbol (hanya weak `mtk_drm_gateic_set_backlight`).
 - Gambar: `twrp-vendor_boot-allsrc.img`
   (md5 `caef8ac1591999d625ecfe48f9f1cb13`).
+- Varian uji tombol power: `twrp-vendor_boot-allsrc-kpd.img`
+  (md5 `10a0e140c9da7b25cbbd1be7c1e87f8b`) — sama dengan allsrc, tetapi
+  `mtk-kpd.ko` **ditambahkan** ke `modules.load` (164) dan
+  `modules.load.recovery` (215), disisipkan tepat setelah
+  `mtk-pmic-keys.ko`. Terverifikasi: 222 modul, vermagic sama, dtb stock
+  utuh.
 
 Untuk system: set `vendor_dlkm` + `odm_dlkm` 100% source sudah disiapkan
 di `/serverhive1/ramabondanp/tmp/dlkm-src` — 269 modul, semuanya dari
