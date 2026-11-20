@@ -39,11 +39,15 @@ ada `.ko` stock di ramdisk. Rincian di `PRETEST.md` §23.
 - Gambar: `twrp-vendor_boot-allsrc.img`
   (md5 `caef8ac1591999d625ecfe48f9f1cb13`).
 - Varian uji tombol power: `twrp-vendor_boot-allsrc-kpd.img`
-  (md5 `10a0e140c9da7b25cbbd1be7c1e87f8b`) — sama dengan allsrc, tetapi
-  `mtk-kpd.ko` **ditambahkan** ke `modules.load` (164) dan
-  `modules.load.recovery` (215), disisipkan tepat setelah
-  `mtk-pmic-keys.ko`. Terverifikasi: 222 modul, vermagic sama, dtb stock
-  utuh.
+  (md5 `10a0e140c9da7b25cbbd1be7c1e87f8b`) — `mtk-kpd.ko` ditambahkan ke
+  kedua daftar. **Layar tetap mati** (`dmesg4.txt`): sebabnya bukan
+  kpd, tapi `tran_ldo.ko` tidak dimuat sehingga regulator `dvdd` panel
+  (TRANLDO26) tidak pernah ready dan `lcm_probe()` tidak dipanggil
+  sama sekali. Lihat `PRETEST.md` §27.
+- Varian terkini: `twrp-vendor_boot-allsrc-kpd-ldo.img`
+  (md5 `c49c48b90e08b026ec451d12cf1e0d9b`) — `mtk-kpd.ko` + `tran_ldo.ko`.
+  `modules.load` 165, `modules.load.recovery` 216, `tran_ldo.ko`
+  disisipkan sebelum `mtk_panel_ext.ko` (urutan sama dengan stock).
 
 Untuk system: set `vendor_dlkm` + `odm_dlkm` 100% source sudah disiapkan
 di `/serverhive1/ramabondanp/tmp/dlkm-src` — 269 modul, semuanya dari

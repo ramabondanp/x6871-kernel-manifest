@@ -1556,3 +1556,73 @@ Baseline pengukuran ulang: pakai `tools/stock-vs-src.py` (lihat §26
 bagian metode). Daftar fungsi per modul kamera tersimpan di
 `/serverhive1/ramabondanp/cmp-out/` (`f-<modul>-stock.txt` vs
 `f-<modul>-src.txt`).
+
+## 27. Layar mati di TWRP: `tran_ldo` tidak dimuat (bukan bug build)
+
+Gejala: TWRP boot, adb hidup, tapi layar tidak pernah menyala
+(`dmesg4.txt`).
+
+```text
+mtk-dsi 14017000.dsi: Waiting for bridge or panel driver   (68x, sampai 17,9 s)
+mediatek-drm 14000000.dispsys_config: Adding component ... (53 komponen)
+mediatek-drm ... : bound ...                               (0 -- tidak pernah)
+```
+
+Panel tidak pernah diprobe sama sekali:
+
+```text
+dmesg3 (stock, layar hidup) : lcm_probe+ / device node name:panel1 / lcm_probe-
+dmesg4 (build kita)         : (tidak ada)
+```
+
+`lcm_probe()` mencetak `pr_info` paling awal, jadi kalau tidak ada cetakan
+sama sekali berarti probe tidak dipanggil, bukan gagal di regulator.
+
+### Sebabnya: supplier regulator tidak pernah ada
+
+DT panel (`frag0.dts` frag@19):
+
+```text
+dvdd-supply = <0x2a>;   /* 0x2a = TRANLDO26 (frag@5/tran_ldo@28) */
+vci-supply  = <...>;    /* dari base DT (mt6368) */
+```
+
+`TRANLDO16/26/36/46` hanya didaftarkan oleh `tran,tran_ldo`:
+
+```text
+/tmp/x6871/frag0.dts:382  tran_ldo@28 { compatible = "tran,tran_ldo"; ... }
+```
+
+`tran_ldo.ko` ada di dalam image (dan **byte-identik** dengan stock,
+md5 `e84f8cb8f6`) tetapi **tidak ada di `modules.load` maupun
+`modules.load.recovery`**. Akibatnya device panel punya supplier yang
+tidak pernah ready; `device_links_check_suppliers()` mengembalikan
+`-EPROBE_DEFER` **sebelum** `lcm_probe()` dipanggil, jadi tidak ada log
+apa pun dan DSI terus menunggu panel.
+
+Bukti terkuat: d3 (stock) memuat `tran_ldo.ko` di 2,373 s tepat sebelum
+`panel-rm69220...ko` (2,406 s), dan `lcm_probe+` muncul 2,412 s.
+
+### Perbaikan
+
+Tambahkan `tran_ldo.ko` sebelum `mtk_panel_ext.ko` di kedua daftar
+(mengikuti urutan stock: 147/148 -> 150/151):
+
+```text
+modules.load          : 163 -> 164 -> 165
+modules.load.recovery : 214 -> 215 -> 216
+```
+
+### Audit yang harus diulang
+
+Bandingkan isi image dengan daftar muat; jangan hanya percaya daftar.
+
+```sh
+comm -23 <(ls $SET/*.ko | xargs -n1 basename | sort) \
+         <(sort -u $SET/modules.load.recovery)
+```
+
+Hasil audit saat itu: 7 modul ada tapi tidak dimuat —
+`tran_ldo` (wajib, lihat di atas), `mtk-dvfsrc-devfreq`,
+`mtk-dvfsrc-helper`, `mtk_slbc`, `slbc_ipi`, `slbc_mt6895`,
+`slbc_trace` (stock juga tidak memuatnya di recovery).
