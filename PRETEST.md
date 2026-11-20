@@ -1188,3 +1188,45 @@ modul-modul itu.
 Gambar uji: `twrp-vendor_boot-allsrc.img`
 (md5 `caef8ac1591999d625ecfe48f9f1cb13`), 222 modul, sudah diverifikasi
 isi ramdisk-nya.
+
+## 24. Set dlkm 100% source (siap untuk repack nanti)
+
+Selain vendor_boot TWRP, set modul untuk `vendor_dlkm` + `odm_dlkm`
+disiapkan di `/serverhive1/ramabondanp/tmp/dlkm-src`. Isinya **269 modul,
+semuanya dari staging build kita**.
+
+Modul stock yang dikeluarkan (25):
+
+- 10 hardware yang tidak ada di DT X6871 (sengaja tidak diport):
+  `ak7316`, `aw36515`, `dw9800k`, `dw9784ois`, `focaltech_ft3683g`,
+  `chipsemi_chsc5xxx_old`, `snd-soc-fs1894`, `snd-soc-aw87xxx`,
+  `snd-soc-oca72xxx`, `elliptic-ultrasound`.
+- 15 software tanpa source: `fpsgo`, `game`, `pages_prefilter`,
+  `priority_allocate`, `task_turbo_v`, `tc_trancare`, `thd`,
+  `transsion_tranlog`, `tran_audio_typec` (tidak ada DT),
+  `tran_health_sched`, `tran_key_bigdata`, `tran_mm_collect`,
+  `tran_perf_util`, `trans_sched`, `tran_zram`.
+
+Penggantian dari source:
+
+- `tran_zram` → `zsmalloc.ko` + `zram.ko` (driver zram kernel, fitur
+  Memfusion/tranlog hilang).
+- `task_turbo_v` → `task_turbo.ko` (base MTK, mengekspor
+  `launch_turbo_enable`/`tt_vip_enable_p` yang dibutuhkan `vip_engine`).
+- Tambahan modul GKI/source yang sebelumnya disediakan stock:
+  `rfkill.ko`, `bluetooth.ko` (untuk `bt_drv_6895`), `libarc4.ko`
+  (untuk `mac80211`), dan `zsmalloc.ko`.
+
+Load list hasil pruning:
+
+- `vendor_dlkm`: 194 entri; `rfkill`/`bluetooth` sebelum `cfg80211`,
+  `libarc4` sebelum `mac80211`, `task_turbo` sebelum `vip_engine`.
+- `odm_dlkm`: 57 entri; `zsmalloc` + `zram` menggantikan `tran_zram`.
+
+Validasi closure simbol (kernel `vmlinux.symvers` + 222 modul
+vendor_boot + 269 modul dlkm): **0 unresolved symbol**. Semua file di
+set dlkm berasal dari staging (`not-from-staging: []`).
+
+Catatan: partisi dlkm (`vendor_dlkm`/`odm_dlkm` di `super`) belum
+di-repack. Set ini adalah bahan siap pakai untuk tahap itu; boot system
+belum diuji.
