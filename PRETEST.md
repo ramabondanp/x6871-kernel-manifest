@@ -1989,3 +1989,69 @@ kita menyetel `ctx->prepared = true` dan `ctx->enabled = true`, sehingga
 di-reset. Layar hanya hidup karena bootloader sudah menginisialisasi
 panel; setelah blank yang melewati `unprepare` (jalur doze), tidak ada
 yang mengirim ulang init sequence.
+
+## 32. Config Transsion: tidak ada yang tertinggal di tree 6.12
+
+Tree 6.12 kita **tidak punya** `kernel/configs/tran_custom.config` sama
+sekali, dan build hanya memakai overlay `entry_level_legacy.config`.
+
+Isi `tran_custom.config` donor 6.1: 71 `CONFIG_*`. Setelah dicek:
+
+```text
+punya Kconfig di tree 6.12 : 2   (AAC_HAPTIC_HV, NXP_NFC_SNXXX_DEVICE)
+tanpa Kconfig              : 69
+```
+
+Tapi 6.12 MGK memakai Bazel, jadi patokannya bukan Kconfig melainkan
+apakah makro itu **dirujuk di source**. Untuk display, dari 71 config 6.1
+hanya 3 yang ada rujukannya di tree kita:
+
+```text
+CONFIG_TRANSSION_DOZE_BRIGHTNESS_SUPPORT  panel-rm69220-vdo-x6871.c  (kita aktifkan)
+CONFIG_TRAN_GET_VREFRESH_SUPPORT          panel-rm69220-vdo-x6871.c  (tidak dipakai build)
+CONFIG_TRAN_LHBM_NOTIFY_FINGERPRINT       transsion_fp_cust.c
+```
+
+Sisanya (TRAN_CWB_SUPPORT, TRAN_ALWAYS_NOTIFY_LCM_COLOR_MODE,
+TRAN_LCD_AOD_ENTER_NOTIFY_SUPPORT, TRAN_DYNAMIC_WCG,
+TRAN_PANEL_I2C_LCD_BIAS_SUPPORT, ...) **nol rujukan** di tree 6.12 —
+mengaktifkannya tidak mengubah apa pun karena kodenya tidak ada.
+
+Bukti tambahan bahwa build kita setara config dengan stock revisi B:
+
+```text
+symbol g_tran_get_vrefresh_main / g_lcm_fresh_mode
+  panel stockB : tidak ada
+  panel kita   : tidak ada          -> dua-duanya tanpa TRAN_GET_VREFRESH
+section .data (ext_params + ext_funcs + tabel AOD)
+  md5 5505711998f3f7388f2a1cf4640bcc20 identik
+```
+
+Dan poin penentu: `diag-stockB` memakai 218 modul **hasil build
+Transsion** (yang jelas memakai `tran_custom.config` lengkap) dan tetap
+tidak bisa bangun. Jadi config build kita bukan penyebab.
+
+### Kesimpulan arah: panel revisi B memang tidak cocok dengan panel HP ini
+
+- DTB `vendor_boot-new.img` identik dengan milik kita (`ead6a965b0aa`) —
+  jadi bukan proyek/DT yang berbeda.
+- Selisih nyata ada di driver panel: revisi A `bit_per_channel = 8`
+  (`bpc:8`, `slice_bits 51840`), revisi B `bit_per_channel = 10`
+  (`bpc:10`, `slice_bits 302400`), tabel backlight beda (1658 vs 1757).
+- Saat boot layar benar karena panel diinisialisasi bootloader; driver
+  kernel revisi B baru meng-init panel pada wake, dan hasilnya gelap.
+
+### Eksperimen: jangan re-init panel
+
+`twrp-vendor_boot-dbg-skipunprep.img` (`77740333d8c71f3763ca2a49bd1f999d`)
+= set kita + `LCMDBG_SKIP_UNPREPARE`: `lcm_unprepare()` tidak mengirim
+sleep-in, jadi panel dibiarkan pada state hasil init bootloader; wake
+hanya menyalakan ulang DSI + backlight.
+
+```text
+layar nyala  -> init sequence revisi B memang tidak cocok untuk panel ini
+                (workaround sah untuk TWRP; perbaikan benar = port config
+                revisi A: bpc 8, tabel backlight 1658, init table A)
+layar gelap  -> bukan init table; sisa kandidat: clock/DSC DDP atau
+                timing DSI
+```
