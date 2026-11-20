@@ -122,20 +122,24 @@ tambahkan compatible bersufiks `_v4l2` pada `ocp81375_of_table`,
 `sgm37864_of_table`, dan `aw36515_of_table` (entri lama dipertahankan untuk 6.1).
 Sudah diverifikasi: alias modul hasil build sekarang memuat kedua bentuk.
 
-### 2. Node tanpa driver
+### 2. Node tanpa driver sendiri (7) — mana yang penting
 
-- `/tran_sensor_cust` -> `mediatek,tran_sensor` -> — | tidak ada
-- `/spmi@1c804000/mtee_svp/MTEE` -> `mediatek,mtk_svp_on_mtee_support` -> — | tidak ada
-- `/spmi@1c804000/mtee_svp/SecureVideoPath` -> `mediatek,mtk_sec_video_path_support` -> — | tidak ada
-- `frag@73` -> `mediatek,md1_sim1_hot_plug_eint-eint` -> — | tidak ada
-- `frag@31` -> `tc_pe5` -> — | tidak ada
-- `frag@37/tc_adapter_control` -> `transsion, adapter_control` -> — | tidak ada
-- `frag@37/tc_trancare` -> `tc,trancare` -> — | tidak ada
+Ketujuhnya **bukan** node yang butuh driver baru. Rinciannya:
 
-`mediatek,tran_sensor`, `tc,trancare`, `tc_pe5`, dan `transsion, adapter_control`
-milik modul Transsion tanpa source (lihat `PRETEST.md` §23 dan §26).
-`mtk_svp_on_mtee_support` / `mtk_sec_video_path_support` hanya flag fitur,
-`md1_sim1_hot_plug_eint-eint` adalah node EINT biasa.
+| Node | compatible | Yang memakai | Dampak | Perlu tindakan? |
+|---|---|---|---|---|
+| `frag@37/tc_trancare` | `tc,trancare` | `tc_trancare.ko` (stock, tidak ada source) | battery health/`bat_cycle`, `tc_upload_battery_health_percent_msg` hilang | ya, kalau fitur battery care dibutuhkan |
+| `/tran_sensor_cust` | `mediatek,tran_sensor` | `sensorhub.ko` versi Transsion | patch sensorhub (`tran-cwb-support`, `un_als_support`, `ml_lcm_info`, brightness/vrefresh ke sensor) hilang -> auto-brightness/true-tone kurang akurat | bisa, tapi patch tidak ada di donor 6.1 |
+| `frag@37/tc_adapter_control` | `transsion, adapter_control` | `tc_misc_intf.c` (`of_find_compatible_node`), `tc_basic_charger.c`, `tc_auto_test.c` | **tidak ada** — node data, konsumennya sudah ada di source kita | tidak |
+| `frag@31` | `tc_pe5` | `tc_pep50.ko` (kita build) | **tidak ada** — DT vendor menulis `tc_pe5` tanpa koma, sedangkan driver (stock maupun source kita) mencocokkan `tc,pe5`; jadi perilakunya sama dengan stock | tidak |
+| `frag@73` | `mediatek,md1_sim1_hot_plug_eint-eint` | eint controller (`mediatek,eint`) | **tidak ada** — node anak EINT, ditangani induknya | tidak |
+| `/spmi@1c804000/mtee_svp/MTEE` | `mediatek,mtk_svp_on_mtee_support` | TEE/userspace (tidak ada di kernel tree) | **tidak ada** — node flag; cukup keberadaannya di DT | tidak |
+| `/spmi@1c804000/mtee_svp/SecureVideoPath` | `mediatek,mtk_sec_video_path_support` | TEE/userspace | **tidak ada** — node flag | tidak |
+
+Jadi hanya dua yang benar-benar kehilangan fitur: `tc,trancare` (battery
+health/battery care) dan patch `mediatek,tran_sensor` di `sensorhub`.
+Sisanya node data/flag yang sudah dikonsumsi kode yang kita punya, atau
+memang tidak pernah bind sejak stock (`tc_pe5`).
 
 ### 3. Batas akurasi
 
