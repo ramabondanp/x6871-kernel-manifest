@@ -1095,3 +1095,38 @@ instruksi identik (termasuk pemanggilan `dma_heap_total_cb` lewat
 Status: `perf_common_v` + `mtk-vcodec-sys-api` selesai; tiga export di
 atas menutup celah `Unknown symbol` untuk modul software stock yang
 tersisa selain keluarga Tranlog/Aegis.
+
+## 22. Validasi simbol: seluruh modul software stock bisa dimuat
+
+Setelah export `g_trans_sched_interface`, `engine_cooler_trigger_duration`,
+dan `dma_heap_emem_printk`, dilakukan pengecekan closure: setiap simbol
+yang di-import 14 modul software yang masih stock harus ada di salah
+satu dari:
+
+- `vmlinux.symvers` hasil build kernel kita,
+- export 263 modul hasil build kita,
+- export modul stock yang memang tetap dipakai (`transsion_tranlog`,
+  `thd`, `tran_zram`, dan modul vendor_boot seperti
+  `tran-ufshcd-core`).
+
+Hasil: **tidak ada lagi `Unknown symbol`**. Satu-satunya yang sempat
+menggantung adalah `tran_low_latency_sched_interface` untuk
+`trans_sched`; simbol itu diekspor `tran-ufshcd-core.ko` di vendor_boot
+(bukan `low_latency_sched.ko` — modul itu justru yang meng-import-nya).
+
+Rantai dependensi yang tersisa:
+
+| modul stock | butuh |
+|---|---|
+| `priority_allocate` | `g_trans_sched_interface` (kita) |
+| `tran_zram` | `g_trans_sched_interface` (kita) + tranlog |
+| `trans_sched` | `g_trans_sched_interface` (kita) + `tran_low_latency_sched_interface` (tran-ufshcd-core) |
+| `tran_mm_collect` | tranlog + `zram_emem_printk` (tran_zram) |
+| `tran_health_sched`, `tran_key_bigdata`, `thd` | tranlog / `startAegisK` (thd) |
+| `pages_prefilter`, `tran_perf_util`, `tc_trancare` | tranlog |
+| `game` | `engine_cooler_trigger_duration` (kita) |
+| `fpsgo`, `task_turbo_v` | mtk_fpsgo_v8 / vip_engine (kita) |
+
+Artinya sisi simbol sudah selesai; yang tersisa adalah perilaku
+(hook scheduler yang belum disambungkan) dan penggantian sumber untuk
+modul Tranlog/Aegis yang tidak punya donor.
