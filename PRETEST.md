@@ -2521,3 +2521,68 @@ Catatan yang masih terbuka: `lcm_probe()` masih menyetel `prepared = true`
 dan `enabled = true`, jadi init pertama setelah boot tetap mengandalkan
 state dari bootloader. Perilaku ini tidak diubah karena boot dan wake
 sudah benar, dan tidak ada keluhan layar saat boot.
+
+## 41. Cabut-colok USB: tumpukan stock = revisi lebih baru dari donor & tree kita
+
+Gejala: adb hidup saat boot (kabel sudah tercolok), tapi setelah kabel
+dicabut lalu dicolok lagi USB tidak enumerate sama sekali.
+
+### Crosscheck donor 6.1 (tidak menjawab)
+
+`tran_usb_ctrl.c`, `tc_tcpc.c`, `tc_chg_type_det.c` donor 6.1 **identik
+secara fungsi** dengan tree kita; bedanya hanya adaptasi API 6.12:
+
+```text
+tran_usb_ctrl.c   21 baris : -#include <linux/pinctrl/consumer.h>, remove() -> int
+tc_tcpc.c         22 baris : const char *const, remove() -> int
+tc_chg_type_det.c 62 baris : usb_types BIT() bitmask -> array enum (6.12),
+                             remove() -> int
+```
+
+Jadi donor tidak punya jawaban untuk kasus ini.
+
+### Yang dipakai stock ternyata revisi lebih baru
+
+Perbandingan string biner `.ko` stock (vendor A) vs build kita, modul tumpukan
+USB/charger:
+
+| modul | fitur yang hanya ada di stock |
+|---|---|
+| `tc_tcpc` | `[TC_TCPC] %s: %s dr_swap, new role=%d` |
+| `tc_chg_type_det` | `stop bc12 due to dr swap`, `data role swap to DFP`, `pd detected!!!`, `tcd_set_bc12_complete`, `wireless is still working, wait for it to stop`, `wireless has stopped working, start BC1.2 detection`, `charger_dev_pd_set_hiz_flag/_charge_flag`, `charger_dev_set_input_current`, `check_wireless_to_wired`, `get_tadapter_by_name` (+ `depends=...tc_adapter_class`) |
+| `mtu3` | `depends=tcpc_class`, `set usb config = %d`, `pe_ready=%d, explicit_contract=%d`, `is_usb_pd`, `mtu3_suspend_reset_work`, `ssusb_get_platform_driver`, `ssusb_remap_axi_domain` |
+| `tran_extcon_usb` | `do_tran_otg_uevent` |
+| `phy-mtk-xsphy` | `mediatek,host-discth`, `mediatek,rev4`, debugfs `dual_val_show` |
+
+Ukuran fungsi (.text per simbol, stock dibanding build kita):
+
+```text
+tc_chg_type_det : tc_detect_bc12_work        2052 vs 1240   (-812)
+                  tc_pd_tcp_notifier_call    1032 vs  760   (-272)
+                  tc_detect_bc12_retry_work  1072 vs  840   (-232)
+                  tc_detect_charger_set_property 492 vs 352 (-140)
+tc_tcpc         : tc_pd_tcp_notifier_call    1580 vs 1396  (-184)
+mtu3            : mtu3_ep0_isr               2404 vs 1980  (-424)
+                  mtu3_probe                 5072 vs 4680  (-392)
+                  ssusb_gadget_init          2300 vs 1976  (-324)
+mt6375-charger  : mt6375_get_vbus_gd_stat     192 vs   0   (hilang, lihat 18)
+```
+
+Semua simbol yang dibutuhkan modul stock tersedia di set kita
+(`charger_dev_pd_set_hiz_flag`, `get_tadapter_by_name`,
+`wireless_manager_reverse_state`, `tc_get_boot_mode`, dst. ada di
+`tc_charger_class`/`tc_adapter_class`/`tc_misc_intf`), jadi modul stock bisa
+dipasang sebagai biseksi.
+
+### Image biseksi (satu variabel per image, sisanya tetap build kita)
+
+```text
+twrp-vendor_boot-usb-bisect-chgdet.img      md5 515b93aa1a3d278087e3f76d80965e8d
+twrp-vendor_boot-usb-bisect-tcpc.img        md5 2732185317e6b53ec732e3af549b8eb7
+twrp-vendor_boot-usb-bisect-chgdet-tcpc.img md5 fbdf780a32c812b93356a8eb6db54a06
+twrp-vendor_boot-usb-bisect-mtu3.img        md5 702fe8d2d1d9c89f1ef66e1ebe66f187
+```
+
+Diverifikasi: hanya `.ko` yang dimaksud yang berbeda dari baseline
+`allsrc-display` (222 modul). Urutan tes: chgdet -> tcpc -> chgdet+tcpc ->
+mtu3. Kalau salah satu lolos uji cabut-colok, modul itu yang harus di-RE.
