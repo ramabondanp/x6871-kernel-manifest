@@ -44,6 +44,10 @@ ada `.ko` stock di ramdisk. Rincian di `PRETEST.md` §23.
   kpd, tapi `tran_ldo.ko` tidak dimuat sehingga regulator `dvdd` panel
   (TRANLDO26) tidak pernah ready dan `lcm_probe()` tidak dipanggil
   sama sekali. Lihat `PRETEST.md` §27.
+- Perbaikan cabut-colok USB: `twrp-vendor_boot-usb-replug.img`
+  (md5 `8233c66d7b09aefd2e5b0fe5f4ca4c2e`), beda dengan
+  `allsrc-display` hanya di `tran_extcon_usb.ko`. Detail: `PRETEST.md`
+  §42.
 - Varian final layar (mati -> nyala OK): `twrp-vendor_boot-allsrc-display.img`
   (md5 `e7014d7273da2b7310ce1da1c947caf7`) — 222 modul source, beda dengan
   `allsrc-vib2` hanya di modul panel. Detail: `PRETEST.md` §40.

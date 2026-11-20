@@ -2586,3 +2586,64 @@ twrp-vendor_boot-usb-bisect-mtu3.img        md5 702fe8d2d1d9c89f1ef66e1ebe66f187
 Diverifikasi: hanya `.ko` yang dimaksud yang berbeda dari baseline
 `allsrc-display` (222 modul). Urutan tes: chgdet -> tcpc -> chgdet+tcpc ->
 mtu3. Kalau salah satu lolos uji cabut-colok, modul itu yang harus di-RE.
+
+## 42. Cabut-colok USB: akar masalah di event `tran_extcon_usb`
+
+`dmesg13` merekam satu siklus penuh cabut (12,3 s) lalu colok lagi (14,3 s).
+Rantainya:
+
+```text
+CABUT  12.327  event:7  (USB_PLUG_OUT)      -> tidak ditangani
+       12.328  event:2  (TC_PD_TYPE, pd_type=0) -> "switch role to host"
+       12.330  cur_dr(2) new_dr(0) lalu new_dr(1)
+       12.331  mtu3: ssusb_set_mode host
+COLOK  14.311  event:6  (USB_PLUG_IN)       -> tidak ditangani
+       14.519  psy: online=1, type=4          -> c_role==HOST, bukan NONE,
+                                                 jadi psy detector tidak
+                                                 menyetel DEVICE
+       16.751  event:2  (pd_type=5)           -> "Delay for swap..." lalu
+                                                 menyerah
+```
+
+Jadi setelah cabut, peran USB ditinggal di **HOST**, dan `psy_detector`
+hanya mau menyetel DEVICE kalau `c_role == USB_ROLE_NONE`.
+
+### Biner stock: nomor event berbeda 2
+
+RE `tran_extcon_usb.ko` stock (yang jalan di `normal.txt`) menunjukkan
+cabang yang dipakai:
+
+| event stock | aksi stock |
+|---|---|
+| 8 | `Type-C SINK plug in` -> role **DEVICE** (di-skip kalau `bypss_typec_sink`) |
+| 9 | `Type-C plug out` -> role **NONE** |
+| 10 | `Type-C SRC plug in` -> role **HOST** |
+| 11 | `Type-C plug out` -> role **NONE** |
+
+Dan `tc_tcpc` stock mengirim `USB_PLUG_IN` sebagai **8**, `SNK_VBUS`
+sebagai **14** — sedangkan header di tree ini punya 6 dan 12. Artinya
+stock memakai enum yang bergeser 2, dan source driver extcon yang
+sekarang ada di tree ini memakai nomor enum yang **salah** (menganggap
+`OTG_PLUG_IN`=8 sebagai `SINK plug in`).
+
+Selain itu, di stock `tc_tcpc` menulis `pd_type` di `noti+0xc`, tapi
+`tran_extcon_usb` stock membacanya di `noti+0x10`; jadi seluruh logika
+"switch role berdasarkan pd_type" di sana adalah **dead code**. Di tree
+ini logika itu hidup, dan justru itulah yang mengubah setiap cabut
+kabel menjadi "switch role to host".
+
+### Perbaikan (kernel `af55c9c00426`)
+
+1. `tran_extcon_pd_tcpc_notifier()` memakai enum tree ini dengan benar:
+   `USB_PLUG_IN` (=6) -> DEVICE, `USB_PLUG_OUT` (=7) / `OTG_PLUG_OUT`
+   (=9) -> NONE, `OTG_PLUG_IN` (=8) -> HOST. Blok `pd_type` dihapus
+   (dead code di stock).
+2. `usb_is_online()` membaca `POWER_SUPPLY_PROP_USB_TYPE` dan menerima
+   SDP/CDP, sama seperti stock (sebelumnya `POWER_SUPPLY_PROP_TYPE`).
+
+Hasil yang diharapkan: cabut -> role NONE (bukan HOST), colok ->
+psy detector (c_role==NONE) menyetel DEVICE lagi.
+
+Image: `twrp-vendor_boot-usb-replug.img`
+(md5 `8233c66d7b09aefd2e5b0fe5f4ca4c2e`), 222 modul, beda dengan
+`allsrc-display` hanya di `tran_extcon_usb.ko`.
