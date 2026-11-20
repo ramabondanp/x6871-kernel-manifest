@@ -116,7 +116,10 @@ kalau memang tidak ada source.
 1. **Jangan pakai `/tmp`** — pakai `/serverhive1/ramabondanp/tmp`.
 2. **Selalu commit + push setelah setiap perubahan, tanpa bertanya.**
    Push ke `alps` dan `local` (branch `w1vo36-6.12-port`).
-3. Commit di tree 6.12 harus **bahasa Inggris**.
+3. Commit di **semua tree kernel** (`w1vo/kernel_device_modules-6.12`,
+   donor 6.1/6.12, repo `alps`) wajib **bahasa Inggris** — subjek dan body.
+   Hanya repo manifest (`w1vo36-kernel-manifest`) yang boleh bahasa
+   Indonesia.
 4. Jangan satu commit untuk semua perubahan; satu commit per fitur.
 5. Repo manifest harus tetap ramping.
 6. **Cocokkan modul lewat fingerprint isi `.ko`, jangan lewat nama.**

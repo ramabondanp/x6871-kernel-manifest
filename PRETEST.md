@@ -2152,7 +2152,7 @@ eksplisit (`0xfe 0x00`, `0xfe 0x60`, `0xfe 0x62`, ...), diakhiri
 `0x11` + 120 ms + `0x29` + 20 ms. Driver kita sebelumnya memakai
 sequence lain (63 entri tanpa page switch lengkap).
 
-### Perbaikan (kernel `e5d72d343f7e`)
+### Perbaikan (kernel `91640cdaead6`)
 
 1. 17 field DSC di ketiga blok `ext_params` disamakan dengan vendor A.
 2. Init sequence diganti dengan tabel vendor A yang diekstrak apa adanya
