@@ -2288,3 +2288,47 @@ sebagai parameter modul untuk uji A/B.
 Image: `twrp-vendor_boot-panelA-rails.img`
 (md5 `ea51c7190c6db999656831e15fdf824d`), beda dengan image sehat
 `allsrc-vib2` hanya di modul panel.
+
+## 36. Akar sebenarnya: DSI data rate kita 1420, panel minta 1056
+
+Perbandingan langsung `ext_params` modul vendor tidak berhenti di DSC.
+Delapan u32 pertama ketiga blok (144/120/60Hz):
+
+```text
+vendor A : 0, 528, 1056, 0, 0, 1, 0, 0
+kita     : 710, 1420, 0, 0, 0, 0, 0, 0     (sebelum perbaikan)
+```
+
+Pasangan `x, 2x` yang berdampingan di awal struct = `pll_clk` dan
+`data_rate`:
+
+```text
+vendor A : pll_clk 528 MHz, data_rate 1056 Mbps
+kita     : pll_clk 710 MHz, data_rate 1420 Mbps   (34% lebih tinggi)
+```
+
+Panel di-konfigurasi oleh init table-nya sendiri untuk rate tertentu
+(register `0x2f` di page 0 dan page `0x60`). Kalau DSI dikirim 1420 saat
+panel di-set untuk 1056, panel tidak bisa mendekode stream:
+
+- panel dibiarkan dalam state bootloader (tidak sleep) -> gambar rusak
+  (dmesg7, DSC juga masih 10bpc saat itu)
+- panel di-power-cycle penuh (rail + reset + init table) -> hitam
+  (dmesg8 dan dmesg9), walau DDP melaporkan bpc 8, 246 extra mux bits,
+  51840 slice bits, dan 0 underrun
+
+Layar saat boot tetap normal karena PLL DSI masih memakai nilai dari
+bootloader sampai resume pertama.
+
+### Perbaikan (kernel `ad6be249ea2a`)
+
+`PLL_CLOCK_144/120/60` diubah 710 -> 528, sehingga `pll_clk = 528` dan
+`data_rate = 528 * 2 = 1056`. Verifikasi `.data` hasil build: delapan u32
+pertama `ext_params` sekarang `528, 1056, 0, 0` seperti vendor.
+
+Image: `twrp-vendor_boot-panelA-528.img`
+(md5 `f053c7b4c322f40a8e21f1ae40df5b95`), beda dengan image sehat
+`allsrc-vib2` hanya di modul panel.
+
+Cara cek di dmesg: baris `mtk_dsi_set_mmclk_by_datarate_V2` harus
+menunjukkan `data_rate=1056` (sebelumnya 1420).
