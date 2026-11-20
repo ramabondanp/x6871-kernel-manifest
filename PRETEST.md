@@ -2055,3 +2055,46 @@ layar nyala  -> init sequence revisi B memang tidak cocok untuk panel ini
 layar gelap  -> bukan init table; sisa kandidat: clock/DSC DDP atau
                 timing DSI
 ```
+
+### Koreksi: image skipunprep pertama gagal karena tabel dep/alias, bukan eksperimen
+
+`pstore8.txt` (image `dbg-skipunprep`) berhenti di:
+
+```text
+init: Loaded kernel module /lib/modules/mtk-mmc-dbg.ko
+init: LoadWithAliases was unable to load mtk_mmc, tried: mtk_mmc
+init: Loaded 149 modules from /lib/modules
+init: Failed to load kernel modules
+init: InitFatalReboot: signal 6  -> reboot reason: bootloader
+```
+
+TWRP memang mengambil daftar dari `modules.load.recovery` (216 entri), dan
+daftar itu **tidak berubah** antara image gagal dan image sehat
+(md5 `81576cbc59` di keduanya). Yang saya tinggalkan saat restore setelah
+eksperimen stockB adalah tabel pendampingnya:
+
+```text
+image gagal  : modules.dep / modules.alias milik set stockB
+image sehat  : modules.dep / modules.alias milik set kita
+```
+
+Dan set stockB tidak punya modul `mtk-mmc.ko` sama sekali, jadi
+`modules.dep`-nya tidak punya baris untuk modul itu:
+
+```text
+vib2 (sehat) : /lib/modules/mtk-mmc.ko: rpmb-mtk.ko ufs-mediatek-mod.ko ...
+stockB       : (tidak ada baris mtk-mmc)
+```
+
+Init memakai daftar dari `modules.load.recovery`, tetapi resolusi nama
+modul tetap lewat tabel dep/alias; karena `mtk-mmc.ko` tidak ada di tabel,
+init mencoba `mtk_mmc` dan gagal -> fatal -> bootloader.
+
+Image perbaikan:
+
+```text
+twrp-vendor_boot-dbg-skipunprep2.img
+  md5 89d94cac8c311070890e769aade31759
+  Beda dengan image sehat vib2 HANYA di panel-rm69220-vdo-x6871.ko
+  (per-file md5 semua modul + load list + dep/alias identik dengan vib2).
+```
