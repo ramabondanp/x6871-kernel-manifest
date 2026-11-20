@@ -2444,3 +2444,40 @@ Verifikasi biner modul hasil build: `mov w8, #0xc05` + `str x8, [x19, #960]`.
 
 Image: `twrp-vendor_boot-panelA-syncpulse.img`
 (md5 `8775055b79a3408563e02091e861e532`).
+
+## 39. Crosscheck donor Transsion: tabel PPS 8bpc bawaan MTK
+
+Donor Transsion memang meng-commonize helper antar HP, jadi dicek langsung
+ke source-nya:
+
+```text
+tmp/ts61-src/.../panel-alpha-jdi-nt36672e-vdo-120hz.c:1073
+    .dsc_param_load_mode = 0,
+    //0: default flow; 1: key param only; 2: full control
+
+tmp/ts61-src/.../nt37703a_fhdp_dsi_vdo_tm_tm_144hz_x6870.c  (saudara x6871)
+    DSC_VER 17, DSC_SLICE_HEIGHT 12, DSC_CHUNK_SIZE 540,
+    DSC_DEC_DELAY 526, DSC_INCREMENT_INTERVAL 287   <- sama dengan nilai
+    vendor A yang sudah kita port
+```
+
+Dan `mtk_disp_dsc.c` punya dua set tabel kuantiser 8bpp yang lengkap:
+
+```text
+tpc_range_8bpp_8bpc_*  : min_qp 0,0,1,1,3,3,3,3,3,3,5,5,5,9,12
+tpc_range_8bpp_10bpc_* : min_qp 0,4,5,5,7,7,7,7,7,7,9,9,9,13,16  <- tabel
+                         yang dipakai driver kita sebelumnya
+```
+
+Jadi tabel lama kita adalah set 10bpc. Dengan `dsc_param_load_mode = 1`,
+DDP memilih set tabel dari `bit_per_channel`/`bit_per_pixel`; untuk
+8bpc/8bpp hasilnya `tpc_range_8bpp_8bpc_*` plus `tpc_rc_buf_thresh` yang
+identik dengan tabel `rc_buf_thresh` panel.
+
+### Perbaikan (kernel `400b51ff9b30`)
+
+`dsc_param_load_mode` di ketiga blok parameter: 0 -> 1, sehingga tidak ada
+lagi tabel PPS yang dibawa manual oleh driver panel.
+
+Image: `twrp-vendor_boot-panelA-mode1.img`
+(md5 `227c49b8980a62dd3bb37b4f23d24b41`).
