@@ -1044,10 +1044,21 @@ instruksi `stp` di `init_module` stock:
 `priority_allocate` (hanya butuh slot 0xa8), `tran_zram`, dan
 `trans_sched` bisa dimuat tanpa `Unknown symbol`.
 
-Catatan: scheduler kita **belum memanggil** slot 0x00/0x08/0xb0/0xb8/
-0xc0/0xc8/0xd0/0xd8/0xe8. `trans_sched` tetap mengisi tabel dan
-mendaftarkan tracepoint-nya sendiri, tetapi keputusan penempatan task
-UX/RT yang lewat scheduler belum aktif. Ini pekerjaan lanjutan.
+Catatan: scheduler kita baru memanggil slot 0x00/0x08 (enqueue/dequeue)
+dan 0xb0 (`should_honor_sync`). Type id kCFI hasil build
+(`0x6fc3696d` dan `0xdb9fd229`) sama dengan call-site stock, jadi
+signature-nya cocok. Slot 0xb8/0xc0/0xc8/0xd0/0xd8/0xe8 (penempatan
+task RT, newidle balance, EAS UX balance) belum disambungkan;
+`trans_sched` tetap mengisi tabel dan mendaftarkan tracepoint-nya
+sendiri, tetapi keputusan yang lewat scheduler belum aktif.
+
+### Modul yang bisa dipangkas: `tran_audio_typec`
+
+`tran_audio_typec.ko` hanya mendukung `mediatek,fsa4480-i2c`,
+`mediatek,was4783-audioswitch`, dan `mediatek,hl1280-audioswitch`.
+Tidak satu pun ada di DT X6871 (`base.dts`/`frag0.dts`); audio switch
+board memakai `transsion,sliptswitch-gpio-audioswitch` (modul
+`splitswitch-gpio`). Jadi modul ini tidak perlu diport untuk X6871.
 
 ### `engine_cooler_trigger_duration` (mtk_game)
 

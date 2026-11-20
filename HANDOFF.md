@@ -450,11 +450,13 @@ belum (harus tetap pakai `.ko` stock):
   `aw36515`, `ak7316`, `dw9800k`, `dw9784ois`, `focaltech_ft3683g`,
   `chipsemi_chsc5xxx_old`, `snd-soc-fs1894`, `snd-soc-aw87xxx`,
   `snd-soc-oca72xxx`, `elliptic-ultrasound`.
-- 15 modul software yang belum punya sumber/port: `fpsgo`, `game`,
+- 14 modul software yang belum punya sumber/port: `fpsgo`, `game`,
   `pages_prefilter`, `priority_allocate`, `task_turbo_v`, `tc_trancare`,
-  `thd`, `transsion_tranlog`, `tran_audio_typec`, `tran_health_sched`,
-  `tran_key_bigdata`, `tran_mm_collect`, `tran_perf_util`, `trans_sched`,
-  `tran_zram`.
+  `thd`, `transsion_tranlog`, `tran_health_sched`, `tran_key_bigdata`,
+  `tran_mm_collect`, `tran_perf_util`, `trans_sched`, `tran_zram`.
+  `tran_audio_typec` tidak perlu diport: driver itu hanya mendukung
+  fsa4480/was4783/hl1280, tidak ada node DT-nya di X6871 (board memakai
+  `splitswitch-gpio`).
 
 Dua modul software terakhir yang selesai diport: `perf_common_v`
 (memasang `format_sbin_data` ke hook `mtk_perf_common`) dan
@@ -468,9 +470,9 @@ Export ABI vendor yang dibutuhkan modul stock juga dilengkapi:
 - `scheduler` mengekspor `g_trans_sched_interface` (layout 34 pointer /
   0x110 byte, sama dengan stock). Dengan ini `priority_allocate`,
   `tran_zram`, dan `trans_sched` tidak lagi gagal `Unknown symbol`.
-  `trans_sched` mengisi tabel itu saat init, tetapi call-site hook di
-  scheduler kita belum disambungkan, jadi fitur UX scheduling belum
-  aktif.
+  `trans_sched` mengisi tabel itu saat init; slot enqueue/dequeue dan
+  `should_honor_sync` sudah dipanggil scheduler kita (type id kCFI sama
+  dengan stock), slot penempatan RT/newidle/EAS UX belum disambungkan.
 - `mtk_game` mengekspor `engine_cooler_trigger_duration()` dan memakai
   parameter `ec_duration` (2000) seperti stock, sehingga `game.ko` stock
   bisa memuat.
