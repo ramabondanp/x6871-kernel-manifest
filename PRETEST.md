@@ -2857,6 +2857,17 @@ repack karena itu tidak menebak format.
   memakai salt berbeda dan sudah dipatch untuk boot modified system
   (sesuai keputusan user), jadi tidak diubah.
 
+### Reproduksi
+
+- Stock image + tree hasil ekstrak: `/serverhive1/ramabondanp/tmp/dlkm-img/`
+  (`vendor_dlkm.img`, `odm_dlkm.img`, `vendor_dlkm/`, `odm_dlkm/`,
+  `config/`).
+- `mkfs.erofs`/`extract.erofs`: `/serverhive1/ramabondanp/tmp/android_tools/bin/`.
+- AVB: `/serverhive1/ramabondanp/tmp/dlkm-build/avbtool.py` (avbtool
+  1.3.0) + `fec` di `tmp/vbwork-twrp/aosp/plugged/bin`, dengan
+  `LD_LIBRARY_PATH=tmp/vbwork-twrp/aosp/plugged/lib`.
+- Builder prototipe yang dipakai: `/serverhive1/ramabondanp/work/build_dlkm_images.py`.
+
 ### Artefak
 
 ```text
