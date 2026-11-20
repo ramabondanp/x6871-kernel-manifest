@@ -16,7 +16,7 @@ Ditulis 2026-11-19, diperbarui 2026-11-20 untuk sesi AI berikutnya. Baca ini dul
 | DLKM (`vendor_dlkm` + `odm_dlkm`) | **269**, 100% source, image siap |
 | Build target | `//kernel_device_modules-6.12:mgk_64_k612_customer_modules_install.user` |
 | Build terakhir | sukses (inkremental), 2026-11-20 |
-| Kernel HEAD | `5ba6fb6559ab` (`w1vo36-6.12-port`) |
+| Kernel HEAD | `5462a6d118a6` (`w1vo36-6.12-port`) |
 | Runtime | **TWRP 100% modul source**, layar + USB replug terverifikasi |
 
 ## Status per 2026-11-20 (TWRP final)
@@ -88,12 +88,19 @@ dibaca dari biner stock (`mov w3,#0x3b`). Fix kernel `5ba6fb6559ab`,
 hanya `vendor_dlkm` yang di-repack. Detail: `PRETEST.md` §46.
 
 ```text
-vendor_dlkm.img  md5 5b7472dea26b60dd8eef5370a2cd13a9  24.551.424 B
+vendor_dlkm.img  md5 72f7e6dae2c25e0274008e69c2cf7fd1  24.551.424 B
 odm_dlkm.img     md5 0ffbb42985d445f7c12808df3b50960e   4.206.592 B  (tidak berubah)
-twrp-dlkm-scpfix-20261120.zip  md5 a9daf0c469810ec32a673e3ecda6bb4a
-release          dlkm-scpfix-20261120
+twrp-dlkm-gpufix-20261120.zip  md5 5ca615ac2b342f4430baba640168efe8
+release          dlkm-gpufix-20261120
 /srv path         /serverhive1/ramabondanp/tmp/dlkm-out/
 ```
+
+**dmesg2**: setelah SCP fix, Mali panic di
+`kbase_backend_gpuprops_get()` (`HW 0x130013, SW 0x0`). Stock memakai
+Mali r54p1-11eac0; donor 6.1 tidak punya tree GPU, donor OPPO 6.12
+punya versi yang sama. Seluruh `drivers/gpu/mediatek` dan
+`mali_avalon/a16w` diimpor dari donor OPPO; kernel commit
+`5462a6d118a6`. Detail: `PRETEST.md` §47.
 
 Image memakai EROFS persis opsi stock + AVB hashtree footer; ukurannya
 sama dengan partisi stock. Zip TWRP hanya menulis `vendor_dlkm`; `odm_dlkm`

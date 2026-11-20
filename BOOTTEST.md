@@ -320,7 +320,9 @@ twrp-dlkm-source-20261120.zip  (release dlkm-20261120)
   `dmesg | grep -iE 'Unknown symbol|module|verity'` dan pastikan sistem
   mencapai launcher. Kalau gagal, rollback dengan stock
   `vendor_dlkm`/`odm_dlkm`.
-- Fix SCP: `vendor_dlkm.img` md5 `5b7472dea26b60dd8eef5370a2cd13a9`,
-  zip `twrp-dlkm-scpfix-20261120.zip` (`SCP_IPI_COUNT` 56 -> 59).
+- Fix SCP: `SCP_IPI_COUNT` 56 -> 59.
+- Fix GPU: Mali donor OPPO r54p1-11eac0 + gpufreq/ged/gpueb donor;
+  `vendor_dlkm.img` md5 `72f7e6dae2c25e0274008e69c2cf7fd1`,
+  zip `twrp-dlkm-gpufix-20261120.zip`.
 - Fitur dari 25 modul stock tanpa source (`transsion_tranlog`,
   `thd`, dll) tidak akan ada.

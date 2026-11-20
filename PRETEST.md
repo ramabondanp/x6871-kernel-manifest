@@ -2970,3 +2970,73 @@ Catatan cakupan: kedua image tetap **269 modul 100% source** (212 vendor
 + 57 odm); 25 nama stock tanpa source tidak ada. `imgsensor.ko` dan
 `flashlight.ko` yang ada di image adalah hasil build source, bukan `.ko`
 stock.
+
+## 47. dmesg2: panic Mali — pakai GPU stack donor OPPO (r54p1-11eac0)
+
+SCP sudah lolos (`dmesg2` berlanjut ke userspace/apexd), tetapi berhenti
+di GPU:
+
+```text
+kbase_backend_gpuprops_get,illegal shader present , HW: 0x130013, SW: 0x0
+kernel BUG at .../mali_kbase_gpuprops_backend.c:60!
+kbase_backend_gpuprops_get
+kbase_gpuprops_init
+kbase_device_early_init
+kbase_platform_device_probe [mali_kbase_mt6895_a16w]
+```
+
+Penyebabnya `gpufreq_get_shader_present()` mengembalikan 0 saat Mali
+probe, sehingga `BUG_ON(1)` di jalur `CONFIG_MTK_GPUFREQ_V2 &&
+!CONFIG_MTK_GPU_LEGACY` aktif.
+
+### Sumber: donor 6.1 tidak punya GPU, donor OPPO 6.12 punya versi stock
+
+- `tmp/ts61-src` tidak memuat tree `vendor/mediatek/kernel_modules/gpu`.
+- Donor OPPO mt6896 6.12 memuat `mali_avalon/a16w` dengan
+  `MALI_RELEASE_NAME="r54p1-11eac0"` — **sama dengan stock X6871**
+  (`modinfo` stock: r54p1-11eac0, UK 1.38).
+- Tree Moto kita sebelumnya r54p1-08bet0, dan `mtk_gpufreq_wrapper.ko`
+  belum mengekspor `gpufreq_driver_ready` seperti stock.
+
+### Config OPPO yang dicek
+
+- `entry_level_legacy.config` OPPO identik dengan kita (tidak ada
+  perbedaan GPU).
+- `a16w/config/fragment/mt6895.fragment` donor menambah config Mali
+  (`CONFIG_MALI_MTK_PROTECTED_PATCH`, `PREVENT_PRINTK_TOO_MUCH`,
+  `KBASE_THREAD_DEBUG`, `KCPUQ_PRIORITZED`, `SCHEDULER_KTHREAD_PATCH`);
+  fragment ini ikut diimpor.
+- Config efektif tetap `CONFIG_MTK_GPUFREQ_V2=y`,
+  `CONFIG_MTK_GPU_LEGACY=n`; jadi bukan sekadar mematikan jalur BUG.
+
+### Perubahan sumber
+
+- `kernel_device_modules-6.12`: seluruh `drivers/gpu/mediatek` diganti
+  versi donor OPPO (ged, gpufreq/v2, gpueb, gpu_pdma, gpu_bm, hal,
+  mt-plat). Kernel commit `5462a6d118a6` (English, pushed ke `alps`).
+- `vendor/mediatek/kernel_modules/gpu`: seluruh `mali_avalon/a16w`
+  diganti donor OPPO (`475324b` di repo lokal; repo ini tidak punya
+  remote `alps`).
+- Dua dependency OPPO-only `oplus_bsp_mm_osvelte` dan
+  `osvelte_public_headers` dihapus dari `midgard/BUILD.bazel`;
+  `CONFIG_OPLUS_FEATURE_MM_OSVELTE` tidak aktif.
+- `conditional_defines` GED hanya untuk `k6993v1_64`, dihapus karena
+  skema build kita belum mendukung argumen itu.
+
+Hasil build:
+- `mali_kbase`: **r54p1-11eac0 (UK 1.38)**, sama dengan stock.
+- `mtk_gpufreq_wrapper`: mengekspor `gpufreq_driver_ready`.
+- `ged`: mengekspor `ged_dvfs_get_util_active/3d/ta/comp` yang dipakai
+  Mali donor.
+
+### Artefak (hanya vendor_dlkm)
+
+```text
+vendor_dlkm.img                 md5 72f7e6dae2c25e0274008e69c2cf7fd1
+odm_dlkm.img (tidak berubah)    md5 0ffbb42985d445f7c12808df3b50960e
+twrp-dlkm-gpufix-20261120.zip   md5 5ca615ac2b342f4430baba640168efe8
+release                         dlkm-gpufix-20261120
+```
+
+Zip/flash hanya menulis `vendor_dlkm`; `odm_dlkm` tetap dari
+`dlkm-20261120`. Boot setelah fix ini belum diuji.
