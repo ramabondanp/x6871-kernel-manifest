@@ -1719,3 +1719,88 @@ muatnya sama. Di `dmesg5.txt` terlihat jalur doze MTK:
 
 Perlu uji A/B dengan image berisi set modul stock untuk memastikan apakah
 gejala ini juga ada di stock (bukan asumsi).
+
+## 29. Layar tidak menyala setelah screen off: panel driver yang salah
+
+`normal.txt` (boot stock yang normal) membongkar akarnya. Modul panel yang
+dipakai boot sehat **bukan** yang kita build:
+
+```text
+normal.txt  : /lib/modules/rm69220_fhdp_dsi_vdo_dsc_csot_csot_144hz_x6871.ko
+              (ada di /tmp/x6871/vr/root/lib/modules, 279.672 byte)
+build kita  : /lib/modules/panel-rm69220-vdo-x6871.ko
+              (dari drivers/gpu/drm/panel/panel-rm69220-vdo-x6871.c)
+```
+
+Keduanya mengklaim compatible yang sama
+(`rm69220,fhdp,dsi,vdo,dsc,csot,csot,144hz,x6871`), tetapi isinya driver
+berbeda. Log-nya pun beda:
+
+```text
+normal : [LCM] lcm_probe lcm_doze_backlight:3;5;7;27;
+         [LCM]lcm_regulator_power_init start/end
+         [LCM] lcm_setbacklight_cmdq level = 2047, mapped_level = 1658
+dmesg5 : lcm_probe+ / device node name:panel1 / lcm_probe-
+         lcm_setbacklight_cmdq level = 2047, mapped_level = 1757 dimming_status = 1
+```
+
+Perbandingan simbol:
+
+```text
+vendor-only : panel_hbm_set_cmdq_switch, dimming_modify_setting,
+              bl_tb0, brightness_mapped_to_alpha_low_light,
+              panel_ext_lcm_power_set, iris_parse_is_factory_bootmode, ...
+milik kita  : aod_mode_enter_setting, aod_mode_exit_setting, ext_params,
+              fhd_default_mode, fhd_mode_120, ...
+```
+
+### Penyebab langsung: blok doze tidak pernah dikompilasi
+
+Di tree 6.12, Kconfig `TRANSSION_DOZE_BRIGHTNESS_SUPPORT` **tidak ada**
+(di donor 6.1 ada di `mediatek_v2/Kconfig`, di-set `=m` oleh
+`tran_custom.config`). Akibatnya semua
+
+```c
+#if IS_ENABLED(CONFIG_TRANSSION_DOZE_BRIGHTNESS_SUPPORT)
+```
+
+di driver panel ikut mati, termasuk `panel_doze_enable`,
+`panel_doze_disable`, `g_lcm_doze_backlight`, dan
+`.set_aod_light_mode`. Modul kita sebelum perbaikan tidak punya satu pun
+simbol doze itu; modul vendor punya ketiganya.
+
+Tanpa hook doze, transisi layar mati -> nyala yang lewat
+`mtk_atomic_doze_preparation/finish` (lihat `dmesg5.txt`) berakhir dengan
+panel tetap gelap walau backlight 2047 sudah diset, disertai
+`DSI0: buffer underrun` berulang.
+
+### Perbaikan
+
+1. Definisikan macro di driver (tree 6.12 tidak punya Kconfig-nya):
+
+   ```c
+   #ifndef CONFIG_TRANSSION_DOZE_BRIGHTNESS_SUPPORT
+   #define CONFIG_TRANSSION_DOZE_BRIGHTNESS_SUPPORT 1
+   #endif
+   ```
+
+2. Pindahkan `struct lcm_doze_backlight` (dan typedef
+   `tran_lcm_doze_backlight`) ke atas `g_lcm_doze_backlight`. Blok itu
+   belum pernah ikut dikompilasi, jadi urutan deklarasinya rusak.
+
+Setelah rebuild, simbol modul panel kita sama dengan vendor:
+
+```text
+panel_doze_enable, panel_doze_disable, g_lcm_doze_backlight
+```
+
+Commit kernel `a31d53a3603b`.
+
+### Kalau masih gelap
+
+Langkah berikutnya adalah menyelaraskan sisa callback yang hanya dimiliki
+vendor (`panel_hbm_set_cmdq_switch`, `dimming_modify_setting`,
+`panel_ext_lcm_power_set`) dan tabel backlight (`mapped_level` vendor 1658
+vs kita 1757). Kandidat jangka panjang: port driver
+`rm69220_fhdp_dsi_vdo_dsc_csot_csot_144hz_x6871.c` milik vendor (source
+tidak dipublikasikan) atau samakan perilakunya dari hasil RE.

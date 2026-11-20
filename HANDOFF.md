@@ -44,7 +44,12 @@ ada `.ko` stock di ramdisk. Rincian di `PRETEST.md` §23.
   kpd, tapi `tran_ldo.ko` tidak dimuat sehingga regulator `dvdd` panel
   (TRANLDO26) tidak pernah ready dan `lcm_probe()` tidak dipanggil
   sama sekali. Lihat `PRETEST.md` §27.
-- Varian terkini: `twrp-vendor_boot-allsrc-vib.img`
+- Varian terkini: `twrp-vendor_boot-allsrc-vib2.img`
+  (md5 `0975ce466b7d015aae8a1825800babc9`) — tran_ldo + mtk-kpd + haptic
+  recovery + panel doze (driver panel kini punya `panel_doze_enable`,
+  `panel_doze_disable`, `g_lcm_doze_backlight` seperti modul vendor).
+  Detail: `PRETEST.md` §29.
+- Varian sebelumnya: `twrp-vendor_boot-allsrc-vib.img`
   (md5 `fb761763e49325183551f4ed74918ddd`) — layar hidup (tran_ldo),
   `mtk-kpd`, dan vibrator. Driver haptic kini mendaftar di recovery
   (guard boot-mode di `aw_i2c_init` hanya menyisakan mode KPOC 8/9),
