@@ -1230,3 +1230,80 @@ set dlkm berasal dari staging (`not-from-staging: []`).
 Catatan: partisi dlkm (`vendor_dlkm`/`odm_dlkm` di `super`) belum
 di-repack. Set ini adalah bahan siap pakai untuk tahap itu; boot system
 belum diuji.
+
+## 25. Storage fork Transsion: hasil RE dan dua modul yang layak di-port
+
+Fork storage Transsion di stock `.ko` berasal dari:
+
+```text
+kernel_device_modules-6.12/fs/atomic_storage/
+  tran_block/ tran_scsi/ tran_mmc/ tran_ufs/
+kernel_device_modules-6.12/fs/tran_rhi/
+kernel_device_modules-6.12/drivers/bootdevice/bootdevice/
+```
+
+Ini bukan patch kecil. `tran_block` 1.237 fungsi/300 ekspor (fork block
+layer penuh), `tran_scsi_mod` 313 fungsi/156 ekspor, `tran_sd_mod` fork
+`sd`, `tran_mmc_block` fork `mmc_block`, dan `tran-ufshcd-core/pltfrm`
+fork UFS core. Semua memakai prefix `tran_*` dan hook `__tran_*_hook`.
+
+### Kenapa tidak dipakai di X6871
+
+Kernel stock sudah built-in:
+
+```text
+CONFIG_SCSI_MOD=y
+CONFIG_BLK_DEV_SD=y
+CONFIG_SCSI_UFSHCD=y
+CONFIG_SCSI_UFSHCD_PLATFORM=y
+CONFIG_MMC_BLOCK=y
+```
+
+`ufs-mediatek-mod.ko` bind controller sebelum modul Tran dimuat:
+
+```text
+2.2279 scsi host0: ufshcd
+2.3294 sd 0:0:0:2: [sdc] Attached SCSI disk
+2.3341 tran_sd_mod: /odm/blkio not exit, donot enable blkio
+2.3341 tran_sd_mod: block io disable, not ctled by cloudengine
+2.3459 tran-ufshcd-core loaded
+2.3596 tran_block loaded
+```
+
+Tidak ada `scsi host`/disk baru setelah `tran-*` dimuat. Node DT
+`/odm/blkio` juga tidak ada di X6871, jadi BLK-IO/atomic storage,
+`low_latency_sched`, dan hook Tran tidak aktif. Fork ini **bukan jalur
+storage X6871**; jangan di-port kecuali ada bukti boot system stock
+memakainya.
+
+### Dua modul standalone yang layak dipertimbangkan
+
+1. **`tran-proc-bootdevice-mod.ko`** — membuat `/proc/bootdevice` dan
+   `/proc/tran_bootdevice`. Modul ini tetap jalan dengan UFS MTK/GKI
+   karena hanya memanggil `ufshcd_query_attr_retry`,
+   `ufshcd_query_descriptor_retry`, `ufshcd_query_flag`, dan
+   `ufshcd_read_desc_param`. Isi node: `name`, `type`, `manfid`,
+   `oemid`, `serial`, `rev`, `prv`, `fwrev`, `hwrev`, `size`, `cid`,
+   `csd`, `ext_csd`, `ocr`, `erase_size`, `enhanced_area_offset/size`,
+   `life_time_est`, `pre_eol_info`, `ffu_support`, `product_name`,
+   `bootmode`, `boottype`. Dipakai tool factory/diagnostik Transsion.
+   Implementasi ulang kecil; tidak perlu fork storage.
+
+2. **`tran_rhi.ko`** — membuat `/proc/health_info`,
+   `/proc/healthinfo_upload`, dan `/proc/healthinfo_upload_new`. Field
+   `health_info.FlashID`, `health_info.FwRev`, `health_info.nand_uid`;
+   ekspor `get_rom_life_time`, `get_total_gc_count`, dan
+   `get_rom_avg_erase_tlc`. Ini procfs mandiri; datanya diisi userspace
+   Transsion. Prioritas rendah, tapi mudah dibuat ulang kalau app health
+   membutuhkannya.
+
+Yang **tidak** perlu di-port: `tran_block`, `tran_scsi_mod`,
+`tran_sd_mod`, `tran_mmc_block`, `tran-ufshcd-core`,
+`tran-ufshcd-pltfrm`, dan `low_latency_sched`. Semuanya dorman di X6871
+dan ukurannya besar (`tran_block` 1.1 MB, `tran-ufshcd-core` 563 KB,
+`tran_scsi_mod` 434 KB).
+
+Bukti: stock `.ko` di
+`/serverhive1/ramabondanp/tmp/twrp-set2/lib/modules/6.12.38-android16-5-g2c4fd33ae6d8-4k/`,
+`/serverhive1/ramabondanp/dmesg3.txt`, dan config kernel stock
+`/serverhive1/ramabondanp/tmp/bootRE_ikconfig`.

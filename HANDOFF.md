@@ -48,6 +48,14 @@ yang sebelumnya disediakan stock. Closure simbol kernel + 222 modul
 vendor_boot + 269 modul dlkm: **0 unresolved**. Partisi dlkm di `super`
 belum di-repack; boot system belum diuji.
 
+Future reference: `PRETEST.md` §25 merangkum hasil RE storage fork
+Transsion. Fork utama (`tran_block`/`tran_scsi`/`tran_sd`/`tran_mmc`/
+`tran_ufs`) dorman di X6871 karena SCSI/sd/UFS/MMC block sudah built-in
+dan `ufs-mediatek-mod` bind lebih dulu; node DT `/odm/blkio` juga tidak
+ada. Yang layak di-port ulang hanya dua modul standalone:
+`tran-proc-bootdevice-mod` (`/proc/bootdevice`, pakai API `ufshcd_query_*`
+GKI) dan `tran_rhi` (`/proc/health_info`, procfs health).
+
 Repo bersih, semua ter-push: `alps`, branch `w1vo36-6.12-port`,
 HEAD `93b7ebca0841`. Manifest `main` mengikuti commit HANDOFF/PLAN/PRETEST
 terakhir.
