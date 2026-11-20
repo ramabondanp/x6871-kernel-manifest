@@ -2098,3 +2098,69 @@ twrp-vendor_boot-dbg-skipunprep2.img
   Beda dengan image sehat vib2 HANYA di panel-rm69220-vdo-x6871.ko
   (per-file md5 semua modul + load list + dep/alias identik dengan vib2).
 ```
+
+## 33. Layar nyala tapi rusak -> konfigurasi DSC revisi B salah untuk panel ini
+
+`dmesg7.txt` (image `dbg-skipunprep2`): layar **hidup** setelah wake, hanya
+gambarnya rusak. Trace membuktikan panel tidak pernah di-reinit:
+
+```text
+[LCMDBG] lcm_disable enter enabled=1 prepared=1
+[LCMDBG] lcm_unprepare enter prepared=1
+[LCMDBG] lcm_unprepare skipped (LCMDBG_SKIP_UNPREPARE)
+[LCMDBG] lcm_enable enter enabled=0 prepared=1
+(1x sebagai ganti jalur post_bl); panel tidak mati, DSI0 buffer underrun hanya 3x
+```
+
+Jadi panel memang bisa menyala; isi gambarnya yang salah. Penyebabnya
+ditemukan dengan membandingkan modul kita terhadap modul panel vendor
+revisi A (`rm69220_..._x6871.ko`) yang di-RE:
+
+### Beda parameter DSC (sama di blok 144/120/60Hz)
+
+```text
+field                  revisi B (kita)   revisi A (vendor, jalan)
+bit_per_channel        10                8
+slice_height           70                12
+chunk_size             630               540
+ver                    18                17
+dsc_cfg                40                34
+line_buf_depth         16                9
+dec_delay              650               526
+increment_interval     1658              287
+decrement_interval     8                 7
+line_bpg_offset        15                12
+nfl_bpg_offset         446               2235
+slice_bpg_offset       319               2170
+flatness_minqp         7                 3
+flatness_maxqp         16                12
+rc_quant_incr_limit0/1 15                11
+dsc_param_load_mode    2                 0
+```
+
+DSC 10bpc/302.400 bit per slice vs 8bpc/51.840 bit per slice: DDP
+mengirim stream yang tidak bisa didekode panel -> hitam (kalau panel
+di-init ulang) atau rusak (kalau panel dibiarkan dalam state bootloader).
+
+### Beda init sequence
+
+Driver vendor memakai tabel `lcm_initialization_setting` di `.data`:
+126 entri, stride 128 byte, layout `{u32 cmd; u8 count; u8 para_list[]}`
+(dibuktikan dari disassembly `push_table_cb`: `add x8, x19, x23, lsl #7`,
+`ldrb w0, [x8, #4]`). Isinya 63 penulisan register dengan page switch
+eksplisit (`0xfe 0x00`, `0xfe 0x60`, `0xfe 0x62`, ...), diakhiri
+`0x11` + 120 ms + `0x29` + 20 ms. Driver kita sebelumnya memakai
+sequence lain (63 entri tanpa page switch lengkap).
+
+### Perbaikan (kernel `e5d72d343f7e`)
+
+1. 17 field DSC di ketiga blok `ext_params` disamakan dengan vendor A.
+2. Init sequence diganti dengan tabel vendor A yang diekstrak apa adanya
+   (`lcm_init_table_a`, 126 entri) + helper `push_init_table_cpu()`;
+   urutan reset GPIO disamakan (1 - 5ms - 0 - 5ms - 1 - 35ms).
+
+Verifikasi: `.data` modul hasil build kini 0 field DSC yang beda dengan
+modul vendor A.
+
+Image: `twrp-vendor_boot-panelA.img` (md5 `de52dbcb8ae8c7642e6d7abd4919aab3`),
+beda dengan image sehat `allsrc-vib2` hanya di modul panel.
