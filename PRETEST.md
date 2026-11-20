@@ -1520,6 +1520,14 @@ dipublikasikan; mulai dari driver `common` dulu.
    (puluhan byte per fungsi). `resume`/`suspend` kemungkinan hanya
    perbedaan config PM saat build, perlu dicek saat port.
 
+   **Sudah diperbaiki (2026-11-20):** DT X6871 memakai compatible
+   `mediatek,ocp81375_v4l2` dan `mediatek,sgm37864_v4l2`, sedangkan
+   source kita hanya punya `mediatek,ocp81375` / `mediatek,sgm37864`
+   sehingga **driver tidak bind**. Entri `_v4l2` ditambahkan di
+   `*_of_table` (ketiganya, termasuk `aw36515`), build ulang sudah
+   diverifikasi: alias modul sekarang memuat kedua bentuk. Detail di
+   `DEVICES.md`.
+
 5. **`aw8601af` (VCM AF cam0) — sudah ditulis sendiri.** Nama fungsi sama
    (7 fungsi), tapi `open`/`close`/`probe`/`remove` beda 8–84 byte dari
    stock; sequencing power/clock kita berbeda. Perlu diuji AF-nya saat

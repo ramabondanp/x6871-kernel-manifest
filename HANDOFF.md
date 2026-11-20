@@ -69,6 +69,13 @@ aman dilewati (tidak ada node DT maupun konsumen). Patch `flashlight`
 (sub/tele torch, thermal) bisa di-port dari donor 6.1. Alat pembanding:
 `tools/stock-vs-src.py` (§26).
 
+Tabel perangkat X6871 dari DTBO: `DEVICES.md` — 978 node `okay`, 470 di
+antaranya sudah punya modul source kita, 130 built-in, 371 node platform,
+7 tanpa driver. Dari tabel itu ketemu satu bug nyata: `of_match` flash LED
+(`ocp81375_v4l2`, `sgm37864_v4l2`) tidak memakai sufiks `_v4l2` seperti
+DT, jadi driver tidak akan bind; sudah ditambahkan di
+`flashlight/v4l2/*.c` dan diverifikasi lewat build.
+
 Repo bersih, semua ter-push: `alps`, branch `w1vo36-6.12-port`,
 HEAD `93b7ebca0841`. Manifest `main` mengikuti commit HANDOFF/PLAN/PRETEST
 terakhir.
