@@ -189,6 +189,23 @@ TMPDIR=/serverhive1/ramabondanp/tmp BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1 \
 Staging hasil build:
 `out_bazel/ad3c7b30a704e8551ed600a0d11ef0f0/execroot/_main/bazel-out/k8-fastbuild/bin/kernel_device_modules-6.12/mgk_64_k612_customer_modules_install.user/`
 
+### Repack vendor_boot (WAJIB dari build terbaru)
+
+```bash
+cd /serverhive1/ramabondanp/w1vo36-kernel-manifest
+./tools/repack-vendor-boot-latest.sh   --out /serverhive1/ramabondanp/tmp/x6871/twrp-vendor_boot-$(date -u +%Y%m%d-%H%M%S).img
+```
+
+Skrip ini menjalankan build di `### Perintah build`, mengambil staging
+**hasil build itu**, men-stage 222 modul dari `tools/recovery-modules.txt`,
+menghapus debug info, meregenerasi `modules.dep`/`alias`/`softdep`, pack
+dengan `tmp/vbwork-twrp`, lalu membongkar hasilnya dan **gagal** kalau ada
+`.ko` yang beda dari staging. Modul tidak pernah disalin dari image lama.
+Info commit/md5 ditulis ke `<out>.buildinfo`.
+
+Menambah/mengurangi modul recovery: edit `tools/recovery-modules.txt`,
+`tools/modules.load`, dan `tools/modules.load.recovery` sekaligus.
+
 ### Jebakan build
 
 - `--user_ddk_unsafe_headers=...mtk_use_gki_unsafe_headers` **wajib**; tanpa
@@ -203,12 +220,11 @@ Staging hasil build:
 - `v1/BUILD.bazel` ber-CRLF; pertahankan atau diff meledak.
 - `tar` gzip satu inti mati di tengah (>3 menit). Pakai
   `pigz -dc file.tar.gz | tar -x -C dir` — 7.106 file <60 s.
-- **Jangan memakai `cmp-out/vbverify5` sebagai baseline repack.** Direktori
-  itu dibuat 12:49 dari `allsrc-vib2`, sebelum perbaikan layar, sehingga
-  masih memuat panel driver lama. Baseline yang benar:
-  `cmp-out/xcmp/display` (isi `allsrc-display`, panel md5 `19507dee...`).
-  Kesalahan ini membuat `usb-replug` gagal bangun dari mati layar
-  (`PRETEST.md` §43).
+- **Jangan menyalin `.ko` dari image lama sebagai baseline repack.** Itu
+  penyebab `usb-replug` memuat panel driver pra-perbaikan layar
+  (`PRETEST.md` §43). Selalu pakai `tools/repack-vendor-boot-latest.sh`;
+  direktori baseline lama (`cmp-out/vbverify5`, `cmp-out/xcmp`) sudah
+  dihapus.
 
 ## Yang sudah selesai
 

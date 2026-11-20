@@ -2760,3 +2760,39 @@ hanya `tran_extcon_usb.ko` dengan versi `usb-replug`:
 
 `twrp-vendor_boot-usb-replug.img` **deprecated** untuk uji layar; pakai
 image di atas.
+
+## 44. Bersih-bersih artefak dan repack otomatis dari build terbaru
+
+Setelah §43, semua baseline hasil unpack lama dihapus supaya tidak ada
+lagi sumber modul yang bisa basi:
+
+- dihapus: `cmp-out/vbverify*`, `cmp-out/vfy-*`, `cmp-out/xcmp`,
+  `cmp-out/chk-*`, `cmp-out/hdr-*`, `cmp-out/dtb-cmp`, `cmp-out/dtb-new`,
+  `cmp-out/px-*`, seluruh `twrp-*.img` lama di `cmp-out` dan
+  `tmp/x6871` kecuali image final, serta image percobaan
+  `vendor_boot-{abie,roundtrip,script,new}.img`
+- disimpan: `tmp/x6871/twrp-vendor_boot-allsrc-display-usb.img`
+  (md5 `0ecdaa1edb3d405954331539b24c911b`), stock `vendor_boot.img`,
+  `boot.img`, `dtbo.img`, dan firmware referensi `tmp/x6871/vr`
+- hasil: `cmp-out` 12G -> 682M, `tmp/x6871` 3.0G -> 458M
+
+Workflow repack baru (commit manifest berikutnya):
+
+```bash
+./tools/repack-vendor-boot-latest.sh
+```
+
+1. build Bazel dengan perintah resmi (`HANDOFF.md` §Perintah build),
+2. cari staging `mgk_64_k612_customer_modules_install.user` terbaru,
+3. stage 222 modul dari `tools/recovery-modules.txt` (bukan dari image),
+4. `llvm-strip --strip-debug` + `depmod` untuk metadata,
+5. pack dengan `tmp/vbwork-twrp`,
+6. unpack hasil dan gagal kalau ada `.ko` yang md5-nya beda dari staging,
+7. tulis `<out>.buildinfo` berisi commit kernel, jumlah modul, md5 image.
+
+Uji: staging dari build `af55c9c00426` menghasilkan 222 modul yang
+**sama persis** dengan image final (metadata teks `modules.dep`,
+`modules.alias`, `modules.softdep`, `modules.load`, `modules.load.recovery`
+juga identik), jadi workflow ini tidak mengubah isi modul yang sudah
+terbukti jalan. Image uji otomatis dibuat lalu dihapus lagi; image final
+tetap `twrp-vendor_boot-allsrc-display-usb.img`.

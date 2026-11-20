@@ -94,7 +94,8 @@ hasil port di-push ke branch `w1vo36-6.12-port`.
 | `audit-sources.sh` | cocokkan modul firmware -> file source **tanpa** peduli nama file |
 | `tools/ko-preflight.py` | bandingkan 4 modul fitur dengan `.ko` stock (export/impor/CRC/call graph) |
 | `tools/preboot-audit.py` | audit **seluruh** modul stock yang digantikan build: 1 baris per `.ko` firmware, plus simulasi loader pada set itu |
-| `tools/pack-vendor-boot.sh` | repack `vendor_boot.img`: ganti `lib/modules` dengan hasil build, dtb/bootconfig/recovery stock dipertahankan |
+| `tools/repack-vendor-boot-latest.sh` | **repack utama X6871**: build source terbaru, stage 222 modul dari Bazel, pack, lalu verifikasi tiap `.ko` di image sama dengan staging |
+| `tools/pack-vendor-boot.sh` | legacy: repack dari image stock + filter nama stock; jangan dipakai untuk X6871 (lihat `HANDOFF.md`) |
 | `BOOTTEST.md` | prosedur uji boot utuh: artefak, flash, rollback, checklist per subsistem, delta yang wajar |
 | `PLAN.md` | rencana port driver device lain (X6871) — Tingkat A sudah selesai |
 
