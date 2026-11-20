@@ -2227,3 +2227,64 @@ masih gelap   -> ada faktor lain di sisi panel power (rail vddi/dvdd/vci
                  lewat panel_ext_lcm_power_set yang juga tidak dipanggil
                  driver kita)
 ```
+
+## 35. Iris bukan penyebabnya; yang belum ada adalah rail panel
+
+### Iris: tidak perlu di-RE
+
+`iris_enable()` di `mediatek_v2/v1/iris_lightup.c` langsung keluar kalau
+config belum disiapkan:
+
+```c
+if (!pcfg->is_prepared) {
+        IRIS_LOGI("%s(), pcfg->is_prepared = %d.", __func__, pcfg->is_prepared);
+        goto exit;
+}
+```
+
+Dan log vendor yang sehat memuat persis pesan itu:
+
+```text
+IRIS_LOG I iris_enable() pcfg->is_prepared = 0.
+IRIS_LOG I iris_lightoff() pcfg->is_prepared = 0.
+```
+
+Ditambah `IRIS_LOG E _iris_find_lightup_node(), failed to find pxlw,iris-lightup-config node`
+pada boot. Artinya di perangkat ini iris tidak mengerjakan apa pun.
+
+Selain itu source iris **sudah ada** di tree kita:
+`drivers/gpu/drm/mediatek/mediatek_v2/v1/iris_lightup.c` dan
+`iris_cmds.c`, dan simbol `iris_*` diekspor `mediatek_drm_v1` (sudah
+dibuktikan waktu image `diag-panelvendor`). Jadi tidak perlu port/RE
+iris; yang perlu hanya memanggilnya kalau memang dibutuhkan.
+
+### Yang benar-benar belum ada: rail vddi/dvdd/vci
+
+Log vendor memanggil hook rail di setiap siklus, log kita 0x:
+
+```text
+normal.txt (vendor)
+  [LCM] panel_ext_lcm_power_set status=1 begin/end   (sebelum lcm_prepare)
+  [LCM] lcm_prepare begin ... end
+  ...
+  [LCM] lcm_unprepare begin ... end
+  [LCM] panel_ext_lcm_power_set status=0 begin/end   (sesudah lcm_unprepare)
+```
+
+Hook itu tidak pernah jalan di kita karena DRM revisi ini tidak punya
+callback `lcm_power_set` (`mtk_panel_funcs` kita 0x1e8 = 488 byte,
+vendor 0x258 = 600 byte). Akibatnya panel tidak pernah di-power-cycle:
+`0x10` sleep-in dikirim, rail tetap hidup, dan panel tidak mau bangkit
+lagi pada init berikutnya.
+
+### Perbaikan (kernel `ad96798c52f0`)
+
+`panel_ext_lcm_power_set()` (sudah ada di source tapi mati) dipanggil
+langsung dari `lcm_prepare()` (sebelum pulse reset) dan dari
+`lcm_unprepare()` (setelah sleep-in), urutannya sama dengan vendor.
+`skip_unprepare` sekarang default 0 (siklus penuh) dan tetap tersedia
+sebagai parameter modul untuk uji A/B.
+
+Image: `twrp-vendor_boot-panelA-rails.img`
+(md5 `ea51c7190c6db999656831e15fdf824d`), beda dengan image sehat
+`allsrc-vib2` hanya di modul panel.
