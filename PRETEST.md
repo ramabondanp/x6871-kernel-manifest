@@ -2164,3 +2164,66 @@ modul vendor A.
 
 Image: `twrp-vendor_boot-panelA.img` (md5 `de52dbcb8ae8c7642e6d7abd4919aab3`),
 beda dengan image sehat `allsrc-vib2` hanya di modul panel.
+
+## 34. DSC sudah benar, layar tetap gelap: panel butuh jalur iris
+
+`dmesg8.txt` (image `panelA`): semua yang berhubungan dengan stream sudah
+sesuai modul vendor, tapi layar tidak menyala.
+
+```text
+mtk_rdma_cal_golden_setting ... bpc:8      <- sama dengan vendor
+RCT_ON = 0x1, num_extra_mux_bits = 246->240, slice_bits = 51840
+                                           <- sama dengan vendor
+DSI0 buffer underrun : 0x                  <- sebelumnya 6x
+[LCM] lcm_prepare enter prepared=0
+[LCM] lcm_panel_init begin/end error=0     <- 195 ms, tabel vendor A jalan
+leds_mtk ... L:2047                        <- backlight diminta maksimum
+lcm_setbacklight_cmdq level = 2047, mapped_level = 1757
+```
+
+Jadi init table lengkap, DSC cocok, tidak ada underrun, backlight 2047 —
+tetap gelap.
+
+### Beda yang tersisa: subsistem iris
+
+Log vendor yang sehat memuat 20 baris `IRIS_LOG`, log kita **0**:
+
+```text
+normal.txt (vendor)
+  IRIS_LOG I iris_init()
+  IRIS_LOG I iris_init_timing_switch()
+  IRIS_LOG I _iris_find_lightup_node(), failed to find pxlw,iris-lightup-config node
+  IRIS_LOG I iris_reset() / _iris_reset_chip() reset start/end
+  IRIS_LOG I iris_enable() pcfg->is_prepared = 0.
+  IRIS_LOG I iris_lightoff() pcfg->is_prepared = 0.
+  IRIS_LOG I iris_set_valid:set:4, real:1
+
+dmesg8 (kita)
+  (tidak ada)
+```
+
+Driver panel vendor memanggil `iris_reset()` lalu `iris_enable(NULL)`
+sebelum push tabel init (terlihat di disassembly `lcm_prepare`), dan
+`iris_lightoff()`/`iris_disable()` saat unprepare. `iris_*` diekspor oleh
+`mediatek_drm_v1`; driver kita tidak pernah memanggilnya (0 rujukan).
+
+Artinya: jalur `0x10` sleep-in yang dikirim `lcm_unprepare` mematikan
+panel, dan tanpa `iris_enable()` panel tidak pernah dinyalakan lagi.
+Layar boot tetap hidup karena bootloader sudah menyalakan iris.
+
+### Image uji: panelA + skip_unprepare
+
+`twrp-vendor_boot-panelA-skipsleep.img` (md5 `aa97ed759d5c50f406257ac3433fd49b`)
+= image `panelA` + `skip_unprepare=1` (parameter modul, default 1).
+Unprepare tidak mengirim sleep-in, panel dibiarkan pada state bootloader,
+dan DSC yang dikirim sekarang 8bpc seperti vendor.
+
+```text
+gambar benar  -> kunci masalahnya memang iris; langkah berikutnya
+                 tambahkan iris_reset/iris_enable/iris_lightoff ke driver
+                 (perlu mediatek_drm_v1 dimuat sebelum modul panel karena
+                 simbolnya diimpor) lalu balikkan skip_unprepare=0
+masih gelap   -> ada faktor lain di sisi panel power (rail vddi/dvdd/vci
+                 lewat panel_ext_lcm_power_set yang juga tidak dipanggil
+                 driver kita)
+```
