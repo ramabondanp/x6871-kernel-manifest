@@ -2647,3 +2647,40 @@ psy detector (c_role==NONE) menyetel DEVICE lagi.
 Image: `twrp-vendor_boot-usb-replug.img`
 (md5 `8233c66d7b09aefd2e5b0fe5f4ca4c2e`), 222 modul, beda dengan
 `allsrc-display` hanya di `tran_extcon_usb.ko`.
+
+### 42.1 Verifikasi: dmesg14 (cabut-colok berulang)
+
+`dmesg14.txt` merekam tiga siklus colok dan dua siklus cabut. Semua
+siklus berakhir dengan enumerasi ulang yang bersih:
+
+```text
+8.837   online=1, type=1  (SDP)
+8.837   Type-C SINK plug in of psy -> cur_dr(0) new_dr(2)
+8.837   ssusb_set_mode device / pullup D+
+9.186   gadget RESET / ep1out+ep1in enable          (enumerasi #1)
+
+12.640  event:7 USB_PLUG_OUT -> "Type-C plug out"
+12.642  cur_dr(2) new_dr(0) -> ssusb_set_mode none / pullup D-
+        (event:2 pd_type=0 diabaikan, sesuai dead-code stock)
+
+14.375  online=1, type=1 -> cur_dr(0) new_dr(2)
+14.375  ssusb_set_mode device / pullup D+
+14.834  gadget RESET / ep1out+ep1in enable          (enumerasi #2)
+
+16.030  event:7 -> "Type-C plug out" -> cur_dr(2) new_dr(0)
+19.017  online=1, type=1 -> cur_dr(0) new_dr(2)
+19.426  gadget RESET / ep1out+ep1in enable          (enumerasi #3)
+```
+
+Catatan penting:
+
+- `type=1` sekarang muncul, sama persis dengan log stock (`normal.txt`),
+  membuktikan pembacaan `POWER_SUPPLY_PROP_USB_TYPE` (SDP) benar.
+- Tidak ada lagi `switch role to host` saat cabut; role berakhir NONE
+  sehingga psy detector bisa menyetel DEVICE lagi.
+- 0 buffer underrun, tiga kali `gadget (high-speed) pullup D+` diikuti
+  `gadget RESET` dan enable endpoint — adb hidup lagi di setiap colok.
+
+Status: **cabut-colok USB selesai**, `twrp-vendor_boot-usb-replug.img`
+(md5 `8233c66d7b09aefd2e5b0fe5f4ca4c2e`) menjadi image final terbaru
+(layar mati->nyala + USB replug).
