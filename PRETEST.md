@@ -1130,3 +1130,61 @@ Rantai dependensi yang tersisa:
 Artinya sisi simbol sudah selesai; yang tersisa adalah perilaku
 (hook scheduler yang belum disambungkan) dan penggantian sumber untuk
 modul Tranlog/Aegis yang tidak punya donor.
+
+## 23. TWRP 100% modul dari source (tanpa stock)
+
+Sesuai keputusan baru: tidak ada modul stock yang dimuat. Set TWRP
+dibangun ulang hanya dari hasil build kita.
+
+### Yang dibuang (17 modul stock)
+
+Storage Transsion: `tran-ufshcd-core`, `tran-ufshcd-pltfrm`,
+`tran_scsi_mod`, `tran_sd_mod`, `tran_block`, `tran_mmc_block`,
+`tran_rhi`, `tran-proc-bootdevice-mod`.
+Layanan/perf Transsion: `low_latency_sched`, `sd_tray`, `tkv_recovery`,
+`thd`, `transsion_tranlog`, `tran_key_bigdata`, `tc_trancare`.
+Panel: `rm69220_fhdp_dsi_vdo_dsc_csot_csot_144hz_cl8` (compatible-nya
+`...,cl8`, bukan DT X6871).
+MMC: `mtk-mmc-mod` diganti `mtk-mmc.ko` hasil build kita.
+
+### Storage sekarang jalur MediaTek
+
+`dmesg3.txt` membuktikan UFS sudah hidup sebelum modul Transsion dimuat:
+
+```
+[2.2218] ufs_mediatek_mod: Loading ...
+[2.2279] scsi host0: ufshcd
+[2.2834] sd 0:0:0:2: [sdc] 62480384 4096-byte logical blocks (256 GB)
+[2.3294] sd 0:0:0:2: [sdc] Attached SCSI disk
+[2.3398] init: Loading module /lib/modules/tran-ufshcd-core.ko
+```
+
+Jadi `ufshcd` core, SCSI, sd, dan mmc_block sudah built-in di kernel
+kita; yang diperlukan hanya `ufs-mediatek-mod.ko` (MediaTek) dan
+`mtk-mmc.ko` (MediaTek, tanpa dependensi `sd_tray`). Modul Transsion
+datang belakangan dan redundan.
+
+Panel: sumber kita `drivers/gpu/drm/panel/panel-rm69220-vdo-x6871.c`
+punya alias `rm69220,fhdp,dsi,vdo,dsc,csot,csot,144hz,x6871` yang persis
+sama dengan DT (`frag0.dts`), jadi panel stock tidak dipakai.
+
+### Hasil
+
+- Set: **222 modul**, semuanya ada di staging hasil build kita
+  (`not-from-staging: []`).
+- `modules.load`: 163 entri; `modules.load.recovery`: 214 entri.
+  Semua file ada, tidak ada nama modul stock.
+- `modules.dep` digenerate `depmod` lalu di-flatten ke
+  `/lib/modules/<nama>.ko`; tidak ada unresolved symbol (hanya
+  `mtk_drm_gateic_set_backlight` yang weak).
+- `llvm-strip --strip-debug` sebelum packing (total 28 MB).
+
+Fitur yang hilang karena sumbernya tidak ada: logging/Aegis Transsion
+(`thd`, `transsion_tranlog`, `tran_key_bigdata`, `tc_trancare`), storage
+latency logging, `sd_tray`/`tkv_recovery`/`tran-proc-bootdevice`, dan
+tuning performa Transsion. Tidak ada dependensi kernel TWRP ke
+modul-modul itu.
+
+Gambar uji: `twrp-vendor_boot-allsrc.img`
+(md5 `caef8ac1591999d625ecfe48f9f1cb13`), 222 modul, sudah diverifikasi
+isi ramdisk-nya.
