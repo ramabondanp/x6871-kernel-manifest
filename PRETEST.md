@@ -2399,3 +2399,48 @@ gambar rusak.
 
 Image: `twrp-vendor_boot-panelA-pps.img`
 (md5 `e675830b69e5394e2c8d96a4559e2d57`).
+
+## 38. Gambar rusak: mode DSI burst, seharusnya sync-pulse
+
+Modul vendor menyimpan `0xc05` ke `dsi->mode_flags` (disasm `lcm_probe`:
+`mov w8, #0xc05` lalu `str x8, [x20, #960]`):
+
+```text
+0xc05 = MIPI_DSI_MODE_VIDEO            (0x001)
+      | MIPI_DSI_MODE_VIDEO_SYNC_PULSE (0x004)
+      | MIPI_DSI_CLOCK_NON_CONTINUOUS  (0x400)
+      | MIPI_DSI_MODE_LPM              (0x800)
+```
+
+Driver kita memakai:
+
+```text
+VIDEO | VIDEO_BURST | LPM | NO_EOT_PACKET = 0xa03
+```
+
+Donor 6.1 mengonfirmasi konvensi panel VDO di platform ini — semuanya
+sync-pulse, tidak ada yang burst:
+
+```text
+nt37703a_fhdp_dsi_vdo_tm_tm_144hz_x6870.c
+ft8725_fhdp_dsi_vdo_txd_boe_144hz_lj7.c
+panel-alpha-jdi-nt36672e-vdo-120hz/144hz.c
+panel-himax-hx83121a-vdo.c
+  -> MIPI_DSI_MODE_VIDEO | MIPI_DSI_MODE_VIDEO_SYNC_PULSE | ...
+```
+
+Dengan DSC 8bpc, PPS, init table, rail, dan DSI rate 1056 sudah sama
+dengan vendor, burst framing inilah yang membuat gambar tampil tapi
+rusak.
+
+### Perbaikan (kernel `6a6db548a43c`)
+
+```c
+dsi->mode_flags = MIPI_DSI_MODE_VIDEO | MIPI_DSI_MODE_VIDEO_SYNC_PULSE |
+                  MIPI_DSI_CLOCK_NON_CONTINUOUS | MIPI_DSI_MODE_LPM;
+```
+
+Verifikasi biner modul hasil build: `mov w8, #0xc05` + `str x8, [x19, #960]`.
+
+Image: `twrp-vendor_boot-panelA-syncpulse.img`
+(md5 `8775055b79a3408563e02091e861e532`).
