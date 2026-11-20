@@ -320,5 +320,7 @@ twrp-dlkm-source-20261120.zip  (release dlkm-20261120)
   `dmesg | grep -iE 'Unknown symbol|module|verity'` dan pastikan sistem
   mencapai launcher. Kalau gagal, rollback dengan stock
   `vendor_dlkm`/`odm_dlkm`.
-- Fitur dari 27 modul stock tanpa source (kamera, `transsion_tranlog`,
+- Fix SCP: `vendor_dlkm.img` md5 `5b7472dea26b60dd8eef5370a2cd13a9`,
+  zip `twrp-dlkm-scpfix-20261120.zip` (`SCP_IPI_COUNT` 56 -> 59).
+- Fitur dari 25 modul stock tanpa source (`transsion_tranlog`,
   `thd`, dll) tidak akan ada.

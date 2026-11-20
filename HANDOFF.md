@@ -16,7 +16,7 @@ Ditulis 2026-11-19, diperbarui 2026-11-20 untuk sesi AI berikutnya. Baca ini dul
 | DLKM (`vendor_dlkm` + `odm_dlkm`) | **269**, 100% source, image siap |
 | Build target | `//kernel_device_modules-6.12:mgk_64_k612_customer_modules_install.user` |
 | Build terakhir | sukses (inkremental), 2026-11-20 |
-| Kernel HEAD | `af55c9c00426` (`w1vo36-6.12-port`) |
+| Kernel HEAD | `5ba6fb6559ab` (`w1vo36-6.12-port`) |
 | Runtime | **TWRP 100% modul source**, layar + USB replug terverifikasi |
 
 ## Status per 2026-11-20 (TWRP final)
@@ -77,25 +77,32 @@ basi tidak terulang (`PRETEST.md` §43/§44).
 Set `vendor_dlkm` + `odm_dlkm` 100% source sudah di-repack. 269 modul dari
 staging (212 vendor + 57 odm), `modules.load` 194/57, closure simbol kernel
 + 222 vendor_boot + 269 dlkm: **0 unresolved** (hanya weak
-`mtk_drm_gateic_set_backlight`). 27 nama stock dikeluarkan karena tidak ada
+`mtk_drm_gateic_set_backlight`). 25 nama stock dikeluarkan karena tidak ada
 source; `tran_zram` diganti `zsmalloc`+`zram`, ditambah `rfkill`,
 `bluetooth`, `libarc4`, `task_turbo`.
 
+**dmesg1**: panic SCP di `mtk_ipi_device_register` karena
+`SCP_IPI_COUNT` 56, sedangkan stock `scp.ko` memakai 59 (DT memakai
+chan_id 56/57). Donor 6.1 tidak punya perubahan X6871 ini; angka 59
+dibaca dari biner stock (`mov w3,#0x3b`). Fix kernel `5ba6fb6559ab`,
+hanya `vendor_dlkm` yang di-repack. Detail: `PRETEST.md` §46.
+
 ```text
-vendor_dlkm.img  md5 c329bbb8a465e32dc5bfd4cdcaede45f  24.551.424 B
-odm_dlkm.img     md5 0ffbb42985d445f7c12808df3b50960e   4.206.592 B
-twrp-dlkm-source-20261120.zip  md5 5ae77a5b98cb99491eccabb635d22370
-release          dlkm-20261120
+vendor_dlkm.img  md5 5b7472dea26b60dd8eef5370a2cd13a9  24.551.424 B
+odm_dlkm.img     md5 0ffbb42985d445f7c12808df3b50960e   4.206.592 B  (tidak berubah)
+twrp-dlkm-scpfix-20261120.zip  md5 a9daf0c469810ec32a673e3ecda6bb4a
+release          dlkm-scpfix-20261120
 /srv path         /serverhive1/ramabondanp/tmp/dlkm-out/
 ```
 
 Image memakai EROFS persis opsi stock + AVB hashtree footer; ukurannya
-sama dengan partisi stock. Zip TWRP menulis ke logical partition yang ada
-(`lptools map` + `dd`), tanpa delete/create. Detail: `PRETEST.md` §45.
+sama dengan partisi stock. Zip TWRP hanya menulis `vendor_dlkm`; `odm_dlkm`
+tetap dari release `dlkm-20261120`. Detail: `PRETEST.md` §45/§46.
 
 **Belum**: boot system belum diuji — langkah berikutnya flash zip lalu
-ambil dmesg/pstore. Fitur yang bergantung pada 27 modul stock tanpa source
-(kamera, tranlog, dll) akan hilang.
+ambil dmesg/pstore. Fitur dari 25 modul stock tanpa source (tranlog,
+thd, varian touch alternatif, dll) hilang; driver sensor kamera X6871
+juga belum ada di source.
 
 ### Kamera
 

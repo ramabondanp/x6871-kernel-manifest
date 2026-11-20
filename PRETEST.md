@@ -1208,12 +1208,12 @@ Selain vendor_boot TWRP, set modul untuk `vendor_dlkm` + `odm_dlkm`
 disiapkan di `/serverhive1/ramabondanp/tmp/dlkm-src`. Isinya **269 modul,
 semuanya dari staging build kita**.
 
-Modul stock yang dikeluarkan (27):
+Modul stock yang dikeluarkan (25):
 
-- 12 hardware yang tidak ada source/DT X6871 (sengaja tidak diport):
+- 10 hardware yang tidak ada source/DT X6871 (sengaja tidak diport):
   `ak7316`, `aw36515`, `dw9800k`, `dw9784ois`, `focaltech_ft3683g`,
   `chipsemi_chsc5xxx_old`, `snd-soc-fs1894`, `snd-soc-aw87xxx`,
-  `snd-soc-oca72xxx`, `elliptic-ultrasound`, `imgsensor`, `flashlight`.
+  `snd-soc-oca72xxx`, `elliptic-ultrasound`.
 - 15 software tanpa source: `fpsgo`, `game`, `pages_prefilter`,
   `priority_allocate`, `task_turbo_v`, `tc_trancare`, `thd`,
   `transsion_tranlog`, `tran_audio_typec` (tidak ada DT),
@@ -2894,9 +2894,79 @@ menghapus/membuat ulang partition. Rollback: flash balik image stock
 
 - **System boot belum diuji.** Yang sudah diverifikasi baru isi image,
   ukuran partisi, AVB footer, metadata modul, dan closure simbol.
-- 27 nama stock tidak dimasukkan karena tidak ada source (kamera
-  `imgsensor`/`flashlight`, `transsion_tranlog`, `thd`, varian touch
-  alternatif, dll). Fitur terkait akan hilang; rincian di HANDOFF.
+- 25 nama stock tidak dimasukkan karena tidak ada source
+  (`transsion_tranlog`, `thd`, varian touch alternatif, dll). Framework
+  `imgsensor.ko`/`flashlight.ko` tetap dibangun dari source; driver sensor
+  X6871 sendiri belum ada. Rincian di HANDOFF.
 - Kalau system tetap menolak mount karena verity, penyebabnya top-level
   `vbmeta`, bukan image ini; sesuai keputusan user, vbmeta sudah dipatch
   dan tidak diubah.
+
+## 46. dmesg1: panic SCP karena `SCP_IPI_COUNT` 56 vs stock 59
+
+`dmesg1` berhenti di 5,11 s dengan:
+
+```text
+scp 1c400000.scp: error -EINVAL: invalid resource (null)
+MBOX 0..4 can't find send/recv status reg
+Internal error: Oops - BRK: 00000000f2000001
+pc : mtk_ipi_device_register+0x340/0x3c4 [mtk_tinysys_ipi]
+lr : mtk_ipi_device_register+0x1e0/0x3c4 [mtk_tinysys_ipi]
+...
+scp_device_probe+0x9f4/0xb94 [scp]
+```
+
+BRK itu adalah bounds check di loop `pin_send_table[]`/`pin_recv_table[]`:
+`chan_id` harus `< ipi_chan_count` yang diteruskan `scp_device_probe()`.
+DT X6871 `scp@1c700000` memakai:
+
+```text
+send-table: ... 0x38 ...     (chan_id 56)
+recv-table: ... 0x39 ...     (chan_id 57)
+```
+
+sedangkan `SCP_IPI_COUNT` di tree 6.12 hanya 56 (ID 0..55). Stock
+`scp.ko` memanggil `mtk_ipi_device_register()` dengan **`w3 = 0x3b`
+(59)** — dibuktikan dari disassembly:
+
+```text
+34dc:  mov  w3, #0x3b
+34e0:  bl   mtk_ipi_device_register
+```
+
+### 6.1 donor tidak menjawab
+
+`tmp/ts61-src/.../scp/include/scp.h` adalah enum SCP yang lebih tua
+(tidak punya ID touch 52..55, dan `SCP_IPI_COUNT`-nya bukan 59). Jadi
+sesuai aturan: donor tidak memuat perubahan X6871 ini, lalu RE biner
+stock yang dipakai. `mtk_tinysys_ipi.c` donor juga punya fitur timeout
+tambahan yang tidak ada di 6.12, tetapi bukan penyebab panic ini.
+
+### Perbaikan (kernel `5ba6fb6559ab`)
+
+`SCP_IPI_COUNT` diubah menjadi **59** (ID 56..58 dicadangkan, sama
+seperti stock). Tidak ada nama IPI baru yang dikarang; komentar di
+header menjelaskan asal angka dari biner stock.
+
+Karena header ini dipakai beberapa modul, rebuild menghasilkan perubahan
+pada `scp.ko`, `ccci_fsm_scp.ko`, `connscp.ko`, `mtk-scp-audiocommon.ko`,
+`mtk-scp-vow.ko`, dan `mtk-vow.ko` — semuanya di `vendor_dlkm`. Sesuai
+permintaan, **hanya `vendor_dlkm` yang di-repack**; `odm_dlkm` tidak
+disentuh.
+
+### Artefak
+
+```text
+vendor_dlkm.img                 md5 5b7472dea26b60dd8eef5370a2cd13a9
+odm_dlkm.img (tidak berubah)    md5 0ffbb42985d445f7c12808df3b50960e
+twrp-dlkm-scpfix-20261120.zip   md5 a9daf0c469810ec32a673e3ecda6bb4a
+release                         dlkm-scpfix-20261120
+```
+
+Flash zip TWRP di atas (hanya menulis `vendor_dlkm`); `odm_dlkm` tetap
+dari release `dlkm-20261120`. Boot system belum diuji setelah fix ini.
+
+Catatan cakupan: kedua image tetap **269 modul 100% source** (212 vendor
++ 57 odm); 25 nama stock tanpa source tidak ada. `imgsensor.ko` dan
+`flashlight.ko` yang ada di image adalah hasil build source, bukan `.ko`
+stock.

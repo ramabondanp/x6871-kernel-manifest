@@ -92,8 +92,10 @@ Yang sudah terverifikasi: layar mati -> nyala (0 buffer underrun) dan
 cabut-colok USB berulang (setiap colok kembali `online=1, type=1` SDP,
 `pullup D+`, `gadget RESET`). Image dlkm 100% source juga sudah siap
 (release `dlkm-20261120`, 269 modul; detail `PRETEST.md` §45) dan tinggal
-diuji boot system. Berikutnya: uji system boot, lalu port driver kamera.
-Detail: `HANDOFF.md`, `PRETEST.md` §40-§45.
+diuji boot system. Boot pertama berhenti di SCP; fix `SCP_IPI_COUNT` 59
+ada di kernel `5ba6fb6559ab` dan release `dlkm-scpfix-20261120`
+(`vendor_dlkm` saja, `PRETEST.md` §46). Berikutnya: uji system boot, lalu
+port driver kamera. Detail: `HANDOFF.md`, `PRETEST.md` §40-§46.
 
 Catatan: hasil port di-push ke branch `w1vo36-6.12-port` di remote `alps`
 (bukan ke `mtk-base-latest`, yang sedang checked-out di working tree lokal).
