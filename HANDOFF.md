@@ -480,6 +480,13 @@ Export ABI vendor yang dibutuhkan modul stock juga dilengkapi:
   disassembly, 0x150 byte, identik dengan stock), dibutuhkan
   `tran_mm_collect`.
 
+Hasil pengecekan closure simbol: 14 modul software yang masih stock
+tidak lagi punya `Unknown symbol` terhadap kernel + modul build kita +
+stock `transsion_tranlog`/`thd`/`tran_zram`/`tran-ufshcd-core`. Sisi
+simbol selesai; yang tersisa adalah hook scheduler (baru enqueue/dequeue
+dan `should_honor_sync` yang disambungkan) dan modul Tranlog/Aegis yang
+tidak punya sumber donor.
+
 Diff per fungsi (nama + ukuran simbol `.text`) untuk 263 modul itu: **126
 modul berbeda**, 47 di antaranya berbeda berat. Puncaknya drift versi sumber,
 bukan salah config:
