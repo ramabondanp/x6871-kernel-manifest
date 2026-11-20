@@ -39,11 +39,14 @@ ada `.ko` stock di ramdisk. Rincian di `PRETEST.md` §23.
 - Gambar: `twrp-vendor_boot-allsrc.img`
   (md5 `caef8ac1591999d625ecfe48f9f1cb13`).
 
-Untuk system: 263/288 modul dlkm sudah dari source. 10 modul hardware
-tidak ada di DT X6871 dan 15 modul software tidak punya source; semuanya
-dikeluarkan dari `modules.load` saat partisi dlkm dibuat. `tran_zram`
-direncanakan diganti `zram.ko` dari source kernel (fitur Memfusion/
-tranlog hilang).
+Untuk system: set `vendor_dlkm` + `odm_dlkm` 100% source sudah disiapkan
+di `/serverhive1/ramabondanp/tmp/dlkm-src` — 269 modul, semuanya dari
+staging. 25 modul stock dikeluarkan (10 hardware tanpa DT + 15 software
+tanpa source), `tran_zram` diganti `zsmalloc.ko` + `zram.ko` dari source,
+dan ditambah `rfkill.ko`, `bluetooth.ko`, `libarc4.ko`, `task_turbo.ko`
+yang sebelumnya disediakan stock. Closure simbol kernel + 222 modul
+vendor_boot + 269 modul dlkm: **0 unresolved**. Partisi dlkm di `super`
+belum di-repack; boot system belum diuji.
 
 Repo bersih, semua ter-push: `alps`, branch `w1vo36-6.12-port`,
 HEAD `93b7ebca0841`. Manifest `main` mengikuti commit HANDOFF/PLAN/PRETEST
