@@ -2681,6 +2681,82 @@ Catatan penting:
 - 0 buffer underrun, tiga kali `gadget (high-speed) pullup D+` diikuti
   `gadget RESET` dan enable endpoint — adb hidup lagi di setiap colok.
 
-Status: **cabut-colok USB selesai**, `twrp-vendor_boot-usb-replug.img`
-(md5 `8233c66d7b09aefd2e5b0fe5f4ca4c2e`) menjadi image final terbaru
-(layar mati->nyala + USB replug).
+Status: **cabut-colok USB selesai**. Image `twrp-vendor_boot-usb-replug.img`
+(md5 `8233c66d7b09aefd2e5b0fe5f4ca4c2e`) kemudian terbukti memakai
+driver panel lama sehingga gagal bangun dari mati layar; lihat §43.
+Image penggantinya: `twrp-vendor_boot-allsrc-display-usb.img`
+(md5 `0ecdaa1edb3d405954331539b24c911b`).
+
+## 43. dmesg15: layar hitam saat bangun — image `usb-replug` memakai panel driver lama
+
+Gejala: setelah layar mati lalu dinyalakan lagi, panel tetap hitam.
+`dmesg15` (image `twrp-vendor_boot-usb-replug.img`) menunjukkan:
+
+```text
+17.996  backlight 0 / screen off
+        TIDAK ADA lcm_unprepare, TIDAK ADA panel_ext_lcm_power_set status=0
+20.430  CRTC resume, data_rate=1420, bpc:10, RCT slice_bits=302400
+        TIDAK ADA panel_ext_lcm_power_set status=1
+        TIDAK ADA lcm_prepare / lcm_panel_init
+20.486  DSI0: buffer underrun
+```
+
+Bandingkan dengan stock `normal.txt`:
+
+```text
+11.523  backlight 0 / screen off
+11.530  [LCM] lcm_unprepare begin ... end
+11.649  [LCM] panel_ext_lcm_power_set status=0
+13.355  CRTC resume, bpc:8, RCT slice_bits=51840
+13.365  [LCM] panel_ext_lcm_power_set status=1
+13.379  [LCM] lcm_prepare begin
+13.379  [LCM] lcm_panel_init begin ... 13.580 end
+13.581  screen on / backlight 2047
+```
+
+dan dengan `dmesg13` (image `allsrc-display`) yang memang bisa mati->nyala:
+
+```text
+ 6.572  panel_ext_lcm_power_set status=0
+ 8.001  data_rate=1056, bpc:8
+ 8.007  [LCM] lcm_prepare enter prepared=0
+ 8.007  panel_ext_lcm_power_set status=1
+ 8.016  [LCM] lcm_panel_init begin ... 8.212 end error=0
+ 8.215  backlight 2047 / 0 underrun
+```
+
+### Akar masalah: baseline packing yang basi
+
+`cmp-out/vbverify5` dibuat **12:49**, yaitu salinan modul dari
+`twrp-vendor_boot-allsrc-vib2.img` — sebelum perbaikan layar (15:09).
+Perbandingan md5 modul panel:
+
+| Sumber | md5 `panel-rm69220-vdo-x6871.ko` |
+|---|---|
+| `allsrc-vib2` / `vbverify5` / `usb-replug` | `466219a6e7cf99a818cb8e5d1ef3ccfd` |
+| `allsrc-display` / build tree sekarang | `19507dee2cf1de89bbec3d8128ef7589` |
+
+Modul lama tidak punya simbol/log `panel_ext_lcm_power_set`, memakai
+mode 10bpc (`data_rate=1420`, `bpc:10`, RCT `302400`), dan tidak
+menjalankan init panel saat resume. Modul final memakai 8bpc
+(`data_rate=1056`, `bpc:8`, RCT `51840`) dan memanggil
+`panel_ext_lcm_power_set` + `lcm_panel_init` saat resume — persis stock.
+
+Jadi ini **bukan bug baru** dan bukan efek perubahan `tran_extcon_usb`:
+image `usb-replug` memang salah memuat driver panel lama. `dmesg14`
+tidak menangkapnya karena tidak ada siklus layar mati->nyala.
+
+### Perbaikan
+
+Repack ulang memakai seluruh modul dari `allsrc-display`, lalu ganti
+hanya `tran_extcon_usb.ko` dengan versi `usb-replug`:
+
+- `twrp-vendor_boot-allsrc-display-usb.img`
+- md5 `0ecdaa1edb3d405954331539b24c911b`
+- 222 modul; diff terhadap `allsrc-display` hanya `tran_extcon_usb.ko`,
+  diff terhadap `usb-replug` hanya `panel-rm69220-vdo-x6871.ko`
+- md5 panel di image = `19507dee...`, md5 USB = `5c196dec...`
+- build tree sekarang (di-strip) menghasilkan md5 panel yang sama
+
+`twrp-vendor_boot-usb-replug.img` **deprecated** untuk uji layar; pakai
+image di atas.

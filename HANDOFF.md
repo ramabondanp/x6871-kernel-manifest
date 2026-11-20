@@ -44,10 +44,15 @@ ada `.ko` stock di ramdisk. Rincian di `PRETEST.md` §23.
   kpd, tapi `tran_ldo.ko` tidak dimuat sehingga regulator `dvdd` panel
   (TRANLDO26) tidak pernah ready dan `lcm_probe()` tidak dipanggil
   sama sekali. Lihat `PRETEST.md` §27.
-- Perbaikan cabut-colok USB (TERVERIFIKASI dmesg14): `twrp-vendor_boot-usb-replug.img`
-  (md5 `8233c66d7b09aefd2e5b0fe5f4ca4c2e`), beda dengan
-  `allsrc-display` hanya di `tran_extcon_usb.ko`. Detail: `PRETEST.md`
-  §42.
+- **Image final terbaru (layar + USB):**
+  `twrp-vendor_boot-allsrc-display-usb.img`
+  (md5 `0ecdaa1edb3d405954331539b24c911b`) — 222 modul source, isinya
+  `allsrc-display` + `tran_extcon_usb.ko` dari perbaikan replug. Detail:
+  `PRETEST.md` §42 dan §43.
+- Perbaikan cabut-colok USB: `twrp-vendor_boot-usb-replug.img`
+  (md5 `8233c66d7b09aefd2e5b0fe5f4ca4c2e`) — **deprecated**, karena
+  repack-nya memakai baseline `vbverify5` yang masih berisi driver panel
+  lama (gagal bangun dari mati layar, `dmesg15`). Lihat `PRETEST.md` §43.
 - Varian final layar (mati -> nyala OK): `twrp-vendor_boot-allsrc-display.img`
   (md5 `e7014d7273da2b7310ce1da1c947caf7`) — 222 modul source, beda dengan
   `allsrc-vib2` hanya di modul panel. Detail: `PRETEST.md` §40.
@@ -198,6 +203,12 @@ Staging hasil build:
 - `v1/BUILD.bazel` ber-CRLF; pertahankan atau diff meledak.
 - `tar` gzip satu inti mati di tengah (>3 menit). Pakai
   `pigz -dc file.tar.gz | tar -x -C dir` — 7.106 file <60 s.
+- **Jangan memakai `cmp-out/vbverify5` sebagai baseline repack.** Direktori
+  itu dibuat 12:49 dari `allsrc-vib2`, sebelum perbaikan layar, sehingga
+  masih memuat panel driver lama. Baseline yang benar:
+  `cmp-out/xcmp/display` (isi `allsrc-display`, panel md5 `19507dee...`).
+  Kesalahan ini membuat `usb-replug` gagal bangun dari mati layar
+  (`PRETEST.md` §43).
 
 ## Yang sudah selesai
 
