@@ -14,7 +14,36 @@ Ditulis 2026-11-19 untuk sesi AI berikutnya. Baca ini dulu, lalu `PLAN.md`
 | Masih hilang (flat / tree) | **27 / 20** |
 | Build target | `//kernel_device_modules-6.12:mgk_64_k612_customer_modules_install.user` |
 | Build terakhir | sukses, 5 aksi (inkremental) |
-| Runtime | **TWRP boot normal** (lihat §Status per 2026-11-19) |
+| Runtime | **TWRP 100% modul source** (lihat §Status per 2026-11-20) |
+
+## Status per 2026-11-20
+
+TWRP sekarang memakai **222 modul, semuanya hasil build sendiri**; tidak
+ada `.ko` stock di ramdisk. Rincian di `PRETEST.md` §23.
+
+- 17 modul stock dibuang: storage Transsion (`tran-ufshcd-core`,
+  `tran-ufshcd-pltfrm`, `tran_scsi_mod`, `tran_sd_mod`, `tran_block`,
+  `tran_mmc_block`, `tran_rhi`, `tran-proc-bootdevice-mod`), layanan
+  (`low_latency_sched`, `sd_tray`, `tkv_recovery`, `thd`,
+  `transsion_tranlog`, `tran_key_bigdata`, `tc_trancare`), panel `cl8`,
+  dan `mtk-mmc-mod`.
+- Storage memakai jalur MediaTek: `ufshcd`/SCSI/sd/mmc_block **built-in**
+  di kernel + `ufs-mediatek-mod.ko` + `mtk-mmc.ko` (pengganti
+  `mtk-mmc-mod`). `dmesg3.txt` membuktikan UFS sudah up sebelum modul
+  Transsion dimuat.
+- Panel memakai `panel-rm69220-vdo-x6871.ko`; alias compatible-nya sama
+  dengan DT X6871, sedangkan panel stock `cl8` tidak cocok.
+- `modules.load` 163 entri, `modules.load.recovery` 214 entri; semua file
+  ada; `modules.dep` digenerate `depmod` lalu di-flatten; tidak ada
+  unresolved symbol (hanya weak `mtk_drm_gateic_set_backlight`).
+- Gambar: `twrp-vendor_boot-allsrc.img`
+  (md5 `caef8ac1591999d625ecfe48f9f1cb13`).
+
+Untuk system: 263/288 modul dlkm sudah dari source. 10 modul hardware
+tidak ada di DT X6871 dan 15 modul software tidak punya source; semuanya
+dikeluarkan dari `modules.load` saat partisi dlkm dibuat. `tran_zram`
+direncanakan diganti `zram.ko` dari source kernel (fitur Memfusion/
+tranlog hilang).
 
 Repo bersih, semua ter-push: `alps`, branch `w1vo36-6.12-port`,
 HEAD `93b7ebca0841`. Manifest `main` mengikuti commit HANDOFF/PLAN/PRETEST
