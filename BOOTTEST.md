@@ -1,8 +1,15 @@
 # BOOTTEST — uji boot utuh X6871
 
+> **Status 2026-11-20:** TWRP final sudah memakai 222 modul 100% source
+> (`twrp-vendor_boot-allsrc-display-usb.img`, md5
+> `0ecdaa1edb3d405954331539b24c911b`); layar dan USB replug sudah lolos.
+> Dokumen ini tetap dipakai untuk checklist system boot. Prosedur repack
+> yang berlaku ada di §2; angka 217/240 di §9-§10 (dan catatan historis
+> di §7) adalah artefak lama.
+
 Tujuan: memvalidasi **seluruh boot**, bukan hanya satu modul. Empat modul
 fitur (`tran_fp`, `tnek`, `tkv`, `tran_extcon_usb`) hanya bagian kecil dari
-217 modul yang menggantikan modul stock.
+222 modul yang menggantikan modul stock.
 
 ## 0. Tiga kenyataan yang menentukan prosedur
 
@@ -24,7 +31,7 @@ fitur (`tran_fp`, `tnek`, `tkv`, `tran_extcon_usb`) hanya bagian kecil dari
    |---|---|
    | simbol kernel yang dipakai kedua build | 2174 |
    | CRC identik | **2174 / 2174** |
-   | modul build kita yang cocok CRC-nya dengan kernel stock | **795 / 795** |
+   | modul build kita yang cocok CRC-nya dengan kernel stock | **795 / 795** (snapshot 2026-11-19) |
 
    Artinya modul kita bisa di-load di kernel stock, dan sebaliknya. Tetap
    disarankan memakai kernel + modul dari satu build supaya perilaku kode
@@ -38,50 +45,30 @@ fitur (`tran_fp`, `tnek`, `tkv`, `tran_extcon_usb`) hanya bagian kecil dari
 
 | Artefak | Sumber | Catatan |
 |---|---|---|
-| `vendor_boot-new.img` | `tools/pack-vendor-boot.sh` | modul kita, dtb/bootconfig/recovery stock |
-| kernel `Image` | `out_bazel/.../mgk_64_k612_kernel_aarch64.user/Image` | harus masuk ke `boot.img` |
+| `twrp-vendor_boot-allsrc-display-usb.img` | `tools/repack-vendor-boot-latest.sh` | **final**: 222 modul source, dtb/bootconfig/recovery TWRP tetap |
+| kernel `Image` | `out_bazel/.../mgk_64_k612_kernel_aarch64.user/Image` | hanya jika boot.img ikut diganti |
 | `dtbo.img` | stock, tidak diubah | build tidak menghasilkan dtbo |
-| modul | `.../mgk_64_k612_customer_modules_install.user/staging/lib/modules/6.12.38-android16-5-g2c4fd33ae6d8-4k` | 217 pengganti + sisanya |
+| modul | `.../mgk_64_k612_customer_modules_install.user/staging/lib/modules/6.12.38-android16-5-g2c4fd33ae6d8-4k` | 806 file / 805 nama unik; 222 dipakai di vendor_boot |
 
-## 2. Membuat `vendor_boot-new.img`
+## 2. Membuat image vendor_boot
 
 ```bash
 cd /serverhive1/ramabondanp/w1vo36-kernel-manifest
-
-STAGING=/serverhive1/ramabondanp/w1vo/out_bazel/ad3c7b30a704e8551ed600a0d11ef0f0/execroot/_main/bazel-out/k8-fastbuild/bin/kernel_device_modules-6.12/mgk_64_k612_customer_modules_install.user/staging/lib/modules/6.12.38-android16-5-g2c4fd33ae6d8-4k
-
-./tools/pack-vendor-boot.sh \
-  --stock   /serverhive1/ramabondanp/tmp/x6871/vendor_boot.img \
-  --staging "$STAGING" \
-  --out     /serverhive1/ramabondanp/tmp/x6871/vendor_boot-new.img
+./tools/repack-vendor-boot-latest.sh \
+  --out /serverhive1/ramabondanp/tmp/x6871/twrp-vendor_boot-$(date -u +%Y%m%d-%H%M%S).img
 ```
 
-Yang dilakukan skrip, berurutan:
+Skrip menjalankan build Bazel resmi, mengambil staging hasil build itu,
+men-stage 222 modul dari `tools/recovery-modules.txt`, menghapus debug
+info, meregenerasi `modules.dep`/`alias`/`softdep`, pack dengan
+cfig/Android_boot_image_editor, lalu membongkar hasilnya dan **gagal**
+kalau ada `.ko` yang beda dari staging. Modul tidak pernah disalin dari
+image lama.
 
-1. `unpack_bootimg` image stock; parameter header dibaca dari image itu
-   sendiri (bukan hardcode).
-2. `vendor_ramdisk00` didekompresi (lz4 legacy) lalu di-`cpio` keluar.
-3. `lib/modules/*.ko` diganti dengan modul build kita. Hanya modul yang
-   memang dikirim stock yang dimasukkan (217 dari ~795 `.ko` di staging),
-   basename ganda diselesaikan dengan memilih salinan `extra/` = versi
-   device. Tiap `.ko` di-`strip --strip-debug` supaya ukurannya setara stock
-   (staging menyimpan debug info; tanpa strip ramdisk jadi ~94 MB dan tidak
-   muat di partisi 64 MB).
-4. `modules.dep`, `modules.alias`, `modules.softdep` diregenerasi dari
-   `modinfo` tiap `.ko`, formatnya disamakan dengan stock
-   (`/lib/modules/x.ko: ...`).
-5. `modules.load` dan `modules.load.recovery` diambil dari stock lalu
-   difilter: entri yang tidak ada di build kita dibuang.
-6. Ramdisk di-`cpio` (`newc`, owner root) dan dikompres `lz4 -l -12`.
-7. `mkbootimg --header_version 4 --base 0` dengan alamat load, dtb,
-   bootconfig, dan fragmen recovery **persis** seperti stock.
-8. Verifikasi otomatis: `dtb`, `bootconfig`, dan `vendor_ramdisk01`
-   (recovery) harus identik (md5); jumlah modul dan vermagic dicetak;
-   image di-pad ke ukuran partisi stock.
-
-Uji round-trip (tanpa mengganti modul) sudah dijalankan dan hasilnya
-**identik byte-per-byte** dengan stock di level isi ramdisk dan header —
-jadi yang berubah hanya isi `lib/modules`.
+`tools/pack-vendor-boot.sh` adalah tool legacy dan **jangan dipakai untuk
+X6871**: ia memfilter berdasarkan nama stock sehingga modul build-only
+(`adaptive-ts`, `gt9916_common`, `mtk-mmc`, `tran_richtap_haptic_hv`)
+bisa hilang. Detail repack: `HANDOFF.md` §Repack dan `PRETEST.md` §44.
 
 ## 3. Flash dan rollback
 
@@ -109,9 +96,9 @@ Ambil `dmesg` penuh setelah boot, lalu periksa:
 |---|---|---|
 | Loader modul | `dmesg \| grep -E 'Unknown symbol\|disagrees about version\|version magic'` | kosong |
 | Storage/UFS | `dmesg \| grep -iE 'ufs\|scsi'`; `ls /dev/block/by-name`; mount `/data` | UFS probe, semua partisi ada, `/data` ter-mount |
-| Display/panel | `dmesg \| grep -iE 'panel\|dsi\|rm69220'` | panel `rm69220,fhdp,dsi,vdo,dsc,csot,csot,144hz,x6871` ter-probe, layar menyala |
+| Display/panel | matikan lalu nyalakan layar; `dmesg \| grep -iE 'lcm_prepare\|panel_ext_lcm_power_set\|underrun'` | resume memanggil `panel_ext_lcm_power_set(1)` + `lcm_prepare` + `lcm_panel_init`, 0 underrun |
 | Touch | `dmesg \| grep -i goodix`; `/dev/input/event*` | tidak ada gagal probe |
-| Charger/USB | `dmesg \| grep -iE 'tc_charger\|tc_tcpc\|extcon'`; `SWITCH_NAME`/`SWITCH_STATE` saat colok | role switch berubah, tidak ada crash |
+| Charger/USB | cabut-colok kabel; `dmesg \| grep -iE 'tran_extcon\|ssusb_set_mode\|online=.*type='` | cabut -> role NONE, colok -> `online=1, type=1` (SDP), `pullup D+`, `gadget RESET` |
 | Audio | `dmesg \| grep -iE 'mt6895-afe\|snd'`; `tinymix`/`aplay` | card terdaftar, tidak ada timeout IPI |
 | Kamera | `dmesg \| grep -iE 'mtk-cam\|imgsensor'` | ISP probe, tidak ada error regulator |
 | Connectivity | `dmesg \| grep -iE 'wlan\|wmt\|bt'`; `ip link` | wlan0 ada |
@@ -132,16 +119,15 @@ Ambil `dmesg` penuh setelah boot, lalu periksa:
 - **Storage memakai stack GKI/MTK**, bukan fork Transsion. Karena itu
   `ufs-mediatek-mod.ko` kita hanya bergantung pada `ufs-mediatek-dbg`,
   `irq-dbg`, `blocktag`, `rpmb` — bukan `tran-ufshcd-*`.
-- **`modules.load` menyusut**: dari 179 entri stock, 17 entri menunjuk modul
-  yang tidak ada di build dan dibuang oleh skrip.
-- **`mtk-socinfo.ko` ter-build dua kali**; `depmod` memilih salinan GKI.
-  Bukan penghalang boot, tapi sebaiknya salah satu dikecualikan saat
-  packaging.
-- **Staging berisi ~795 `.ko`, perangkat hanya butuh 217.** Sisanya modul
-  platform lain (mt6858/mt6991/mt6993, varian panel, dsb). Skrip repack
-  memfilter ke daftar modul yang benar-benar dikirim stock; tanpa filter itu
-  ramdisk membengkak jadi 430 MB dan tidak muat di partisi 64 MB.
-  Pakai `--all-modules` hanya kalau memang ingin membawa semuanya.
+- **`modules.load`/`modules.load.recovery`**: 165/216 entri. Entri stock
+  yang modulnya tidak ada di build dibuang; modul build-only ditambahkan.
+- **`mtk-socinfo.ko` ter-build dua kali** (`kernel/` dan `extra/`).
+  `tools/stage-recovery-modules.py` sengaja memilih salinan `kernel/`,
+  sama dengan image yang sudah terbukti boot.
+- **Staging berisi 806 file / 805 nama unik, perangkat hanya butuh 222.**
+  Sisanya modul platform lain (mt6858/mt6991/mt6993, varian panel, dsb).
+  Komposisi vendor_boot dikunci oleh `tools/recovery-modules.txt`, bukan
+  filter nama stock, supaya modul build-only tidak hilang.
 - **dtb/dtbo stock** dipakai apa adanya. Kalau ada driver yang mengeluh
   properti DT tidak dikenal, itu konsekuensi langsung dari poin ini.
 - **API hardware baru** di tiga modul: `clk-common`, `tran_ldo`,
@@ -162,22 +148,23 @@ Ambil `dmesg` penuh setelah boot, lalu periksa:
 5. Ambil `pstore`/`ramoops` (`/sys/fs/pstore`) atau UART untuk panic.
 6. Rollback dengan image stock sebelum mencoba varian berikutnya.
 
-## 7. Artefak yang sudah dibuat
+## 7. Artefak final
 
-```
-/serverhive1/ramabondanp/tmp/x6871/vendor_boot-new.img
+```text
+/serverhive1/ramabondanp/tmp/x6871/twrp-vendor_boot-allsrc-display-usb.img
   ukuran : 67108864 (sama dengan partisi stock)
-  md5    : 9c83483806f8cbbe62b2cbfa9236e34a
-  modul  : 217 (set pengganti stock, sudah di-strip)
-  dtb / bootconfig / vendor_ramdisk01 : identik dengan stock
-  modules.load           : 163 entri, 0 menggantung
-  modules.load.recovery  : 213 entri, 0 menggantung
-  modules.dep            : 0 referensi menggantung
+  md5    : 0ecdaa1edb3d405954331539b24c911b
+  modul  : 222, semuanya hasil build sendiri
+  dtb / bootconfig / vendor_ramdisk01 : identik dengan base TWRP
+  modules.load           : 165 entri
+  modules.load.recovery  : 216 entri
+  modules.dep            : hasil depmod, 0 referensi menggantung
   vermagic semua modul   : 6.12.38-android16-5-g2c4fd33ae6d8-4k
 ```
 
-Uji round-trip (repack tanpa mengganti modul) menghasilkan isi ramdisk dan
-header yang **identik** dengan stock, jadi yang berubah hanya `lib/modules`.
+Catatan historis: image 217 modul (`vendor_boot-new.img`) dan 240 modul
+campuran stock (`cfig` §9-§10) sudah tidak dipakai. Yang berlaku adalah
+222 modul source di atas.
 
 ## 8. Kalau modul gagal load: cek `modules.dep`
 
@@ -228,7 +215,7 @@ jangan dikejar. Yang menentukan hanya apakah simbolnya ada. Karena itu
 satu-satunya penyebab kegagalan di log pertama adalah `modules.dep` yang
 kehilangan dependensi, bukan beda versi kernel.
 
-## 9. Repack dengan cfig/Android_boot_image_editor
+## 9. Repack dengan cfig/Android_boot_image_editor (historis)
 
 Selain `tools/pack-vendor-boot.sh`, image bisa direpack dengan
 [`cfig/Android_boot_image_editor`](https://github.com/cfig/Android_boot_image_editor)
@@ -269,7 +256,7 @@ modul pun yang dimuat** — kegagalan packaging, bukan driver. Repack dengan
 tool ini menghasilkan arsip newc yang sah (diawali entri `adb_keys` seperti
 stock, `TRAILER!!!` + padding nol, magic lz4 legacy `02 21 4c 18`).
 
-## 10. Ramdisk zstd (TWRP) — tool perlu dipatch
+## 10. Ramdisk zstd (TWRP) — catatan tool (historis)
 
 Image TWRP untuk X6871 memakai ramdisk **zstd** (`28 b5 2f fd`), bukan lz4.
 `cfig/Android_boot_image_editor` (commit `f692aff`) belum mengenalnya:

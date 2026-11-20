@@ -31,8 +31,10 @@ cd ..
 ~/w1vo36-kernel-manifest/build.sh user
 ```
 
-Hasil: `1.401 .ko` di
+Hasil baseline MTK murni: `1.401 .ko` di
 `out_bazel/*/execroot/_main/bazel-out/k8-fastbuild/bin/kernel_device_modules-6.12/mgk_64_k612_customer_modules_install.user/`.
+Branch port di bawah menghasilkan staging 806 file / 805 nama unik dan flat
+customer install 702 `.ko`.
 
 Soc lain: `PLATFORM=mt6991 ./build.sh user` (default `mt6895`).
 
@@ -40,7 +42,7 @@ Soc lain: `PLATFORM=mt6991 ./build.sh user` (default `mt6895`).
 
 `mtk-base-latest` di langkah 3 hanya MTK murni. Semua pekerjaan port
 (Iris, panel rm69220, `tran_ldo`, fondasi charger Transsion) ada di branch
-terpisah, ter-push ke remote `local`:
+terpisah, ter-push ke remote `alps`:
 
 ```bash
 cd kernel_device_modules-6.12
@@ -50,7 +52,8 @@ git checkout -B w1vo36-6.12-port FETCH_HEAD
 
 cd ..
 ~/w1vo36-kernel-manifest/setup.sh
-~/w1vo36-kernel-manifest/build.sh user   # 1.422 .ko
+~/w1vo36-kernel-manifest/build.sh user
+# staging: 806 .ko (805 nama unik), flat customer install: 702 .ko
 ```
 
 Branch: <https://github.com/ramabondanp/alps-kernel_device_modules-6.12/tree/w1vo36-6.12-port>
@@ -59,21 +62,39 @@ Branch ini dibuat baru (bukan di atas `android16`) supaya riwayat `android16`
 tidak tersentuh. `android16` (`30a0466a`) memang ancestor dari baseline
 w1vo36.88-36-7 (`06079c2`), jadi branch ini juga fast-forward-able ke sana.
 
-Branch itu 6 commit di atas `06079c2` (baseline w1vo36.88-36-7), satu commit
-per fitur:
+Branch berisi **58 commit** di atas `06079c2`, satu commit per fitur.
+Ringkasan commit awal dan commit final yang penting:
 
 | commit | isi |
 |---|---|
 | `33d0005` | `tran_audio_control`, `splitswitch-gpio`, `hiber` |
 | `2b880e6` | Iris (34 file, Pixelworks) |
 | `cfb098c` | `tran_ldo` (ET5904) |
-| `381f45e` | panel rm69220 X6871 |
+| `381f45e` | panel rm69220 X6871 (versi awal) |
 | `fdc1174` | `tc_common_class` (fondasi `tran_device`) |
 | `618a8c5` | `tc_charger_class`/`adapter`/`algorithm`/`misc_intf` |
+| `91640cd`..`28f5237` | panel final: init table, DSC, rails, 8bpc/1056 Mbps |
+| `af55c9c` | `tran_extcon_usb`: role DEVICE/NONE/HOST saat cabut-colok |
 
-Catatan: remote `local` menolak push ke `mtk-base-latest` karena branch itu
-sedang checked-out di working tree-nya (`receive.denyCurrentBranch`), jadi
-hasil port di-push ke branch `w1vo36-6.12-port`.
+Daftar lengkap: `git log --oneline 06079c2..HEAD`.
+
+## Status runtime (2026-11-20)
+
+TWRP memakai **222 modul, 100% hasil build sendiri**. Image final yang
+sudah diuji:
+
+```text
+twrp-vendor_boot-allsrc-display-usb.img
+md5 0ecdaa1edb3d405954331539b24c911b
+```
+
+Yang sudah terverifikasi: layar mati -> nyala (0 buffer underrun) dan
+cabut-colok USB berulang (setiap colok kembali `online=1, type=1` SDP,
+`pullup D+`, `gadget RESET`). Berikutnya: repack partisi dlkm untuk boot
+system, lalu port driver kamera. Detail: `HANDOFF.md`, `PRETEST.md` §40-§44.
+
+Catatan: hasil port di-push ke branch `w1vo36-6.12-port` di remote `alps`
+(bukan ke `mtk-base-latest`, yang sedang checked-out di working tree lokal).
 
 
 ## File
@@ -94,7 +115,11 @@ hasil port di-push ke branch `w1vo36-6.12-port`.
 | `audit-sources.sh` | cocokkan modul firmware -> file source **tanpa** peduli nama file |
 | `tools/ko-preflight.py` | bandingkan 4 modul fitur dengan `.ko` stock (export/impor/CRC/call graph) |
 | `tools/preboot-audit.py` | audit **seluruh** modul stock yang digantikan build: 1 baris per `.ko` firmware, plus simulasi loader pada set itu |
+| `tools/stock-vs-src.py` | bandingkan source vs `.ko` stock (dipakai audit kamera, `PRETEST.md` §26) |
 | `tools/repack-vendor-boot-latest.sh` | **repack utama X6871**: build source terbaru, stage 222 modul dari Bazel, pack, lalu verifikasi tiap `.ko` di image sama dengan staging |
+| `tools/stage-recovery-modules.py` | stage + strip modul dari staging, regenerasi `modules.dep`/`alias`/`softdep` |
+| `tools/recovery-modules.txt` | daftar 222 modul recovery (sumber kebenaran komposisi vendor_boot) |
+| `tools/modules.load`, `tools/modules.load.recovery` | daftar muat init, 165 / 216 entri |
 | `tools/pack-vendor-boot.sh` | legacy: repack dari image stock + filter nama stock; jangan dipakai untuk X6871 (lihat `HANDOFF.md`) |
 | `BOOTTEST.md` | prosedur uji boot utuh: artefak, flash, rollback, checklist per subsistem, delta yang wajar |
 | `PLAN.md` | rencana port driver device lain (X6871) — Tingkat A sudah selesai |

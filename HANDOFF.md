@@ -1,6 +1,6 @@
 # HANDOFF — W1VO36 / X6871 kernel device modules
 
-Ditulis 2026-11-19 untuk sesi AI berikutnya. Baca ini dulu, lalu `PLAN.md`
+Ditulis 2026-11-19, diperbarui 2026-11-20 untuk sesi AI berikutnya. Baca ini dulu, lalu `PLAN.md`
 (bagian §6.1b, §6.2k, §6.2m, §6.2n, §6.2o, §6.2p, §6.2q, §6.2r, §6.2s,
 §6.2t, §6.2u) dan `PRETEST.md`.
 
@@ -8,113 +8,105 @@ Ditulis 2026-11-19 untuk sesi AI berikutnya. Baca ini dulu, lalu `PLAN.md`
 
 | Item | Nilai |
 |---|---|
-| `.ko` flat customer install | **692** |
-| `.ko` di tree staging lengkap | **796** |
+| `.ko` flat customer install | **702** |
+| `.ko` di staging (file / nama unik) | **806 / 805** (`mtk-socinfo` dobel) |
 | Modul di firmware X6871 | 237 |
-| Masih hilang (flat / tree) | **27 / 20** |
+| Nama stock tidak ada di build | **20** (6 tidak direncanakan, 14 kandidat) |
+| Modul recovery vendor_boot | **222**, 100% source |
 | Build target | `//kernel_device_modules-6.12:mgk_64_k612_customer_modules_install.user` |
-| Build terakhir | sukses, 5 aksi (inkremental) |
-| Runtime | **TWRP 100% modul source** (lihat §Status per 2026-11-20) |
+| Build terakhir | sukses (inkremental), 2026-11-20 |
+| Kernel HEAD | `af55c9c00426` (`w1vo36-6.12-port`) |
+| Runtime | **TWRP 100% modul source**, layar + USB replug terverifikasi |
 
-## Status per 2026-11-20
+## Status per 2026-11-20 (TWRP final)
 
-TWRP sekarang memakai **222 modul, semuanya hasil build sendiri**; tidak
-ada `.ko` stock di ramdisk. Rincian di `PRETEST.md` §23.
+TWRP memakai **222 modul, semuanya hasil build sendiri**; tidak ada `.ko`
+stock di ramdisk. Image yang sudah diuji di device:
 
-- 17 modul stock dibuang: storage Transsion (`tran-ufshcd-core`,
-  `tran-ufshcd-pltfrm`, `tran_scsi_mod`, `tran_sd_mod`, `tran_block`,
-  `tran_mmc_block`, `tran_rhi`, `tran-proc-bootdevice-mod`), layanan
-  (`low_latency_sched`, `sd_tray`, `tkv_recovery`, `thd`,
-  `transsion_tranlog`, `tran_key_bigdata`, `tc_trancare`), panel `cl8`,
-  dan `mtk-mmc-mod`.
+```text
+twrp-vendor_boot-allsrc-display-usb.img
+md5 0ecdaa1edb3d405954331539b24c911b
+222 modul; isi = allsrc-display + tran_extcon_usb.ko perbaikan replug
+```
+
+Detail: `PRETEST.md` §23 (set modul), §40 (layar), §42 (USB), §43
+(insiden panel lama), §44 (repack otomatis).
+
+### Yang sudah terbukti di device
+
+- **Layar mati -> nyala**: panel `panel-rm69220-vdo-x6871.ko` memakai
+  8bpc/1056 Mbps seperti stock; resume memanggil `panel_ext_lcm_power_set`
+  + `lcm_prepare` + `lcm_panel_init`, 0 buffer underrun (`dmesg13`).
+- **Cabut-colok USB**: tiga siklus colok / dua siklus cabut; setiap colok
+  menghasilkan `online=1, type=1` (SDP) -> `ssusb_set_mode device` ->
+  `pullup D+` -> `gadget RESET` + enable endpoint (`dmesg14`/`dmesg15`).
+- **Vibrator/richtap**, **touch gt9916**, **UFS/MTK storage**, dan
+  **stack charger `tc_*`** sudah jalan di recovery.
+- Modul recovery tetap **222**; `modules.load` 165 entri dan
+  `modules.load.recovery` 216 entri; `modules.dep` dari `depmod`
+  (flatten), tidak ada unresolved symbol (hanya weak
+  `mtk_drm_gateic_set_backlight`).
+
+### Set modul: 20 nama stock tidak ada, 5 modul build-only
+
+- 20 nama stock tidak ada di build. Enam memang tidak direncanakan: panel
+  `cl8`/`ili7838e` + alias panel X6871, dan tiga modul MMC/SD
+  (`mtk-mmc-mod`, `sd_tray`, `tran_mmc_block`). Empat belas kandidat:
+  7 storage Transsion, 4 terblokir `transsion_tranlog`, dan 3 fitur
+  mandiri (`tkv_recovery`, `tran_rhi`, `tran_expand_key`). Rincian:
+  `## Yang tersisa` di bawah dan `PRETEST.md` §25.
+- Lima modul build-only menggantikan/menambah: `adaptive-ts`,
+  `gt9916_common`, `mtk-mmc`, `panel-rm69220-vdo-x6871`,
+  `tran_richtap_haptic_hv`.
 - Storage memakai jalur MediaTek: `ufshcd`/SCSI/sd/mmc_block **built-in**
-  di kernel + `ufs-mediatek-mod.ko` + `mtk-mmc.ko` (pengganti
-  `mtk-mmc-mod`). `dmesg3.txt` membuktikan UFS sudah up sebelum modul
-  Transsion dimuat.
-- Panel memakai `panel-rm69220-vdo-x6871.ko`; alias compatible-nya sama
-  dengan DT X6871, sedangkan panel stock `cl8` tidak cocok.
-- `modules.load` 163 entri, `modules.load.recovery` 214 entri; semua file
-  ada; `modules.dep` digenerate `depmod` lalu di-flatten; tidak ada
-  unresolved symbol (hanya weak `mtk_drm_gateic_set_backlight`).
-- Gambar: `twrp-vendor_boot-allsrc.img`
-  (md5 `caef8ac1591999d625ecfe48f9f1cb13`).
-- Varian uji tombol power: `twrp-vendor_boot-allsrc-kpd.img`
-  (md5 `10a0e140c9da7b25cbbd1be7c1e87f8b`) — `mtk-kpd.ko` ditambahkan ke
-  kedua daftar. **Layar tetap mati** (`dmesg4.txt`): sebabnya bukan
-  kpd, tapi `tran_ldo.ko` tidak dimuat sehingga regulator `dvdd` panel
-  (TRANLDO26) tidak pernah ready dan `lcm_probe()` tidak dipanggil
-  sama sekali. Lihat `PRETEST.md` §27.
-- **Image final terbaru (layar + USB):**
-  `twrp-vendor_boot-allsrc-display-usb.img`
-  (md5 `0ecdaa1edb3d405954331539b24c911b`) — 222 modul source, isinya
-  `allsrc-display` + `tran_extcon_usb.ko` dari perbaikan replug. Detail:
-  `PRETEST.md` §42 dan §43.
-- Perbaikan cabut-colok USB: `twrp-vendor_boot-usb-replug.img`
-  (md5 `8233c66d7b09aefd2e5b0fe5f4ca4c2e`) — **deprecated**, karena
-  repack-nya memakai baseline `vbverify5` yang masih berisi driver panel
-  lama (gagal bangun dari mati layar, `dmesg15`). Lihat `PRETEST.md` §43.
-- Varian final layar (mati -> nyala OK): `twrp-vendor_boot-allsrc-display.img`
-  (md5 `e7014d7273da2b7310ce1da1c947caf7`) — 222 modul source, beda dengan
-  `allsrc-vib2` hanya di modul panel. Detail: `PRETEST.md` §40.
-- Diagnostik layar (bukan final): `twrp-vendor_boot-diag-panelvendor.img`
-  (md5 `bfa4f21986abda1dfa4e8cf01080f024`) dan
-  `twrp-vendor_boot-diag-drmvendor.img`
-  (md5 `1b5dd4e5e0b12c6a275e6efb62dc20fe`). Detail: `PRETEST.md` §30.
-- Varian terkini: `twrp-vendor_boot-allsrc-vib2.img`
-  (md5 `0975ce466b7d015aae8a1825800babc9`) — tran_ldo + mtk-kpd + haptic
-  recovery + panel doze (driver panel kini punya `panel_doze_enable`,
-  `panel_doze_disable`, `g_lcm_doze_backlight` seperti modul vendor).
-  Detail: `PRETEST.md` §29.
-- Varian sebelumnya: `twrp-vendor_boot-allsrc-vib.img`
-  (md5 `fb761763e49325183551f4ed74918ddd`) — layar hidup (tran_ldo),
-  `mtk-kpd`, dan vibrator. Driver haptic kini mendaftar di recovery
-  (guard boot-mode di `aw_i2c_init` hanya menyisakan mode KPOC 8/9),
-  sehingga `/sys/class/leds/vibrator_single` muncul dan TWRP bisa
-  memakainya. Setara patch biner `tools/patch_haptic_ko.py` di device tree
-  TWRP. Detail: `PRETEST.md` §28. Kernel commit `e6fe27871d2f`.
-- Varian sebelumnya: `twrp-vendor_boot-allsrc-kpd-ldo.img`
-  (md5 `c49c48b90e08b026ec451d12cf1e0d9b`) — sama tanpa perbaikan haptic.
+  di kernel + `ufs-mediatek-mod.ko` + `mtk-mmc.ko`. Fork `tran-*` dorman;
+  alasannya di `PRETEST.md` §25.
+- Panel stock `cl8` tidak cocok dengan DT X6871; driver kita memakai
+  compatible `rm69220,fhdp,dsi,vdo,dsc,csot,csot,144hz,x6871`.
 
-Untuk system: set `vendor_dlkm` + `odm_dlkm` 100% source sudah disiapkan
-di `/serverhive1/ramabondanp/tmp/dlkm-src` — 269 modul, semuanya dari
-staging. 25 modul stock dikeluarkan (10 hardware tanpa DT + 15 software
-tanpa source), `tran_zram` diganti `zsmalloc.ko` + `zram.ko` dari source,
-dan ditambah `rfkill.ko`, `bluetooth.ko`, `libarc4.ko`, `task_turbo.ko`
-yang sebelumnya disediakan stock. Closure simbol kernel + 222 modul
-vendor_boot + 269 modul dlkm: **0 unresolved**. Partisi dlkm di `super`
-belum di-repack; boot system belum diuji.
+### Repack
 
-Future reference: `PRETEST.md` §25 merangkum hasil RE storage fork
-Transsion. Fork utama (`tran_block`/`tran_scsi`/`tran_sd`/`tran_mmc`/
-`tran_ufs`) dorman di X6871 karena SCSI/sd/UFS/MMC block sudah built-in
-dan `ufs-mediatek-mod` bind lebih dulu; node DT `/odm/blkio` juga tidak
-ada. Yang layak di-port ulang hanya dua modul standalone:
-`tran-proc-bootdevice-mod` (`/proc/bootdevice`, pakai API `ufshcd_query_*`
-GKI) dan `tran_rhi` (`/proc/health_info`, procfs health).
+Selalu pakai `tools/repack-vendor-boot-latest.sh` (lihat §Perintah build /
+Repack). Jangan menyalin `.ko` dari image lama. Baseline lama
+(`cmp-out/vbverify5`, `cmp-out/xcmp`) sudah dihapus supaya insiden panel
+basi tidak terulang (`PRETEST.md` §43/§44).
 
-Audit stack kamera: `PRETEST.md` §26. Ringkas: display/USB/charging
-kodenya identik dengan stock (221 modul dibandingkan per section+simbol+
-relokasi = 0 beda), sedangkan **kamera adalah satu-satunya stack yang
-source-nya tidak lengkap**. Driver sensor X6871 (`s5khm6sx`, `gc32e1`,
-`gc02m3`, `gc02m3macro`) tidak ada di tree 6.12 kita; 3 di antaranya ada
-di donor 6.1 (`mtkcam/imgsensor/src-v4l2/common/`) sehingga bisa di-port,
-`gc02m3` harus diturunkan dari versi macro. `camera_eeprom_v4l2` (46
-fungsi kalibrasi OTP per sensor) dan patch Ext-ISP di `mtk-cam-isp` tidak
-dipublikasikan - eeprom perlu RE atau diterima tanpa kalibrasi, Ext-ISP
-aman dilewati (tidak ada node DT maupun konsumen). Patch `flashlight`
-(sub/tele torch, thermal) bisa di-port dari donor 6.1. Alat pembanding:
-`tools/stock-vs-src.py` (§26).
+### System / dlkm
 
-Tabel perangkat X6871 dari DTBO: `DEVICES.md` — 978 node `okay`, 470 di
-antaranya sudah punya modul source kita, 130 built-in, 371 node platform,
-7 tanpa driver. Dari tabel itu ketemu satu bug nyata: `of_match` flash LED
-(`ocp81375_v4l2`, `sgm37864_v4l2`) tidak memakai sufiks `_v4l2` seperti
-DT, jadi driver tidak akan bind; sudah ditambahkan di
-`flashlight/v4l2/*.c` dan diverifikasi lewat build.
+Set `vendor_dlkm` + `odm_dlkm` 100% source sudah disiapkan di
+`/serverhive1/ramabondanp/tmp/dlkm-src` — 269 modul dari staging. 25 modul
+stock dikeluarkan (10 hardware tanpa DT + 15 software tanpa source),
+`tran_zram` diganti `zsmalloc.ko` + `zram.ko`, ditambah `rfkill.ko`,
+`bluetooth.ko`, `libarc4.ko`, `task_turbo.ko`. Closure simbol kernel + 222
+modul vendor_boot + 269 modul dlkm: **0 unresolved**.
 
-Repo bersih, semua ter-push: `alps`, branch `w1vo36-6.12-port`,
-HEAD `93b7ebca0841`. Manifest `main` mengikuti commit HANDOFF/PLAN/PRETEST
-terakhir.
+**Belum**: partisi dlkm di `super` belum di-repack dan boot system belum
+diuji. Ini target berikutnya bersama kamera.
+
+### Kamera
+
+Audit stack kamera: `PRETEST.md` §26. Display/USB/charging identik dengan
+stock (221 modul dibandingkan per section+simbol+relokasi = 0 beda),
+sedangkan kamera satu-satunya stack yang source-nya tidak lengkap. Empat
+driver sensor X6871 (`s5khm6sx`, `gc32e1`, `gc02m3`, `gc02m3macro`) tidak
+ada di tree 6.12; 3 ada di donor 6.1 (`mtkcam/imgsensor/src-v4l2/common/`)
+sehingga bisa di-port, `gc02m3` diturunkan dari versi macro.
+`camera_eeprom_v4l2` (46 fungsi kalibrasi OTP per sensor) dan patch Ext-ISP
+di `mtk-cam-isp` tidak dipublikasikan; eeprom perlu RE atau diterima tanpa
+kalibrasi, Ext-ISP aman dilewati (tidak ada node DT/konsumen). Patch
+`flashlight` (sub/tele torch, thermal) bisa di-port dari donor 6.1. Alat
+pembanding: `tools/stock-vs-src.py` (§26).
+
+### Device table
+
+`DEVICES.md` — 978 node `okay`, 470 sudah punya modul source kita, 130
+built-in, 371 node platform, 7 tanpa driver. Bug nyata yang ditemukan:
+`of_match` flash LED (`ocp81375_v4l2`, `sgm37864_v4l2`) tidak memakai
+sufiks `_v4l2` seperti DT; sudah diperbaiki di `flashlight/v4l2/*.c` dan
+diverifikasi lewat build.
+
+Repo kernel bersih dan ter-push: `alps`, branch `w1vo36-6.12-port`, HEAD
+`af55c9c00426`. Manifest `main` mengikuti commit dokumentasi terakhir.
 
 ## Objective
 
@@ -127,7 +119,8 @@ kalau memang tidak ada source.
 
 1. **Jangan pakai `/tmp`** — pakai `/serverhive1/ramabondanp/tmp`.
 2. **Selalu commit + push setelah setiap perubahan, tanpa bertanya.**
-   Push ke `alps` dan `local` (branch `w1vo36-6.12-port`).
+   Push ke remote `alps` (branch `w1vo36-6.12-port`); remote `local` hanya
+   kalau tersedia di workspace.
 3. Commit di **semua tree kernel** (`w1vo/kernel_device_modules-6.12`,
    donor 6.1/6.12, repo `alps`) wajib **bahasa Inggris** — subjek dan body.
    Hanya repo manifest (`w1vo36-kernel-manifest`) yang boleh bahasa
@@ -239,9 +232,10 @@ Daftar commit per fitur ada di `git log` branch `w1vo36-6.12-port`.
 ## Yang tersisa: 20 modul di tree staging
 
 Angka 20 adalah nama stock yang tidak ada di **tree staging lengkap**
-(`staging/lib/modules/6.12.38-.../`, 796 `.ko`). Flat customer install
-(692 `.ko`) masih melaporkan 27 karena 7 modul GKI tidak disalin ke flat
-root, tetapi semuanya ada di tree staging. Lihat `PRETEST.md` §3.
+(`staging/lib/modules/6.12.38-.../`, 806 file / 805 nama unik). Flat
+customer install berisi 702 `.ko`; angka flat tidak dipakai sebagai
+patokan gap karena 7 modul GKI tidak disalin ke flat root. Lihat
+`PRETEST.md` §3.
 
 Dari 20 nama itu, 6 memang **tidak direncanakan** untuk X6871: dua varian
 panel perangkat lain (`ili7838e...cl9`, `rm69220...cl8`), satu alias panel
@@ -335,10 +329,9 @@ impor tak terselesaikan, 0 CRC tak terpenuhi, 0 export ambigu**. Detail di
   balik ke region.
 
 ### Berikutnya paling siap
-- **Boot test** memakai checklist `PRETEST.md` §7. Pastikan image memakai
-  `modules.dep`/`modules.alias` hasil build dari tree staging, bukan
-  `modules.dep` stock (stock masih memaksa `transsion_tranlog` untuk
-  `tran_fp`). Ini menentukan apakah 7 modul fork storage masih diperlukan.
+- **System boot**: repack partisi dlkm dari `tmp/dlkm-src` (269 modul,
+  closure 0 unresolved), lalu uji boot system. Ini target utama berikutnya
+  setelah TWRP; detail di `PRETEST.md` §24/§26 dan bagian dlkm di atas.
 - `tkv_recovery` — sibling `tkv`, 20 KB, 11 ekspor / 24 impor; kandidat
   berikutnya yang paling kecil.
 - `tran_rhi` — health info storage (ECC/erase/suhu), 47 KB, tanpa source.
@@ -508,9 +501,10 @@ agar build gagal kalau offset bergeser.
 
 ## Wajib diuji saat boot
 
-Jalur panel (Iris probe, `tran_ldo` bus i2c 6 / `et5904_regulators6[]`),
-`tc_charger_framework` pada `tc,charger`, `nfc_i2c` pada `nxp,pn544`,
-`leds-aw22xxx` pada `awinic,aw22xxx_led`.
+Di TWRP sudah lolos: panel (Iris probe, `tran_ldo` bus i2c 6 /
+`et5904_regulators6[]`), `tc_charger_framework` pada `tc,charger`, dan
+`leds-aw22xxx` pada `awinic,aw22xxx_led`. Untuk system boot, pantau jalur
+yang sama plus pemuatan `vendor_dlkm`/`odm_dlkm` dan probe kamera.
 
 ## Blocker yang perlu dump image vendor/super
 
@@ -518,7 +512,7 @@ Jalur panel (Iris probe, `tran_ldo` bus i2c 6 / `et5904_regulators6[]`),
 `pxlw-rm69220_..._x6871.fw` ada di `/vendor/firmware` dan belum pernah
 di-dump. Hanya ramdisk `vendor_boot` yang ada di disk.
 
-## Status per 2026-11-19 (akhir sesi)
+## Status per 2026-11-19 (historis; status terbaru di atas)
 
 **TWRP boot normal dan aman dengan modul kita.** Vendor_boot TWRP (ramdisk
 zstd) yang diisi modul build kita memuat 238 modul, tanpa `Unknown symbol`,
@@ -536,8 +530,8 @@ Artefak terakhir (release `boottest-20261119`):
 | `twrp-vendor_boot-fixed.img` | TWRP (zstd) | 238 | `327c4e52a0b81e807d71bba00138f6e5` |
 | `vendor_boot-new.img` | stock (lz4) | 218 | `e65fdcf92e15a1b9ffd2bafcc7b2ae73` |
 
-Commit terakhir: kernel `93b7ebca0841` (define `CONFIG_TC_CHARGER`),
-manifest `c53fce7`.
+Commit terakhir saat itu: kernel `93b7ebca0841` (define
+`CONFIG_TC_CHARGER`), manifest `c53fce7`.
 
 ### Sumber stock `vendor_dlkm` dan `odm_dlkm`
 

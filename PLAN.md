@@ -4,10 +4,13 @@
 belum selesai, pengetahuan kritis. `README.md` = cara build. `PLAN.md` =
 catatan teknis lengkap per temuan (§6.x), termasuk bukti tiap keputusan.
 
-Status per 2026-11-19. Semua angka di bawah hasil pengukuran, bukan perkiraan.
-
-Ringkas: **688 `.ko` di staging, 32 modul firmware masih hilang** (dari 237).
-Untuk memulai sesi baru, baca `HANDOFF.md` lebih dulu.
+> **Status 2026-11-20:** TWRP final memakai **222 modul 100% source**,
+> layar mati->nyala dan cabut-colok USB sudah terverifikasi. Image:
+> `twrp-vendor_boot-allsrc-display-usb.img` (md5
+> `0ecdaa1edb3d405954331539b24c911b`). Berikutnya: repack dlkm untuk boot
+> system, lalu kamera. Angka 688 `.ko` / 32 hilang di bawah adalah snapshot
+> 2026-11-19; angka build sekarang 806 file / 805 nama unik, recovery 222.
+> Untuk memulai sesi baru, baca `HANDOFF.md` lebih dulu.
 
 ---
 
@@ -1847,7 +1850,7 @@ vsync_start, vsync_end, vtotal. `clock` = u32 di offset 0.
 4. DT: node `panel1@0` + GPIO/regulator sesuai `frag0.dts`.
 5. Pasang firmware `iris5.fw` + `pxlw-rm69220_..._x6871.fw` ke image.
 
-Belum: panel belum pernah dijalankan di device.
+Status: panel sudah dijalankan di device; layar mati->nyala OK (PRETEST §40).
 
 Catatan mode: `rm692j0` (donor 6.1) itu **CMD 1260x2800**, sedangkan
 `rm69220` X6871 **VDO RAMLESS 1080x2400**. Beda drive mode — jangan pakai
@@ -1877,7 +1880,7 @@ Ini satu-satunya bagian yang benar-benar RE, dan sifatnya **ekstraksi data**
 |---|---|---|---|---|
 | 1 | Tingkat A: nyalakan `entry_level_legacy.config` | 1 build | rendah | +12 modul, sekaligus validasi loop build varian |
 | 2 | Tingkat C: port stack charging Transsion | sedang | sedang | +38 modul |
-| 3 | Phase 3: vendor Iris + port panel rm69220 | besar | **tinggi** | device bisa nyala |
+| 3 | Phase 3: vendor Iris + port panel rm69220 | besar | **tinggi** | ✅ selesai: device menyala (2026-11-20) |
 | 4 | Tingkat B: rename fpsgo/game | kecil | rendah | +2 |
 | 5 | Tingkat D: cari donor Transsion 6.12 | ? | ? | ~55 |
 
@@ -1907,14 +1910,28 @@ bisa dipakai membandingkan `CONFIG_*` kita vs device.
 
 ---
 
-## 10. Yang belum terbukti
+## 10. Yang belum terbukti / status terbaru
 
-- **Runtime**: campuran modul Moto + donor OPPO **belum pernah di-boot**.
-  Ini berlaku juga untuk hasil Phase 3 nanti.
-- `mt6991` / `mt6993`: kabel sudah ada, belum pernah dibangun.
-- Tingkat A: belum pernah dibuild dengan `entry_level_legacy.config`.
-- Iris: belum pernah dikompilasi terhadap `mediatek_v2` 6.12. Drift struct
-  diperkirakan kecil (§7.4) tapi belum dibuktikan dengan compiler.
-- Target ABI `user_customer_abi` tidak bisa lulus di tree ini (328 simbol
-  duplikat antar varian driver, gagal di `stg merge`). Bukan mismatch KMI.
-  Lihat `HANDOFF.md`.
+Sudah terbukti di device (2026-11-20):
+
+- TWRP boot dengan 222 modul 100% source; tidak ada `.ko` stock di ramdisk.
+- Panel rm69220: layar mati -> nyala memanggil `lcm_prepare` +
+  `lcm_panel_init` seperti stock, 0 buffer underrun (`dmesg13`).
+- USB: cabut -> role NONE, colok -> DEVICE, `online=1, type=1` (SDP),
+  `pullup D+`, `gadget RESET`; berulang 3 siklus (`dmesg14`/`dmesg15`).
+- Vibrator/richtap, touch gt9916, UFS/MTK storage, dan stack charger `tc_*`
+  jalan di recovery.
+
+Belum:
+
+- **System boot**: partisi dlkm di `super` belum di-repack. Set 269 modul
+  source sudah disiapkan di `/serverhive1/ramabondanp/tmp/dlkm-src` dengan
+  closure 0 unresolved; boot system belum diuji.
+- **Kamera**: 4 driver sensor X6871 belum ada di tree; 3 bisa di-port dari
+  donor 6.1, `gc02m3` diturunkan dari versi macro. `camera_eeprom_v4l2`
+  (OTP) dan patch Ext-ISP tidak dipublikasikan.
+- Tingkat B rename `fpsgo`/`game` belum dikerjakan (tidak menghambat TWRP).
+- `mt6991`/`mt6993` belum pernah dibangun.
+- Target ABI `user_customer_abi` tidak bisa lulus (328 simbol duplikat antar
+  varian driver, gagal di `stg merge`); bukan mismatch KMI. Lihat
+  `HANDOFF.md`.

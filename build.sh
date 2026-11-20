@@ -8,9 +8,12 @@
 #
 # OVERLAYS: nama file di kernel_device_modules-6.12/kernel/configs/,
 # dipisah spasi. Contoh yang sudah diverifikasi:
-#   entry_level_legacy.config  -> +13 modul, 764 jadi 775 (lihat PLAN.md)
+#   entry_level_legacy.config  -> +13 modul (angka absolut berubah setelah
+#                                 port X6871; lihat PLAN.md/HANDOFF.md)
 #
-# Perintah ini sudah diverifikasi: 1.401 .ko, 0 error (baseline).
+# Perintah ini sudah diverifikasi: 1.401 .ko baseline MTK murni, 0 error.
+# Branch port X6871 + OVERLAYS=entry_level_legacy.config: 806 file staging
+# (805 nama unik), flat customer install 702 .ko. Lihat HANDOFF.md.
 #
 # Tiga hal yang wajib, semuanya dari build.sh MTK/Samsung asli:
 #   --allow_ddk_unsafe_headers=1

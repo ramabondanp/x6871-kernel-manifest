@@ -1,7 +1,20 @@
 # PRETEST — simulasi & perbandingan sebelum boot X6871
 
-Dibuat 2026-11-19. Kernel `w1vo36-6.12-port` HEAD **`6334ce2b9910`**.
-Empat modul fitur: `tran_extcon_usb`, `tran_fp`, `tnek`, `tkv`.
+Dibuat 2026-11-19 sebagai catatan kronologis. Kernel
+`w1vo36-6.12-port` sekarang di **`af55c9c00426`**.
+
+> **Status 2026-11-20:** TWRP final memakai **222 modul 100% source**;
+> image `twrp-vendor_boot-allsrc-display-usb.img` (md5
+> `0ecdaa1edb3d405954331539b24c911b`). Layar mati->nyala (§40), cabut-colok
+> USB (§42), insiden panel basi (§43), dan workflow repack otomatis (§44)
+> sudah selesai. Angka 796 `.ko` / `modules.load` lama di bagian awal adalah
+> snapshot saat itu; angka final: 806 file / 805 nama unik di staging,
+> 222 modul recovery, `modules.load` 165, `modules.load.recovery` 216.
+> Berikutnya: repack dlkm untuk boot system, lalu kamera.
+
+Bagian penting: §23 (set 222 modul), §24 (set dlkm), §25 (storage fork),
+§26 (audit kamera), §40 (layar), §42 (USB), §43 (insiden panel basi),
+§44 (repack otomatis).
 
 Tujuan: memastikan modul tidak menggantung/menimpa simbol stock dan tidak
 melakukan operasi yang bisa merusak hardware **sebelum** image di-boot.
@@ -2517,6 +2530,9 @@ twrp-vendor_boot-allsrc-display.img
   beda dengan image sehat allsrc-vib2 hanya di panel-rm69220-vdo-x6871.ko
 ```
 
+Varian ini adalah final **layar** saat itu; image final sekarang adalah
+`allsrc-display-usb` (§43/§44) yang menambahkan perbaikan USB.
+
 Catatan yang masih terbuka: `lcm_probe()` masih menyetel `prepared = true`
 dan `enabled = true`, jadi init pertama setelah boot tetap mengandalkan
 state dari bootloader. Perilaku ini tidak diubah karena boot dan wake
@@ -2776,7 +2792,7 @@ lagi sumber modul yang bisa basi:
   `boot.img`, `dtbo.img`, dan firmware referensi `tmp/x6871/vr`
 - hasil: `cmp-out` 12G -> 682M, `tmp/x6871` 3.0G -> 458M
 
-Workflow repack baru (commit manifest berikutnya):
+Workflow repack baru (commit manifest `88b6a03`):
 
 ```bash
 ./tools/repack-vendor-boot-latest.sh
