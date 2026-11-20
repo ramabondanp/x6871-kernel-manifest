@@ -463,6 +463,21 @@ Dua modul software terakhir yang selesai diport: `perf_common_v`
 `mtk_vcodec_set_sys_api_funcs`/`mtk_vcodec_set_task_priority` dan encoder
 memakai jalur itu).
 
+Export ABI vendor yang dibutuhkan modul stock juga dilengkapi:
+
+- `scheduler` mengekspor `g_trans_sched_interface` (layout 34 pointer /
+  0x110 byte, sama dengan stock). Dengan ini `priority_allocate`,
+  `tran_zram`, dan `trans_sched` tidak lagi gagal `Unknown symbol`.
+  `trans_sched` mengisi tabel itu saat init, tetapi call-site hook di
+  scheduler kita belum disambungkan, jadi fitur UX scheduling belum
+  aktif.
+- `mtk_game` mengekspor `engine_cooler_trigger_duration()` dan memakai
+  parameter `ec_duration` (2000) seperti stock, sehingga `game.ko` stock
+  bisa memuat.
+- `mtk_heap_debug` mengekspor `dma_heap_emem_printk()` (rekonstruksi
+  disassembly, 0x150 byte, identik dengan stock), dibutuhkan
+  `tran_mm_collect`.
+
 Diff per fungsi (nama + ukuran simbol `.text`) untuk 263 modul itu: **126
 modul berbeda**, 47 di antaranya berbeda berat. Puncaknya drift versi sumber,
 bukan salah config:

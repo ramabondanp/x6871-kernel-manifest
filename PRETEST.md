@@ -1014,3 +1014,73 @@ Verifikasi: `mtk-vcodec-enc.ko` hanya mengimpor
 simbol baru; `mtk-vcodec-sys-api.ko` mengimpor
 `mtk_vcodec_set_sys_api_funcs` dan `set_task_priority`, dengan
 `depends=mtk-vcodec-common,vip_engine`.
+
+## 21. Export ABI vendor untuk modul software stock
+
+Tiga export yang membuat modul software stock bisa dimuat di atas modul
+sumber kita sudah dilengkapi. Semua diverifikasi dengan membandingkan
+simbol dan disassembly terhadap `.ko` stock.
+
+### `g_trans_sched_interface` (scheduler)
+
+Stock `scheduler.ko` mengekspor variabel `.bss` 0x110 byte; `trans_sched.ko`
+mengisinya dengan 34 pointer fungsi saat init. Layout diambil dari
+instruksi `stp` di `init_module` stock:
+
+| offset | isi |
+|---|---|
+| 0x00, 0x08 | `android_rvh_enqueue_task_hook`, `..._dequeue_...` |
+| 0x10, 0x18, 0x20, 0x28, 0x30 | fork, build_sched_domains, tick, replace_next_task_fair, check_preempt_wakeup |
+| 0x38..0xa0 | hook binder, mutex, rwsem, free_task, rename, switch prev/next |
+| 0xa8 | `tran_is_ux_task` (dipakai `tran_zram`/`priority_allocate`) |
+| 0xb0, 0xb8 | `trans_should_honor_sync`, `balance_on_wakeup_ux` |
+| 0xc0, 0xc8 | `trans_select_task_rq_rt`, `filterout_on_wakeup_rt` |
+| 0xd0, 0xd8 | `android_rvh_find_lowest_rq_hook`, `adjust_rt_lowest_mask` |
+| 0xe0, 0xe8 | `__trans_tick_balance`, `__trans_newidle_balance` |
+| 0xf0..0x108 | `xmu_schedule`, `xmu_tick_entry`, `xmu_cpufreq_limit`, `xmu_is_runnable_boost_enabled` |
+
+`scheduler.ko` kita sekarang punya `g_trans_sched_interface` berukuran
+0x110 byte dan mengekspornya dengan nama yang sama. Artinya
+`priority_allocate` (hanya butuh slot 0xa8), `tran_zram`, dan
+`trans_sched` bisa dimuat tanpa `Unknown symbol`.
+
+Catatan: scheduler kita **belum memanggil** slot 0x00/0x08/0xb0/0xb8/
+0xc0/0xc8/0xd0/0xd8/0xe8. `trans_sched` tetap mengisi tabel dan
+mendaftarkan tracepoint-nya sendiri, tetapi keputusan penempatan task
+UX/RT yang lewat scheduler belum aktif. Ini pekerjaan lanjutan.
+
+### `engine_cooler_trigger_duration` (mtk_game)
+
+Stock hanya mengembalikan `ec_duration * 1000`, dengan `ec_duration`
+adalah module parameter bernilai 2000. Kita mengganti nama parameter
+`yield_duration` menjadi `ec_duration` (agar sysfs sama dengan stock) dan
+mengekspor `engine_cooler_trigger_duration()`. Disassembly kita identik:
+`adrp/ldr/mul/ret`, ukuran 0x14 byte seperti stock.
+
+### `dma_heap_emem_printk` (mtk_heap_debug)
+
+Dipakai `tran_mm_collect.ko`. Rekonstruksi memakai helper yang sudah ada
+(`get_dma_heap_buffer_total(NULL)` dan `get_dma_heap_pool_total()`):
+
+```c
+void dma_heap_emem_printk(long emem_kb)
+{
+        long buffer_kb = get_dma_heap_buffer_total(NULL) / 1024;
+        long pool_kb = get_dma_heap_pool_total() / 1024;
+
+        pr_info("[TranMemoryInfo] %s: dmabuf buffer total: %ld KB, page pool total: %ld KB, threshold : %ld kB.\n",
+                __func__, buffer_kb, pool_kb, emem_kb);
+
+        if (buffer_kb > emem_kb)
+                dma_heap_default_show(NULL, NULL, 524);
+}
+```
+
+Hasil kompilasi sama persis dengan stock: ukuran 0x150 byte dan urutan
+instruksi identik (termasuk pemanggilan `dma_heap_total_cb` lewat
+`kset_dma_buf_get_each`, penjumlahan page pool per heap, dan
+`dma_heap_default_show` dengan flag 524).
+
+Status: `perf_common_v` + `mtk-vcodec-sys-api` selesai; tiga export di
+atas menutup celah `Unknown symbol` untuk modul software stock yang
+tersisa selain keluarga Tranlog/Aegis.
