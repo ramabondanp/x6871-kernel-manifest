@@ -13,6 +13,7 @@ Ditulis 2026-11-19, diperbarui 2026-11-20 untuk sesi AI berikutnya. Baca ini dul
 | Modul di firmware X6871 | 237 |
 | Nama stock tidak ada di build | **20** (6 tidak direncanakan, 14 kandidat) |
 | Modul recovery vendor_boot | **222**, 100% source |
+| DLKM (`vendor_dlkm` + `odm_dlkm`) | **269**, 100% source, image siap |
 | Build target | `//kernel_device_modules-6.12:mgk_64_k612_customer_modules_install.user` |
 | Build terakhir | sukses (inkremental), 2026-11-20 |
 | Kernel HEAD | `af55c9c00426` (`w1vo36-6.12-port`) |
@@ -73,15 +74,28 @@ basi tidak terulang (`PRETEST.md` §43/§44).
 
 ### System / dlkm
 
-Set `vendor_dlkm` + `odm_dlkm` 100% source sudah disiapkan di
-`/serverhive1/ramabondanp/tmp/dlkm-src` — 269 modul dari staging. 25 modul
-stock dikeluarkan (10 hardware tanpa DT + 15 software tanpa source),
-`tran_zram` diganti `zsmalloc.ko` + `zram.ko`, ditambah `rfkill.ko`,
-`bluetooth.ko`, `libarc4.ko`, `task_turbo.ko`. Closure simbol kernel + 222
-modul vendor_boot + 269 modul dlkm: **0 unresolved**.
+Set `vendor_dlkm` + `odm_dlkm` 100% source sudah di-repack. 269 modul dari
+staging (212 vendor + 57 odm), `modules.load` 194/57, closure simbol kernel
++ 222 vendor_boot + 269 dlkm: **0 unresolved** (hanya weak
+`mtk_drm_gateic_set_backlight`). 27 nama stock dikeluarkan karena tidak ada
+source; `tran_zram` diganti `zsmalloc`+`zram`, ditambah `rfkill`,
+`bluetooth`, `libarc4`, `task_turbo`.
 
-**Belum**: partisi dlkm di `super` belum di-repack dan boot system belum
-diuji. Ini target berikutnya bersama kamera.
+```text
+vendor_dlkm.img  md5 c329bbb8a465e32dc5bfd4cdcaede45f  24.551.424 B
+odm_dlkm.img     md5 0ffbb42985d445f7c12808df3b50960e   4.206.592 B
+twrp-dlkm-source-20261120.zip  md5 5ae77a5b98cb99491eccabb635d22370
+release          dlkm-20261120
+/srv path         /serverhive1/ramabondanp/tmp/dlkm-out/
+```
+
+Image memakai EROFS persis opsi stock + AVB hashtree footer; ukurannya
+sama dengan partisi stock. Zip TWRP menulis ke logical partition yang ada
+(`lptools map` + `dd`), tanpa delete/create. Detail: `PRETEST.md` §45.
+
+**Belum**: boot system belum diuji — langkah berikutnya flash zip lalu
+ambil dmesg/pstore. Fitur yang bergantung pada 27 modul stock tanpa source
+(kamera, tranlog, dll) akan hilang.
 
 ### Kamera
 
@@ -329,9 +343,9 @@ impor tak terselesaikan, 0 CRC tak terpenuhi, 0 export ambigu**. Detail di
   balik ke region.
 
 ### Berikutnya paling siap
-- **System boot**: repack partisi dlkm dari `tmp/dlkm-src` (269 modul,
-  closure 0 unresolved), lalu uji boot system. Ini target utama berikutnya
-  setelah TWRP; detail di `PRETEST.md` §24/§26 dan bagian dlkm di atas.
+- **System boot**: image dlkm sudah siap (`dlkm-20261120`); flash
+  `twrp-dlkm-source-20261120.zip` lewat TWRP lalu uji boot system dan
+  ambil dmesg/pstore. Detail di `PRETEST.md` §45 dan bagian dlkm di atas.
 - `tkv_recovery` — sibling `tkv`, 20 KB, 11 ekspor / 24 impor; kandidat
   berikutnya yang paling kecil.
 - `tran_rhi` — health info storage (ECC/erase/suhu), 47 KB, tanpa source.

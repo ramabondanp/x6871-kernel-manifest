@@ -14,7 +14,7 @@ Dibuat 2026-11-19 sebagai catatan kronologis. Kernel
 
 Bagian penting: §23 (set 222 modul), §24 (set dlkm), §25 (storage fork),
 §26 (audit kamera), §40 (layar), §42 (USB), §43 (insiden panel basi),
-§44 (repack otomatis).
+§44 (repack otomatis), §45 (repack dlkm).
 
 Tujuan: memastikan modul tidak menggantung/menimpa simbol stock dan tidak
 melakukan operasi yang bisa merusak hardware **sebelum** image di-boot.
@@ -1202,18 +1202,18 @@ Gambar uji: `twrp-vendor_boot-allsrc.img`
 (md5 `caef8ac1591999d625ecfe48f9f1cb13`), 222 modul, sudah diverifikasi
 isi ramdisk-nya.
 
-## 24. Set dlkm 100% source (siap untuk repack nanti)
+## 24. Set dlkm 100% source (final)
 
 Selain vendor_boot TWRP, set modul untuk `vendor_dlkm` + `odm_dlkm`
 disiapkan di `/serverhive1/ramabondanp/tmp/dlkm-src`. Isinya **269 modul,
 semuanya dari staging build kita**.
 
-Modul stock yang dikeluarkan (25):
+Modul stock yang dikeluarkan (27):
 
-- 10 hardware yang tidak ada di DT X6871 (sengaja tidak diport):
+- 12 hardware yang tidak ada source/DT X6871 (sengaja tidak diport):
   `ak7316`, `aw36515`, `dw9800k`, `dw9784ois`, `focaltech_ft3683g`,
   `chipsemi_chsc5xxx_old`, `snd-soc-fs1894`, `snd-soc-aw87xxx`,
-  `snd-soc-oca72xxx`, `elliptic-ultrasound`.
+  `snd-soc-oca72xxx`, `elliptic-ultrasound`, `imgsensor`, `flashlight`.
 - 15 software tanpa source: `fpsgo`, `game`, `pages_prefilter`,
   `priority_allocate`, `task_turbo_v`, `tc_trancare`, `thd`,
   `transsion_tranlog`, `tran_audio_typec` (tidak ada DT),
@@ -1240,9 +1240,8 @@ Validasi closure simbol (kernel `vmlinux.symvers` + 222 modul
 vendor_boot + 269 modul dlkm): **0 unresolved symbol**. Semua file di
 set dlkm berasal dari staging (`not-from-staging: []`).
 
-Catatan: partisi dlkm (`vendor_dlkm`/`odm_dlkm` di `super`) belum
-di-repack. Set ini adalah bahan siap pakai untuk tahap itu; boot system
-belum diuji.
+Partisi dlkm sudah di-repack dari set ini; lihat §45 untuk image,
+md5, dan cara flash. Boot system belum diuji.
 
 ## 25. Storage fork Transsion: hasil RE dan dua modul yang layak di-port
 
@@ -2812,3 +2811,81 @@ Uji: staging dari build `af55c9c00426` menghasilkan 222 modul yang
 juga identik), jadi workflow ini tidak mengubah isi modul yang sudah
 terbukti jalan. Image uji otomatis dibuat lalu dihapus lagi; image final
 tetap `twrp-vendor_boot-allsrc-display-usb.img`.
+
+## 45. DLKM repack: vendor_dlkm + odm_dlkm 100% source
+
+Stock image diperoleh dari filebin (`gj6uxkeye4syth9x`, `Archive.zip`):
+`vendor_dlkm.img` 24.551.424 byte dan `odm_dlkm.img` 4.206.592 byte,
+keduanya EROFS + AVB hashtree footer. Diekstrak dengan
+`android_tools/bin/extract.erofs`; hasil `config/*_fs_options` memuat
+perintah build stock yang persis:
+
+```text
+mkfs.erofs -zlz4hc -T 1230768000 -U <uuid> \
+  --mount-point=/vendor_dlkm \
+  --fs-config-file=./config/vendor_dlkm_fs_config \
+  --file-contexts=./config/vendor_dlkm_file_contexts \
+  <out> ./vendor_dlkm
+```
+
+Sebagai validasi, tree stock dibangun ulang dengan perintah itu lalu
+ditambah AVB footer yang sama (salt, partition size, props, release
+string) menghasilkan image **byte-identik** dengan stock. Pipeline
+repack karena itu tidak menebak format.
+
+### Hasil
+
+| Partisi | Modul | `modules.load` | `modules.dep` | Ukuran | md5 |
+|---|---|---|---|---|---|
+| `vendor_dlkm` | 212 | 194 | 212 | 24.551.424 | `c329bbb8a465e32dc5bfd4cdcaede45f` |
+| `odm_dlkm` | 57 | 57 | 57 | 4.206.592 | `0ffbb42985d445f7c12808df3b50960e` |
+
+- Total **269 modul, semuanya dari staging build source** (bukan `.ko`
+  stock). Modul diambil dari staging terbaru, `llvm-strip --strip-debug`,
+  lalu md5 dicek ulang dari image hasil ekstrak: 0 beda.
+- `modules.dep`/`alias`/`softdep` digenerate `depmod`; path memakai
+  `/vendor_dlkm/lib/modules/...` dan `/odm_dlkm/lib/modules/...`.
+- `modules.load` sudah difilter: 194/57 entri, 0 referensi menggantung.
+- Closure simbol kernel + 222 modul vendor_boot + 269 modul dlkm: hanya
+  weak `mtk_drm_gateic_set_backlight` (tidak menghambat load).
+- SELinux label dan permission modul baru (`bluetooth`, `rfkill`,
+  `libarc4`, `task_turbo`, `zram`, `zsmalloc`) ditambahkan ke
+  fs_config/file_contexts; hasil ekstrak image menunjukkan
+  `vendor_file` + 0644 root.
+- AVB hashtree footer dipertahankan: salt image, partition name, ukuran,
+  FEC roots 2, dan props sama seperti stock. Top-level `vbmeta` stock
+  memakai salt berbeda dan sudah dipatch untuk boot modified system
+  (sesuai keputusan user), jadi tidak diubah.
+
+### Artefak
+
+```text
+/serverhive1/ramabondanp/tmp/dlkm-out/vendor_dlkm.img
+/serverhive1/ramabondanp/tmp/dlkm-out/odm_dlkm.img
+/serverhive1/ramabondanp/tmp/dlkm-out/twrp-dlkm-source-20261120.zip
+  md5 5ae77a5b98cb99491eccabb635d22370
+release: dlkm-20261120
+```
+
+Cara flash:
+
+1. **TWRP**: Install zip `twrp-dlkm-source-20261120.zip`.
+2. **fastbootd** (kalau tersedia): `fastboot flash vendor_dlkm
+   vendor_dlkm.img` lalu `fastboot flash odm_dlkm odm_dlkm.img`.
+3. Rollback: flash balik stock `vendor_dlkm`/`odm_dlkm`.
+
+Zip TWRP memetakan logical partition yang sudah ada (`lptools map`),
+mengecek ukuran, lalu `dd` image ke `/dev/block/mapper/<part>`; tidak
+menghapus/membuat ulang partition. Rollback: flash balik image stock
+`vendor_dlkm`/`odm_dlkm`.
+
+### Catatan / belum diuji
+
+- **System boot belum diuji.** Yang sudah diverifikasi baru isi image,
+  ukuran partisi, AVB footer, metadata modul, dan closure simbol.
+- 27 nama stock tidak dimasukkan karena tidak ada source (kamera
+  `imgsensor`/`flashlight`, `transsion_tranlog`, `thd`, varian touch
+  alternatif, dll). Fitur terkait akan hilang; rincian di HANDOFF.
+- Kalau system tetap menolak mount karena verity, penyebabnya top-level
+  `vbmeta`, bukan image ini; sesuai keputusan user, vbmeta sudah dipatch
+  dan tidak diubah.

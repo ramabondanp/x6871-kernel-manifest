@@ -301,3 +301,24 @@ kita (termasuk panel `panel-rm69220-vdo-x6871.ko` menggantikan
 `rm69220_fhdp_dsi_vdo_dsc_csot_csot_144hz_x6871.ko`), sisanya tetap versi
 TWRP/stock — `adaptive-ts` butuh `cloudengine_*` dari `transsion_tranlog`
 yang tidak kita build, jadi modul itu harus tetap ada agar sentuhan hidup.
+
+## 11. DLKM source (2026-11-20)
+
+`vendor_dlkm` dan `odm_dlkm` sudah di-repack 100% source:
+
+```text
+vendor_dlkm.img  md5 c329bbb8a465e32dc5bfd4cdcaede45f  24.551.424 B
+odm_dlkm.img     md5 0ffbb42985d445f7c12808df3b50960e   4.206.592 B
+twrp-dlkm-source-20261120.zip  (release dlkm-20261120)
+```
+
+- 212 modul vendor + 57 modul odm, `modules.load` 194/57.
+- EROFS memakai opsi stock persis, AVB hashtree footer dipertahankan.
+- Zip TWRP memetakan logical partition (`lptools map`) lalu `dd`; tidak
+  delete/create partition.
+- Setelah flash: reboot, ambil dmesg/pstore, cek
+  `dmesg | grep -iE 'Unknown symbol|module|verity'` dan pastikan sistem
+  mencapai launcher. Kalau gagal, rollback dengan stock
+  `vendor_dlkm`/`odm_dlkm`.
+- Fitur dari 27 modul stock tanpa source (kamera, `transsion_tranlog`,
+  `thd`, dll) tidak akan ada.

@@ -90,8 +90,10 @@ md5 0ecdaa1edb3d405954331539b24c911b
 
 Yang sudah terverifikasi: layar mati -> nyala (0 buffer underrun) dan
 cabut-colok USB berulang (setiap colok kembali `online=1, type=1` SDP,
-`pullup D+`, `gadget RESET`). Berikutnya: repack partisi dlkm untuk boot
-system, lalu port driver kamera. Detail: `HANDOFF.md`, `PRETEST.md` §40-§44.
+`pullup D+`, `gadget RESET`). Image dlkm 100% source juga sudah siap
+(release `dlkm-20261120`, 269 modul; detail `PRETEST.md` §45) dan tinggal
+diuji boot system. Berikutnya: uji system boot, lalu port driver kamera.
+Detail: `HANDOFF.md`, `PRETEST.md` §40-§45.
 
 Catatan: hasil port di-push ke branch `w1vo36-6.12-port` di remote `alps`
 (bukan ke `mtk-base-latest`, yang sedang checked-out di working tree lokal).
