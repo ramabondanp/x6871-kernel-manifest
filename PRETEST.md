@@ -2481,3 +2481,43 @@ lagi tabel PPS yang dibawa manual oleh driver panel.
 
 Image: `twrp-vendor_boot-panelA-mode1.img`
 (md5 `227c49b8980a62dd3bb37b4f23d24b41`).
+
+## 40. Layar mati -> nyala: SELESAI (dmesg12)
+
+Hasil akhir `dmesg12.txt`, siklus layar mati -> nyala bersih:
+
+```text
+mtk_dsi_set_mmclk_by_datarate_V2 ... data_rate=1056, mmclk=213 pixclk_min=193
+mtk_rdma_cal_golden_setting ... bpc:8
+RCT_ON = 0x1, num_extra_mux_bits = 246->240, slice_bits = 51840
+DSI0 buffer underrun : 0x
+[LCM] lcm_prepare enter prepared=0
+[LCM] lcm_panel_init begin/end error=0
+```
+
+### Rangkaian perbaikan yang diperlukan (semuanya dari modul stock)
+
+| # | Perbaikan | Commit kernel |
+|---|---|---|
+| 1 | init sequence: tabel `lcm_initialization_setting` vendor (126 entri) + urutan reset | `91640cdaead6` |
+| 2 | parameter DSC vendor: bpc 8, dsc_cfg 34, ver 17, slice 12, chunk 540, dec 526, incr 287, dst | `91640cdaead6` |
+| 3 | rail `panel_ext_lcm_power_set` dipanggil di prepare/unprepare | `ad96798c52f0` |
+| 4 | DSI rate 528 MHz / 1056 Mbps (bukan 710/1420) | `ad6be249ea2a` |
+| 5 | `ext_pps_cfg` hanya `rc_buf_thresh` (tabel lain NULL) | `f9a9ae52f076` |
+| 6 | `mode_flags` 0xc05: sync-pulse + non-continuous clock (bukan burst) | `6a6db548a43c` |
+| 7 | `dsc_param_load_mode = 1` -> tabel PPS 8bpc bawaan MTK | `400b51ff9b30` |
+| 8 | buang parameter diagnostik `skip_unprepare` | `28f523738d7a` |
+
+### Varian final
+
+```text
+twrp-vendor_boot-allsrc-display.img
+  md5 e7014d7273da2b7310ce1da1c947caf7
+  222 modul (semua dari source), load 165, recovery 216
+  beda dengan image sehat allsrc-vib2 hanya di panel-rm69220-vdo-x6871.ko
+```
+
+Catatan yang masih terbuka: `lcm_probe()` masih menyetel `prepared = true`
+dan `enabled = true`, jadi init pertama setelah boot tetap mengandalkan
+state dari bootloader. Perilaku ini tidak diubah karena boot dan wake
+sudah benar, dan tidak ada keluhan layar saat boot.
