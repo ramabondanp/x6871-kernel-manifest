@@ -1626,3 +1626,96 @@ Hasil audit saat itu: 7 modul ada tapi tidak dimuat —
 `tran_ldo` (wajib, lihat di atas), `mtk-dvfsrc-devfreq`,
 `mtk-dvfsrc-helper`, `mtk_slbc`, `slbc_ipi`, `slbc_mt6895`,
 `slbc_trace` (stock juga tidak memuatnya di recovery).
+
+## 28. Vibrator mati di recovery: guard boot-mode di driver haptic
+
+Gejala: TWRP boot, layar hidup, tapi getaran tidak ada. Di `dmesg5.txt`
+hanya terlihat:
+
+```text
+<haptic_hv>aw_i2c_init: aw_haptic driver version v1.5.0
+[haptic_hv][4327]tran_get_boot_mode: tran_tp_get_boot_mode is 2
+init: Loaded kernel module /lib/modules/tran_richtap_haptic_hv.ko
+```
+
+`aw_i2c_probe()` mencetak `pr_info("<%s>%s: enter")` paling awal, jadi
+tidak adanya baris itu berarti probe **tidak pernah dipanggil**.
+
+### Bukti RE: stock pun sama
+
+Disassembly `init_module` pada `tran_richtap_haptic_hv.ko` **stock**:
+
+```text
+bl  tran_get_boot_mode
+cmp w0, #0x9
+mov w8, #1
+mov w9, #0x304        ; bit 2, 8, 9 -> recovery (2), KPOC (8/9)
+lsl w8, w8, w0
+tst w8, w9
+b.eq <i2c_register_driver>
+mov w19, wzr          ; return 0 tanpa registrasi
+```
+
+Log recovery menunjukkan `tran_tp_get_boot_mode is 2` -> stock juga
+melewati registrasi. Ini bukan efek samping port kita.
+
+TWRP sendiri memang mengharapkan node `vibrator_single`:
+
+```text
+libtwrpminui.so : /sys/class/leds/vibrator_single/duration
+                  /sys/class/leds/vibrator/duration          (fallback)
+                  /sys/class/timed_output/vibrator/enable    (fallback)
+init.recovery.mt6895.rc: write /sys/class/leds/vibrator_single/ram_update 1
+```
+
+Karena `vibrator_single` tidak ada, TWRP jatuh ke `/sys/class/leds/vibrator`
+milik `regulator-vibrator` (stub PMIC), sehingga tidak ada getaran.
+
+Device tree TWRP untuk X6871 sudah punya patch biner untuk ini:
+`tools/patch_haptic_ko.py` (ubah immediate `0x304` -> `0x300`, jadi mode 2
+tidak lagi di-skip).
+
+### Perbaikan di source
+
+Guard yang sama ada di `haptic_hv.c`:
+
+```c
+/* sebelum */
+if (boot_mode == KERNEL_POWER_OFF_CHARGING_BOOT ||
+    boot_mode == LOW_POWER_OFF_CHARGING_BOOT ||
+    boot_mode == RECOVERY_BOOT)
+        return 0;
+
+/* sesudah */
+if (boot_mode == KERNEL_POWER_OFF_CHARGING_BOOT ||
+    boot_mode == LOW_POWER_OFF_CHARGING_BOOT)
+        return 0;
+```
+
+Hasil kompilasi (setara patch biner di atas):
+
+```text
+and  w9, w0, #0xfffffffe      ; boot_mode & ~1
+cmp  w9, #0x8                 ; hanya 8/9 (KPOC) yang skip
+b.ne <i2c_register_driver>
+```
+
+Commit kernel `e6fe27871d2f`. Tidak perlu perubahan lain: nama LED tetap
+`vibrator_single` (KERNEL_OVER_5_10) sehingga tidak bentrok dengan
+`regulator-vibrator`.
+
+### Masih terbuka: layar tidak menyala setelah screen off
+
+Bukan modul: seluruh modul jalur display (panel, `mediatek_drm_v1`,
+`mtk_panel_ext`, `pwm-mtk-disp`, `leds-mtk*`, `cmdq*`, `mtk-smi`,
+`mtk_iommu`, `mtk-mminfra*`) **byte-identik** dengan stock dan urutan
+muatnya sama. Di `dmesg5.txt` terlihat jalur doze MTK:
+
+```text
+[DISP][E]mtk_atomic_doze_preparation connector has no crtc
+[DISP]mtk_output_dsi_disable, underrun force release:1
+[DISP][E][IRQ] DSI0: buffer underrun        (berulang setelah unblank)
+```
+
+Perlu uji A/B dengan image berisi set modul stock untuk memastikan apakah
+gejala ini juga ada di stock (bukan asumsi).

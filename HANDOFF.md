@@ -44,10 +44,15 @@ ada `.ko` stock di ramdisk. Rincian di `PRETEST.md` §23.
   kpd, tapi `tran_ldo.ko` tidak dimuat sehingga regulator `dvdd` panel
   (TRANLDO26) tidak pernah ready dan `lcm_probe()` tidak dipanggil
   sama sekali. Lihat `PRETEST.md` §27.
-- Varian terkini: `twrp-vendor_boot-allsrc-kpd-ldo.img`
-  (md5 `c49c48b90e08b026ec451d12cf1e0d9b`) — `mtk-kpd.ko` + `tran_ldo.ko`.
-  `modules.load` 165, `modules.load.recovery` 216, `tran_ldo.ko`
-  disisipkan sebelum `mtk_panel_ext.ko` (urutan sama dengan stock).
+- Varian terkini: `twrp-vendor_boot-allsrc-vib.img`
+  (md5 `fb761763e49325183551f4ed74918ddd`) — layar hidup (tran_ldo),
+  `mtk-kpd`, dan vibrator. Driver haptic kini mendaftar di recovery
+  (guard boot-mode di `aw_i2c_init` hanya menyisakan mode KPOC 8/9),
+  sehingga `/sys/class/leds/vibrator_single` muncul dan TWRP bisa
+  memakainya. Setara patch biner `tools/patch_haptic_ko.py` di device tree
+  TWRP. Detail: `PRETEST.md` §28. Kernel commit `e6fe27871d2f`.
+- Varian sebelumnya: `twrp-vendor_boot-allsrc-kpd-ldo.img`
+  (md5 `c49c48b90e08b026ec451d12cf1e0d9b`) — sama tanpa perbaikan haptic.
 
 Untuk system: set `vendor_dlkm` + `odm_dlkm` 100% source sudah disiapkan
 di `/serverhive1/ramabondanp/tmp/dlkm-src` — 269 modul, semuanya dari
