@@ -2332,3 +2332,70 @@ Image: `twrp-vendor_boot-panelA-528.img`
 
 Cara cek di dmesg: baris `mtk_dsi_set_mmclk_by_datarate_V2` harus
 menunjukkan `data_rate=1056` (sebelumnya 1420).
+
+## 37. Layar menyala tapi rusak: tabel PPS min_qp/max_qp/bpg_ofs
+
+`dmesg10.txt` (image `panelA-528`): semua parameter stream sudah benar dan
+layar **menyala**, hanya gambarnya rusak.
+
+```text
+mtk_dsi_set_mmclk_by_datarate_V2, data_rate=1056   <- sesuai vendor
+mtk_rdma_cal_golden_setting ... bpc:8              <- sesuai vendor
+RCT_ON = 0x1, num_extra_mux_bits = 246->240, slice_bits = 51840
+DSI0 buffer underrun : 0x
+[LCM] lcm_panel_init begin/end error=0
+```
+
+### Donor 6.1 rm6xxx: bukan sumber konfigurasi 8bpc
+
+Panel rm6xxx di donor 6.1 (`rm692j0_fhdp_dsi_cmd_dsc_boe*_144hz_*.c`,
+ada di `tmp/ts61-src`, `tmp/ts61-tar`, `tmp/mt6897`, `tmp/cfg-x`) memakai
+blok DSC yang **sama dengan konfigurasi lama kita**:
+
+```text
+.ver = 18, .dsc_cfg = 40, .bit_per_channel = 10, .slice_height = 70,
+.chunk_size = 630, .dec_delay = 650, .increment_interval = 1658, ...
+```
+
+Jadi nilai 10bpc kita memang berasal dari keluarga donor itu, dan donor
+tidak menyediakan varian 8bpc untuk panel ini.
+
+### Yang berbeda: isi `ext_pps_cfg`
+
+Dari `.data` modul vendor A (offset `0x4f04`):
+
+```text
+rc_tgt_offset (0x4f04) = 0
+ext_pps_cfg.enable     = 1
+rc_buf_thresh          -> .data+0x42e0  (14 nilai: 896, 1792, ... 8064
+                                        = sama persis dengan tabel kita)
+range_min_qp           = NULL
+range_max_qp           = NULL
+range_bpg_ofs          = NULL
+```
+
+Driver kita mengisi ketiganya dengan tabel 10bpc
+(`min_qp = 0,4,5,5,7,7,7,7,7,7,9,9,9,13,16`). `mtk_disp_dsc.c` menulis
+grup register PPS itu hanya kalau pointer-nya tidak NULL:
+
+```c
+if (dsc_param_load_mode == 1) { ... tabel tpc_* bawaan ... }
+else {
+        rc_buf_thresh = dsc_params->ext_pps_cfg.rc_buf_thresh;
+        range_min_qp  = dsc_params->ext_pps_cfg.range_min_qp;
+        ...
+}
+if (rc_buf_thresh) { ... }   /* per grup */
+```
+
+Jadi DDP mengirim tabel kuantiser 10bpc padahal panel mendekode 8bpc →
+gambar rusak.
+
+### Perbaikan (kernel `f9a9ae52f076`)
+
+`range_min_qp`, `range_max_qp`, `range_bpg_ofs` di ketiga blok parameter
+(144/120/60Hz) di-set `NULL`, `rc_buf_thresh` tetap. Hasilnya
+`ext_pps_cfg` identik dengan modul vendor.
+
+Image: `twrp-vendor_boot-panelA-pps.img`
+(md5 `e675830b69e5394e2c8d96a4559e2d57`).
