@@ -56,6 +56,19 @@ ada. Yang layak di-port ulang hanya dua modul standalone:
 `tran-proc-bootdevice-mod` (`/proc/bootdevice`, pakai API `ufshcd_query_*`
 GKI) dan `tran_rhi` (`/proc/health_info`, procfs health).
 
+Audit stack kamera: `PRETEST.md` §26. Ringkas: display/USB/charging
+kodenya identik dengan stock (221 modul dibandingkan per section+simbol+
+relokasi = 0 beda), sedangkan **kamera adalah satu-satunya stack yang
+source-nya tidak lengkap**. Driver sensor X6871 (`s5khm6sx`, `gc32e1`,
+`gc02m3`, `gc02m3macro`) tidak ada di tree 6.12 kita; 3 di antaranya ada
+di donor 6.1 (`mtkcam/imgsensor/src-v4l2/common/`) sehingga bisa di-port,
+`gc02m3` harus diturunkan dari versi macro. `camera_eeprom_v4l2` (46
+fungsi kalibrasi OTP per sensor) dan patch Ext-ISP di `mtk-cam-isp` tidak
+dipublikasikan - eeprom perlu RE atau diterima tanpa kalibrasi, Ext-ISP
+aman dilewati (tidak ada node DT maupun konsumen). Patch `flashlight`
+(sub/tele torch, thermal) bisa di-port dari donor 6.1. Alat pembanding:
+`tools/stock-vs-src.py` (§26).
+
 Repo bersih, semua ter-push: `alps`, branch `w1vo36-6.12-port`,
 HEAD `93b7ebca0841`. Manifest `main` mengikuti commit HANDOFF/PLAN/PRETEST
 terakhir.

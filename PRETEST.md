@@ -1307,3 +1307,244 @@ Bukti: stock `.ko` di
 `/serverhive1/ramabondanp/tmp/twrp-set2/lib/modules/6.12.38-android16-5-g2c4fd33ae6d8-4k/`,
 `/serverhive1/ramabondanp/dmesg3.txt`, dan config kernel stock
 `/serverhive1/ramabondanp/tmp/bootRE_ikconfig`.
+
+## 26. Audit stack kamera: driver sensor tidak ada di source mana pun
+
+Ringkas: **kamera satu-satunya stack yang source-nya benar-benar tidak
+lengkap.** Beda dengan storage (§25, fork dorman) atau charging
+(bloat modul tapi kode identik), di kamera kita tidak punya driver
+sensor X6871 sama sekali. Tanpa port, kamera **mati total**, bukan
+sekadar kehilangan fitur.
+
+### Metode
+
+Perbandingan lapis tiga, semua modul kandidat stock (`vendor_dlkm` +
+`odm_dlkm`) vs hasil build kita:
+
+1. hash per section yang dimuat: `.text`, `.init.text`, `.exit.text`,
+   `.rodata*`, `.data`, `.bss`, `__versions`, `.modinfo`,
+   `.gnu.linkonce.this_module`;
+2. tabel simbol (nama, section, offset, size, tipe, binding);
+3. relokasi section kode + `modinfo` (`name`/`depends`/`vermagic`).
+
+Hasil untuk 221 modul yang ada di kedua sisi: **identik semua**, bukan
+hanya `.text`. Disassembly `.text`/`.init.text`/`.exit.text` juga sama
+karakter-per-karakter (beda hanya baris header path `objdump`). Contoh
+level fungsi: `mediatek_drm_v1` 3411/3411 fungsi, `mtk-mml` 893/893,
+`mtu3` 293/293, `tcpc_class` 707/707 — signature simbol (alamat+size+nama)
+sama.
+
+Artinya tree kita = revisi source yang sama dengan vendor. Kalau ada
+patch Transsion, ia **wajib** muncul sebagai delta section/simbol. Dan
+memang muncul, semuanya terkonsentrasi di kamera.
+
+Skrip pembandingnya ada di repo: `tools/stock-vs-src.py`.
+
+```sh
+./tools/stock-vs-src.py <dir-stock> <dir-src> [-v] [--vermagic]
+```
+
+### Batas metode: set vendor_boot vs set dlkm
+
+221 modul identik di atas berasal dari set **vendor_boot** stock, yang
+`vermagic`-nya persis sama dengan build kita:
+
+```text
+stock vendor_boot : 6.12.38-android16-5-g2c4fd33ae6d8-4k
+build kita        : 6.12.38-android16-5-g2c4fd33ae6d8-4k
+stock dlkm        : 6.12.38-android16-5-gcc51d883045d-4k   (beda build)
+```
+
+Jadi untuk `vendor_dlkm`/`odm_dlkm`, perbandingan byte **tidak**
+apple-to-apple:
+
+```text
+vendor_dlkm : 208 modul ada di kedua sisi -> 97 identik, 93 beda
+odm_dlkm    :  55 modul ada di kedua sisi ->  3 identik, 52 beda
+```
+
+Sebagian besar perbedaan itu artefak build (vermagic/localversion,
+`__versions` CRC, `depends` hasil konfigurasi), bukan patch vendor. Karena
+itu penilaian delta kamera di bawah memakai **nama fungsi, ekspor, dan
+string sensor**, ditambah disassembly titik tertentu — bukan hash
+`.text`. Untuk modul dlkm, hash `.text` hanya dipakai kalau hasilnya
+"sama" (bukti kuat), bukan sebaliknya.
+
+### Modul kamera yang identik (aman)
+
+```text
+camera_af_media            clk-mt6895-cam
+clk-mt6895-ccu             imgsensor-glue
+mtk-cam-plat-mt6895        mtk-cam-plat-util
+mtk_hcp_isp71              mtk_imgsys_isp71
+mtk_imgsys_v4l2            mtk-vmm-isp71-regulator
+```
+
+`camera_dpe_isp70` dan `mtk_imgsys_cmdq_isp71` juga identik di
+`.text`/`.rodata`/`.data`; yang beda hanya `__versions` (CRC simbol kernel
+karena stock dlkm dibangun di build kernel lain).
+
+### Modul kamera yang BEDA
+
+| Modul | Delta terukur |
+|---|---|
+| `imgsensor` | stock 12 sensor vs kita 26 sensor; **0 sensor X6871 di sisi kita** |
+| `camera_eeprom_v4l2` | +46 fungsi kalibrasi per-sensor Transsion; 119 fungsi sama, 9 beda ukuran |
+| `mtk-cam-isp` | 750 vs 721 fungsi; 32 fungsi stock-only, 3 source-only; 961 fungsi sama, **158 beda ukuran** |
+| `flashlight` | 60 vs 54 fungsi; 11 stock-only, 5 source-only; 49 sama, 15 beda ukuran |
+| `aw36515_v4l2` | 30 vs 26 fungsi (prefix `_v4l2_`), +`get_hw_fault` |
+| `ocp81375_v4l2` | 31 vs 27 fungsi (prefix `_v4l2_`) |
+| `sgm37864_v4l2` | 31 vs 25 fungsi (prefix `_v4l2_`), +`get_hw_fault`, +`resume`/`suspend` |
+| `mtk_ccuv` | 47 fungsi, hanya `mtk_ccu_probe` beda 16 byte (kita **lebih baru**: ada `mtk_ccu_deallocate_mem` di probe) |
+| `aw8601af` | 7 fungsi sama nama; `open`/`close`/`probe`/`remove` beda ukuran 8–84 byte (implementasi kita sendiri, bukan port donor) |
+
+### Blocker utama: driver sensor
+
+DT X6871 (`frag0.dts` fragment@58–61):
+
+```text
+sensor0@10  s5khm6sx_mipi_raw      + camera_eeprom0@50 + camera_af_main aw8601af
+sensor1@4A  gc32e1_mipi_raw        + camera_eeprom1@51
+sensor2@10  gc02m3_mipi_raw
+sensor3@10  gc02m3macro_mipi_raw
+```
+
+Keempatnya tidak ada di tree kita:
+
+```text
+$ grep -r s5khm6sx w1vo/kernel_device_modules-6.12   -> 0 hasil
+$ ls w1vo/vendor/mediatek/kernel_modules/mtkcam/imgsensor/src-v4l2/common
+  gc13a2 imx214 imx258 imx334 imx334sub imx481 imx499 imx519 imx576
+  imx586 imx598lite imx598 imx709 imx758lite imx758 imx766dual imx766
+  imx866 imx966 imx989lite imx989 ov48b ov64b s5k3m5sx s5k3p9sp s5khp3sp
+```
+
+Framework yang dipakai stock **memang `src-v4l2`** dari
+`vendor/mediatek/kernel_modules/mtkcam/imgsensor` (bukti: `imgsensor-glue`
+berisi path `.../imgsensor/src-v4l2/imgsensor-glue/imgsensor-glue.c`, dan
+`imgsensor.ko` `depends=aee_aed,mtk_ccuv,imgsensor-glue` di kedua sisi).
+Jadi target port jelas: `src-v4l2/common/`.
+
+### Yang tersedia di donor 6.1 (port realistis, bukan RE)
+
+Lokasi sama persis dengan tree 6.12 kita:
+
+```text
+/serverhive1/ramabondanp/tmp/mt6897/vendor/mediatek/kernel_modules/mtkcam/
+  imgsensor/src-v4l2/common/s5khm6sx_mipi_raw/
+  imgsensor/src-v4l2/common/gc32e1_mipi_raw/
+  imgsensor/src-v4l2/common/gc02m3macro_mipi_raw/
+```
+
+(ada juga di `/serverhive1/ramabondanp/tmp/ts61-full/...`)
+
+| Sensor | Isi donor | Ukuran |
+|---|---|---|
+| `s5khm6sx_mipi_raw` | `*mipiraw_Sensor.c/.h`, `s5khm6sx_Sensor_setting.h`, `s5khm6sx_ana_gain_table.h`, `Makefile` | 27.965 baris (25.328 baris tabel setting) |
+| `gc32e1_mipi_raw` | set sama | 5.766 baris |
+| `gc02m3macro_mipi_raw` | set sama | 2.430 baris |
+| `gc02m3_mipi_raw` | **tidak ada** — harus diturunkan dari versi macro (chip GC02M3 sama) | — |
+
+Tabel register lengkap ada di donor, jadi **tidak perlu bongkar `.rodata`
+stock**. Driver memakai API standar `subdrv_*` yang sudah ada di header
+6.12 kita (`subdrv_i2c_wr_regs` di 11 file, `subdrv_i2c_rd_u8` di 25
+file). Diff header adaptor 6.1 → 6.12 kecil:
+
+```text
+adaptor-ctrls.h  identik
+adaptor.h        5 baris beda
+adaptor-def.h    8 baris beda
+adaptor-subdrv.h 20 baris beda
+```
+
+Catatan: donor 6.1 punya folder `src-v4l2/camera_project/tran_*` berisi
+override per-proyek (mis. `tran_x6873/s5khm6sx_mipi_raw`). Tree 6.12 kita
+`camera_project` kosong. Kalau ada nilai tuning proyek X6871, ia tidak
+dipublikasikan; mulai dari driver `common` dulu.
+
+### Yang harus RE atau diterima hilang
+
+1. **`camera_eeprom_v4l2` — kalibrasi OTP per sensor.** Fungsi stock yang
+   tidak ada di sisi kita:
+
+   ```text
+   do_2a_gain_{gc32e1,s5khm6sx,hi5022q,imx890,s5kjn1sub,s5kjn1teleaiisp,...}
+   do_pdaf_*          do_single_lsc_*        do_preisp_lsc_*
+   do_OISread_OTPdata_{hm6sx,imx890,s5kjn1teleaiisp}
+   do_readMultiCam_data / imx890_do_readMultiCam_data / s5khm6sx_do_readMultiCam_data
+   iWriteData_CAM_CAL / write_data / write_data_region / checkSumPreIspLSC
+   get_cal_OIS_data / get_cal_preisp_data
+   ```
+
+   Source modul ini = `mtkcam/cam_cal/src_v4l2/common/v2/eeprom_driver.c`
+   + `custom/cam_cal_config.c`. Di tree 6.12 kita, `cam_cal` custom hanya
+   punya layout 30 sensor lama (imx586, imx766, s5k3p9sp, s5kjn1, …);
+   donor 6.1 pun tidak punya `s5khm6sx`/`gc32e1`/`gc02m3`. Jadi format OTP
+   Transsion untuk sensor X6871 **tidak dipublikasikan** — harus RE
+   46 fungsi (ada fixed-point) atau terima kamera tanpa kalibrasi.
+
+2. **`mtk-cam-isp` Ext-ISP/fake-sensor.** Delta terbukti murni cabang
+   extisp:
+
+   ```text
+   stock  mtk_cam_ctx_stream_on -> mtk_cam_is_ext_isp_ext_sensor_signal,
+                                   prepare_fake_sensor_vsync
+   source mtk_cam_ctx_stream_on -> (tidak ada; hanya mtk_cam_extisp_prepare_meta)
+   ```
+
+   Fungsi tambahan stock: `mtk_cam_extisp_cb_register` (diekspor),
+   `mtk_cam_extisp_all_sof_coming`, `mtk_cam_event_extisp_camsys_ready`,
+   `mtk_cam_extisp_*`, `*_device_buf_*`, `*fake_sensor_vsync*`,
+   `mtk_cam_sv_vf_reset`, `mtk_cam_raw_vf_reset`.
+
+   X6871 **tidak memakai** ini: tidak ada node DT `extisp`/`aiisp`, dan
+   tidak ada satu pun modul stock lain yang mereferensikan
+   `mtk_cam_extisp_cb_register`. Aman dilewati.
+
+3. **`flashlight` core (portable dari donor).** Stock punya sysfs
+   `sub_torch_level`, `tele_torch_level`, `sysfs_strobe`, timer thermal;
+   tree kita 6.12 hanya `g_sysfs_strobe_level[2]` + `flashlight_pt_*`.
+   Donor 6.1 `drivers/misc/mediatek/flashlight/flashlight-core.c` (2.464
+   baris) **punya** tambahan itu (`g_sysfs_strobe_level[3]`,
+   `sub_torch_level_store/show`, `tele_torch_level_store/show`,
+   `sysfs_strobe_store`), jadi tinggal port diff 6.1 → 6.12. Relevan
+   karena X6871 punya dua LED: `ocp81375_v4l2@63` (part 0) +
+   `sgm37864_v4l2@64` (part 1), keduanya `flashledno = <1>`.
+
+4. **Trio flashlight v4l2.** Tree kita
+   `drivers/misc/mediatek/flashlight/v4l2/*.c` praktis sama dengan donor
+   6.1 (diff 3 baris), tapi kalah dari stock: penamaan fungsi di stock
+   diberi infix `_v4l2_` (mis. `sgm37864_v4l2_probe` vs `sgm37864_probe`)
+   dan ada `get_hw_fault`, `thermal_timer_func`, `resume`/`suspend`.
+   `thermal_timer_func` + `get_hw_fault` tidak ada di donor → RE kecil
+   (puluhan byte per fungsi). `resume`/`suspend` kemungkinan hanya
+   perbedaan config PM saat build, perlu dicek saat port.
+
+5. **`aw8601af` (VCM AF cam0) — sudah ditulis sendiri.** Nama fungsi sama
+   (7 fungsi), tapi `open`/`close`/`probe`/`remove` beda 8–84 byte dari
+   stock; sequencing power/clock kita berbeda. Perlu diuji AF-nya saat
+   boot system pertama.
+
+### Dampak kalau tidak dikerjakan
+
+- `imgsensor` tanpa 4 driver itu → tidak bisa probe sensor → HAL tidak
+  dapat `/dev/video*` → **kamera mati total** di system.
+- Eeprom tanpa kalibrasi → kamera hidup tapi tanpa LSC/PDAF/OIS/AWB
+  calibration (shading, tint, AF kurang presisi).
+- TWRP **tidak terpengaruh** (kamera tidak dipakai di recovery).
+
+### Rencana port (urutan yang disarankan)
+
+1. Copy 3 direktori sensor donor 6.1 → `src-v4l2/common/`, adaptasi
+   header adaptor, daftarkan di Kconfig/Makefile/BUILD.bazel, build
+   `imgsensor.ko`, verifikasi `SENSOR_DRVNAME_*` muncul.
+2. Turunkan `gc02m3_mipi_raw` dari `gc02m3macro`, verifikasi tabel
+   register terhadap stock `imgsensor.ko`.
+3. Port diff `flashlight-core.c` 6.1 → 6.12 + tambahan trio v4l2.
+4. Putuskan eeprom: RE 46 fungsi, atau rilis tanpa kalibrasi dulu.
+5. Skip `mtk-cam-isp` extisp dan `mtk_ccuv` (kita lebih baru).
+
+Baseline pengukuran ulang: pakai `tools/stock-vs-src.py` (lihat §26
+bagian metode). Daftar fungsi per modul kamera tersimpan di
+`/serverhive1/ramabondanp/cmp-out/` (`f-<modul>-stock.txt` vs
+`f-<modul>-src.txt`).
