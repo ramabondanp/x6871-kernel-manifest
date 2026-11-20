@@ -1804,3 +1804,101 @@ vendor (`panel_hbm_set_cmdq_switch`, `dimming_modify_setting`,
 vs kita 1757). Kandidat jangka panjang: port driver
 `rm69220_fhdp_dsi_vdo_dsc_csot_csot_144hz_x6871.c` milik vendor (source
 tidak dipublikasikan) atau samakan perilakunya dari hasil RE.
+
+## 30. dmesg6: vibrator beres, layar tetap gelap — akarnya beda revisi modul
+
+Vibrator sudah normal (`haptic_hv` probe jalan, `vibrator_single` ada).
+Layar masih gelap. Analisis `dmesg6.txt` vs `normal.txt` (boot sehat)
+membongkar satu hal besar yang sebelumnya salah diasumsikan.
+
+### Koreksi penting: `tmp/twrp-set2` bukan modul stock ponsel ini
+
+Verifikasi lama ("221/221 identik dengan stock") membandingkan build kita
+dengan `tmp/twrp-set2`. Set itu **bukan** isi `vendor_boot.img` ponsel,
+melainkan build dari revisi yang sama dengan tree kita:
+
+```text
+tmp/x6871/vr/root/lib/modules/mediatek_drm_v1.ko   (vendor_boot asli)
+    vermagic 6.12.38-android16-5-gcc51d883045d-4k
+    esd_check_switch dicetak di baris :1064
+tmp/twrp-set2/.../mediatek_drm_v1.ko               (build revisi kita)
+    vermagic 6.12.38-android16-5-g2c4fd33ae6d8-4k
+    esd_check_switch dicetak di baris :784  (sama dengan build kita)
+```
+
+Perbandingan terhadap vendor_boot ASLI dengan `tools/stock-vs-src.py`:
+
+```text
+modul di kedua sisi : 217
+identik             : 80
+beda                : 137
+   contoh: aee_aed, clk-common, cmdq-platform-mt6895, cmdq_helper_inf,
+           cqhci, emi, i2c-mt65xx, xhci-mtk-hcd-v2, ufs-mediatek-mod, ...
+```
+
+Jadi tree kita = **revisi lain** dari firmware yang dipakai ponsel. Ini
+juga sebabnya driver panel berbeda:
+
+```text
+vendor_boot asli : rm69220_fhdp_dsi_vdo_dsc_csot_csot_144hz_x6871.ko
+build kita       : panel-rm69220-vdo-x6871.ko
+```
+
+`rm69220_..._x6871.c` tidak ada di tree kita, di `tmp/ts61-full`, di
+`tmp/mt6897`, maupun di branch `alps/android16` (sudah dicek). Ia berasal
+dari source Transsion yang tidak dipublikasikan (kelas yang sama dengan
+`camera_eeprom_v4l2`).
+
+### Yang terlihat di dmesg6
+
+DTB identik (`ead6a965b0aa`), bootconfig identik, jadi bukan DT.
+
+| Kejadian | dmesg6 (kita) | normal.txt (vendor_boot asli) |
+|---|---|---|
+| resume layar | lewat jalur idlemgr/low-power: `mtk_crtc_config_default_path`, `mtk_dsi_set_mmclk_by_datarate_V2` (7x) | jalur biasa `drm_panel_prepare` |
+| hook power panel | `panel_ext_lcm_power_set` **tidak ada** di modul kita (di-`__maybe_unused`, tidak didaftarkan di `ext_funcs`), 0x dipanggil | 8x dipanggil (`status=0/1 begin/end`) |
+| konfigurasi DSC | `bit_per_channel = 10` → `bpc:10`, `num_extra_mux_bits 270`, `slice_bits 302400` | `bpc:8`, `num_extra_mux_bits 246`, `slice_bits 51840` |
+| backlight | `mapped_level = 1757` | `mapped_level = 1658` |
+| saat layar mati | `mtk_output_dsi_disable, underrun force release:1` (underrun_cnt>0, v-idle aktif) | tidak pernah |
+| DSI0 buffer underrun | 6x (mulai tepat saat unblank) | 0x |
+
+Catatan: `_mtk_dsi_host_transfer` 0x di dmesg6 BUKAN bukti tidak ada DCS —
+string log itu hanya ada di binary vendor, revisi kita tidak mencetaknya.
+
+Artinya: di stack kita, saat bangun layar panel tidak melewati
+power-up/init ulang (rail `vddi/dvdd/vci` tidak disentuh karena hook-nya
+tidak terdaftar), sementara DDP tetap men-scan ke DSI yang baru
+di-start ulang → `DSI0: buffer underrun`, backlight 2047, gambar hitam.
+
+### Dua image diagnostik (bukan kandidat final)
+
+Dibuat untuk memastikan siapa yang salah: panel atau DRM core.
+
+```text
+twrp-vendor_boot-diag-panelvendor.img
+  md5 bfa4f21986abda1dfa4e8cf01080f024
+  isi: 222 modul (semua source) tetapi panel diganti
+       rm69220_fhdp_dsi_vdo_dsc_csot_csot_144hz_x6871.ko (vendor)
+
+twrp-vendor_boot-diag-drmvendor.img
+  md5 1b5dd4e5e0b12c6a275e6efb62dc20fe
+  isi: seperti di atas + mediatek_drm_v1.ko dari vendor_boot asli
+```
+
+Cara baca hasilnya:
+
+```text
+panelvendor OK      -> DRM core kita kompatibel; yang perlu diperbaiki
+                       hanya konfigurasi driver panel kita (DSC 8bpc,
+                       hook power_set, tabel backlight 1658)
+panelvendor gelap   -> bukan panel; lanjut drmvendor
+drmvendor OK        -> DRM core revisi kita yang jadi biang
+keduanya gelap      -> bukan dua modul itu; sisa stack display
+                       (cmdq/ovl/rdma/leds) juga beda revisi
+```
+
+Konsekuensi aturan "100% source": driver panel + DRM yang benar berasal
+dari revisi firmware `gcc51d883045d` yang source-nya tidak kita miliki.
+Kalau `drmvendor` yang benar, opsinya hanya (a) dapatkan source revisi
+itu, atau (b) pertahankan modul display vendor sebagai pengecualian
+terdokumentasi sampai source tersedia.
