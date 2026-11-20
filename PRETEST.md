@@ -1902,3 +1902,90 @@ dari revisi firmware `gcc51d883045d` yang source-nya tidak kita miliki.
 Kalau `drmvendor` yang benar, opsinya hanya (a) dapatkan source revisi
 itu, atau (b) pertahankan modul display vendor sebagai pengecualian
 terdokumentasi sampai source tersedia.
+
+## 31. Modul display tidak boleh dicampur antar revisi (dua image diag gagal boot)
+
+### `diag-drmvendor` -> bootloop ke bootloader
+
+Penyebabnya bukan crash, tapi modul gagal dimuat dan `init` langsung
+fatal (setiap modul yang gagal = reboot ke bootloader):
+
+```text
+mediatek_drm_v1: Unknown symbol update_tran_brightness (err -2)
+mediatek_drm_v1: Unknown symbol tranlog_local (err -2)
+mediatek_drm_v1: Unknown symbol startAegisK (err -2)
+mediatek_drm_v1: Unknown symbol set_disp_freq_by_regulator (err -2)
+init: Failed to insmod '/lib/modules/mediatek_drm_v1.ko'
+init: Failed to load kernel modules
+init: InitFatalReboot: signal 6   -> reboot reason: bootloader
+```
+
+Asal simbol (semuanya di set vendor):
+
+```text
+update_tran_brightness        <- leds-mtk.ko (versi vendor)
+tranlog_local                 <- transsion_tranlog.ko   (dibuang, tanpa source)
+startAegisK                   <- thd.ko                 (dibuang, tanpa source)
+set_disp_freq_by_regulator    <- mmqos-common.ko        (versi vendor)
+```
+
+Jadi "pakai DRM vendor" pun menyeret 2 modul Transsion tanpa source
+(`transsion_tranlog`, `thd`) plus hook Transsion di `leds-mtk` dan
+`mmqos-common`. Bukan jalan pintas.
+
+### `diag-panelvendor` -> juga bootloop: ABI `mtk_panel_funcs` beda
+
+Walaupun semua simbol panel vendor tersedia (`iris_*`, `find_panel_*`,
+`mtk_panel_*`, `cmdq_pkt_sleep` semuanya ada di set kita), ukuran
+struktur tabelnya beda:
+
+```text
+panel vendor (gcc51d88) : ext_funcs 0x258 (600 B), ext_params 0x10958
+panel kita  (g2c4fd33)  : ext_funcs 0x1e8 (488 B), ext_params 0x10368
+```
+
+`mtk_panel_ext_create()` dari core kita membaca tabel 600 byte itu dengan
+layout 488 byte -> pointer callback salah -> gagal muat/crash -> bootloop.
+Artinya **modul display tidak bisa dicampur antar revisi**, harus satu set.
+
+### Kabar baik: ada firmware revisi yang cocok dengan tree kita
+
+`vendor_boot-new.img` ternyata image revisi **sama** dengan tree kita
+(`gcc51d883045d` bukan, melainkan `g2c4fd33ae6d8`), lengkap dengan
+`modules.load` + `modules.load.recovery`. Modul panel-nya
+(`panel-rm69220-vdo-x6871.ko`, md5 `f4900300b5`, 272.368 B) punya offset
+simbol dan ukuran `ext_funcs`/`ext_params` yang sama dengan hasil build
+kita, dan sudah memuat `panel_doze_enable/disable`. Jadi driver panel kita
+= driver yang dipakai firmware revisi ini; kita punya referensi biner
+persis untuk pembanding.
+
+### Image berikutnya
+
+```text
+twrp-vendor_boot-diag-stockB.img
+  md5 d04a30ca00cd0710e1fe83b071c4a10a
+  ramdisk kita + SELURUH 218 modul stock revisi g2c4fd33 (dari
+  vendor_boot-new.img). Tanpa adaptive-ts/gt9916/haptic, jadi sentuh dan
+  vibrator tidak akan jalan; yang dinilai hanya layar + wake.
+
+twrp-vendor_boot-dbg-paneltrace.img
+  md5 c6ea6866e883c65f4d83f34c3499def6
+  set kita + trace `[LCMDBG]` di lcm_prepare/unprepare/enable/disable,
+  lcm_panel_init, panel_doze_enable/disable.
+```
+
+Bacaan hasil:
+
+```text
+stockB wake OK  -> revisi g2c4fd33 memang bisa; build source kita yang
+                   beda -> diff per modul terhadap set stockB
+stockB gelap    -> revisi g2c4fd33 tidak cocok dengan HP/kernel ini, dan
+                   satu-satunya jalan = source revisi gcc51d88
+```
+
+Temuan sampingan saat menyiapkan trace: di `lcm_probe()` driver panel
+kita menyetel `ctx->prepared = true` dan `ctx->enabled = true`, sehingga
+`drm_panel_prepare()`/`enable()` jadi no-op selama flag itu tidak
+di-reset. Layar hanya hidup karena bootloader sudah menginisialisasi
+panel; setelah blank yang melewati `unprepare` (jalur doze), tidak ada
+yang mengirim ulang init sequence.
