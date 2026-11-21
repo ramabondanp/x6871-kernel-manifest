@@ -323,8 +323,14 @@ twrp-dlkm-source-20261120.zip  (release dlkm-20261120)
 - Fix SCP: `SCP_IPI_COUNT` 56 -> 59.
 - Fix GPU: Mali donor OPPO r54p1-11eac0 + gpufreq/ged/gpueb donor;
   shared-status layout stock (padding sebelum `power_count`: `power_count`
-  0x24..`active_count` 0x34, `temperature` 0x38, `shader_present` 0xe0):
-  `vendor_dlkm.img` md5 `d68e9a2b95c56e3e0cac17143b1dd412`,
-  zip `twrp-dlkm-gpu3-20261121.zip` (release `dlkm-gpu3-20261121`).
+  0x24..`active_count` 0x34, `temperature` 0x38, `shader_present` 0xe0).
+- Fix dmesg4 (spam OC 65 Hz + mode switch panel 120/60 Hz):
+  `rfg-mtk-tran-conf-diff` di `mtk_battery_oc_throttling` (`vendor_dlkm`)
+  dan `mt6375-battery` (`odm_dlkm` + `vendor_boot`), plus timing & VFP cmd
+  switch stock di `panel-rm69220-vdo-x6871` (`vendor_boot`):
+  `twrp-vendor_boot-allsrc-display-usb-v2.img` md5 `e3a1fbe803361749d7fd28f1049d1ffa`,
+  `vendor_dlkm.img` md5 `ec627a474d09bb3303408e52211b6437`,
+  `odm_dlkm.img` md5 `c2c312b3374ebdb0e835db396663e924`,
+  zip `twrp-dlkm-ocfix-20261121.zip` (release `dlkm-ocfix-20261121`).
 - Fitur dari 25 modul stock tanpa source (`transsion_tranlog`,
   `thd`, dll) tidak akan ada.

@@ -16,8 +16,8 @@ Ditulis 2026-11-19, diperbarui 2026-11-21 untuk sesi AI berikutnya. Baca ini dul
 | DLKM (`vendor_dlkm` + `odm_dlkm`) | **269**, 100% source, image siap |
 | Build target | `//kernel_device_modules-6.12:mgk_64_k612_customer_modules_install.user` |
 | Build terakhir | sukses (inkremental), 2026-11-21 |
-| Kernel HEAD | `07eb1dab07c2` (`w1vo36-6.12-port`) |
-| Runtime | **TWRP 100% modul source**, layar + USB replug terverifikasi |
+| Kernel HEAD | `e6d0ab2fb66a` (`w1vo36-6.12-port`) |
+| Runtime | **Android boot sampai launcher + Wi-Fi + GPU** (`dmesg4`); fix spam OC + mode switch panel siap uji |
 
 ## Status per 2026-11-20 (TWRP final)
 
@@ -88,12 +88,27 @@ dibaca dari biner stock (`mov w3,#0x3b`). Fix kernel `5ba6fb6559ab`,
 hanya `vendor_dlkm` yang di-repack. Detail: `PRETEST.md` §46.
 
 ```text
-vendor_dlkm.img  md5 d68e9a2b95c56e3e0cac17143b1dd412  24.551.424 B
-odm_dlkm.img     md5 0ffbb42985d445f7c12808df3b50960e   4.206.592 B  (tidak berubah)
-twrp-dlkm-gpu3-20261121.zip   md5 28b43f8b8c169289a1d4451a7d43ac14
-release          dlkm-gpu3-20261121
-/srv path         /serverhive1/ramabondanp/tmp/dlkm-out/
+twrp-vendor_boot-allsrc-display-usb-v2.img  md5 e3a1fbe803361749d7fd28f1049d1ffa  67.108.864 B
+vendor_dlkm.img                             md5 ec627a474d09bb3303408e52211b6437  24.551.424 B
+odm_dlkm.img                                md5 c2c312b3374ebdb0e835db396663e924   4.206.592 B
+twrp-dlkm-ocfix-20261121.zip                md5 6fce24575faacd85164de86fc775495a
+release                                     dlkm-ocfix-20261121
+/srv path                                   /serverhive1/ramabondanp/tmp/dlkm-out/ (+ tmp/x6871/)
 ```
+
+**dmesg4**: Android boot sampai launcher, Mali r54p1-11eac0, Wi-Fi, touch,
+haptic, dan charger berjalan. Dua bug teridentifikasi:
+1. Spam log 65 Hz (`battery_oc_level=1 <-> 0`, `md_pt_over_current_cb`,
+   `ocp81375_*` menimpa awal dmesg): `r-fg-value = 50` di DT dikalikan 10
+   menjadi 500 karena tidak membaca `rfg-mtk-tran-conf-diff = 15`. Fix di
+   `mtk_battery_oc_throttling.c` (`8d38cd08a65c`, `vendor_dlkm`) dan
+   `mtk_battery.c` (`0f7ce1ce8f7e`, `odm_dlkm` + `vendor_boot`).
+2. Layar setengah kanan pink: di Android SurfaceFlinger berganti 120/60 Hz
+   (TWRP tetap 144 Hz), mengenai timing 120/60 Hz yang salah (`HFP=24/VFP=40`,
+   `mmclk=88`), `cmd_null_pkt_len=400/700`, dan `0x2F` 144↔120 terbalik
+   tanpa `{0xFE, 0x00}`. Fix panel ke 4 mode stock (`144/120/60/40 Hz`
+   byte-identik) + `change_fps_by_vfp_send_cmd=1` + `dfps_cmd_table`:
+   `e6d0ab2fb66a` (`vendor_boot`). Detail: `PRETEST.md` §49.
 
 **dmesg3**: Mali sudah r54p1-11eac0 tetapi tetap BUG; RE getter
 wrapper menunjukkan struct `gpufreq_shared_status` stock 8 byte lebih
@@ -113,11 +128,14 @@ punya versi yang sama. Seluruh `drivers/gpu/mediatek` dan
 `5462a6d118a6`. Detail: `PRETEST.md` §47.
 
 Image memakai EROFS persis opsi stock + AVB hashtree footer; ukurannya
-sama dengan partisi stock. Zip TWRP hanya menulis `vendor_dlkm`; `odm_dlkm`
-tetap dari release `dlkm-20261120`. Detail: `PRETEST.md` §45/§46.
+sama dengan partisi stock. Zip `twrp-dlkm-ocfix-20261121.zip` menulis
+`vendor_dlkm` + `odm_dlkm`; flash bersama
+`twrp-vendor_boot-allsrc-display-usb-v2.img` untuk panel fix. Detail:
+`PRETEST.md` §45–§49.
 
-**Belum**: boot system belum diuji — langkah berikutnya flash
-`twrp-dlkm-gpu3-20261121.zip` lalu ambil dmesg/pstore. Fitur dari 25 modul stock tanpa source (tranlog,
+**Langkah berikutnya**: flash `twrp-vendor_boot-allsrc-display-usb-v2.img`
++ `twrp-dlkm-ocfix-20261121.zip` lalu ambil `dmesg` penuh dari `t=0 s` dan
+cek apakah separuh kanan pink hilang. Fitur dari 25 modul stock tanpa source (tranlog,
 thd, varian touch alternatif, dll) hilang; driver sensor kamera X6871
 juga belum ada di source.
 
@@ -144,7 +162,7 @@ sufiks `_v4l2` seperti DT; sudah diperbaiki di `flashlight/v4l2/*.c` dan
 diverifikasi lewat build.
 
 Repo kernel bersih dan ter-push: `alps`, branch `w1vo36-6.12-port`, HEAD
-`07eb1dab07c2`. Manifest `main` mengikuti commit dokumentasi terakhir.
+`e6d0ab2fb66a`. Manifest `main` mengikuti commit dokumentasi terakhir.
 
 ## Objective
 
@@ -367,10 +385,11 @@ impor tak terselesaikan, 0 CRC tak terpenuhi, 0 export ambigu**. Detail di
   balik ke region.
 
 ### Berikutnya paling siap
-- **System boot**: image dlkm terbaru sudah siap (`dlkm-gpu3-20261121`,
-  `vendor_dlkm` saja; `odm_dlkm` tetap dari `dlkm-20261120`). Flash
-  `twrp-dlkm-gpu3-20261121.zip` lewat TWRP lalu uji boot system dan
-  ambil dmesg/pstore. Detail di `PRETEST.md` §45–§48.1 dan bagian dlkm di atas.
+- **System boot (uji ulang dmesg5)**: flash
+  `twrp-vendor_boot-allsrc-display-usb-v2.img` +
+  `twrp-dlkm-ocfix-20261121.zip` (release `dlkm-ocfix-20261121`), lalu ambil
+  dmesg dari `t=0 s` dan cek status separuh kanan layar. Detail di
+  `PRETEST.md` §45–§49.
 - `tkv_recovery` — sibling `tkv`, 20 KB, 11 ekspor / 24 impor; kandidat
   berikutnya yang paling kecil.
 - `tran_rhi` — health info storage (ECC/erase/suhu), 47 KB, tanpa source.

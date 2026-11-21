@@ -62,7 +62,7 @@ Branch ini dibuat baru (bukan di atas `android16`) supaya riwayat `android16`
 tidak tersentuh. `android16` (`30a0466a`) memang ancestor dari baseline
 w1vo36.88-36-7 (`06079c2`), jadi branch ini juga fast-forward-able ke sana.
 
-Branch berisi **62 commit** di atas `06079c2`, satu commit per fitur.
+Branch berisi **65 commit** di atas `06079c2`, satu commit per fitur.
 Ringkasan commit awal dan commit final yang penting:
 
 | commit | isi |
@@ -95,10 +95,14 @@ cabut-colok USB berulang (setiap colok kembali `online=1, type=1` SDP,
 Percobaan boot system berhenti berurutan di SCP, Mali, lalu
 shared-status gpufreq: `SCP_IPI_COUNT` 59 (`5ba6fb6559ab`), GPU donor
 OPPO r54p1-11eac0 (`5462a6d118a6`), dan padding gpufreq sebelum
-`power_count` (`07eb1dab07c2`). Artefak terbaru
-`twrp-dlkm-gpu3-20261121.zip` (`vendor_dlkm` saja; `PRETEST.md`
-§46-§48.1). Berikutnya: uji system boot dengan zip itu, lalu port
-driver kamera. Detail: `HANDOFF.md`, `PRETEST.md` §40-§48.1.
+`power_count` (`07eb1dab07c2`), hingga akhirnya **boot sampai launcher +
+Wi-Fi + Mali GPU** (`dmesg4`). Fix berikutnya menutup spam IRQ battery OC
+65 Hz (`8d38cd08a65c`), skala gauge `r-fg-value` (`0f7ce1ce8f7e`), dan
+timing/VFP mode switch 144/120/60/40 Hz panel (`e6d0ab2fb66a`). Artefak
+terbaru release `dlkm-ocfix-20261121` (`twrp-vendor_boot-allsrc-display-usb-v2.img`
++ `twrp-dlkm-ocfix-20261121.zip`; `PRETEST.md` §46-§49). Berikutnya: uji
+ulang system boot + ambil dmesg dari `t=0 s`, lalu port driver kamera.
+Detail: `HANDOFF.md`, `PRETEST.md` §40-§49.
 
 Catatan: hasil port di-push ke branch `w1vo36-6.12-port` di remote `alps`
 (bukan ke `mtk-base-latest`, yang sedang checked-out di working tree lokal).

@@ -3142,3 +3142,81 @@ release                       dlkm-gpu3-20261121
 
 Zip TWRP hanya menulis `vendor_dlkm`. Boot system setelah fix ini belum
 diuji.
+
+## 49. dmesg4: Android boot sampai launcher + Wi-Fi; spam battery OC & mode switch panel
+
+Dengan `dlkm-gpu3-20261121`, **Android berhasil boot penuh** (userspace,
+Mali r54p1-11eac0, Wi-Fi, touch, haptic, charger hidup melewati `t=109 s`).
+Dua masalah ditemukan dari `dmesg4.txt` dan pengamatan layar:
+
+### 49.1 Spam log 65 Hz (`mtk_battery_oc_throttling` + `mt6375-battery`)
+
+21.696 dari 26.223 baris (~83%) dalam 37 detik adalah osilasi IRQ
+over-current baterai (`battery_oc_level=1 <-> 0`, `md_pt_over_current_cb`,
+dan `ocp81375_*` PT disable) yang menimpa awal ring buffer (`dmesg4.txt`
+baru mulai di `t=72,66 s`).
+
+Akar masalah (DT `merged.dts` + RE biner stock):
+- DT X6871 mengisi `r-fg-value = <50>` (sudah ×10 = 5,0 mΩ) dan properti
+  Transsion `rfg-mtk-tran-conf-diff = <15>`.
+- Stock `mtk_battery_oc_throttling.ko` (`battery_oc_parse_dt`) dan
+  `mt6375-battery.ko` (`fg_custom_init_from_dts`) sama-sama membaca
+  `rfg-mtk-tran-conf-diff` (default 15) dan hanya mengalikan
+  `r_fg_value *= 10` bila `r_fg_value < r_fg_diff`.
+- Driver kita mengalikan tanpa syarat (`50 * 10 = 500`), sehingga
+  `to_fg_code()` overflow 16-bit dan memprogram threshold OC yang salah
+  (IRQ ping-pong 65 Hz), sementara gauge melaporkan arus 10× terlalu kecil
+  (`I=-69`).
+
+Perbaikan:
+- Kernel `8d38cd08a65c`: hormati `rfg-mtk-tran-conf-diff` di
+  `mtk_battery_oc_throttling.c` (`battery_oc_parse_dt` 305 == 305 instruksi
+  dengan stock).
+- Kernel `0f7ce1ce8f7e`: hormati `rfg-mtk-tran-conf-diff` di
+  `mtk_battery.c` (`mt6375-battery.ko`).
+
+### 49.2 Layar setengah kanan pink: bug timing & mode switch 120/60 Hz panel
+
+TWRP selalu bertahan di mode 0 (144 Hz), sedangkan Android SurfaceFlinger
+berpindah-pindah antara mode 1 (120 Hz) dan mode 2 (60 Hz). Perbandingan
+`panel-rm69220-vdo-x6871.ko` kita dengan stock
+`rm69220_fhdp_dsi_vdo_dsc_csot_csot_144hz_x6871.ko`:
+
+- Mode 120 Hz kita memakai `clk=336660, HFP=24, VFP=40` (stock:
+  `clk=368928, HFP=120, VFP=64`).
+- Mode 60 Hz kita memakai `clk=168330, HFP=24, VFP=40` sehingga `mmclk`
+  turun ke 88 MHz (< `pixclk_min=193`; stock: `clk=368928, HFP=120,
+  VFP=2584`). Mode 40 Hz (`clk=368732, HFP=120, VFP=5100`) belum ada.
+- `change_fps_by_vfp_send_cmd` sebelumnya 0 (stock: 1); `mode_switch` kita
+  mengirim `0x2F 0x05` untuk 144 Hz dan `0x2F 0x00` untuk 120 Hz
+  (**terbalik** dari stock) tanpa page select `{0xFE, 0x00}`, dan
+  `cmd_null_pkt_len` diset 400/700 (sisa panel CMD; stock: 0 di semua mode).
+
+Perbaikan (kernel `e6d0ab2fb66a`):
+- Pasang 4 `drm_display_mode` persis stock (`144/120/60/40 Hz`, diverifikasi
+  **byte-identik** dengan `.rodata` stock).
+- Aktifkan `change_fps_by_vfp_send_cmd = 1` + `dyn_fps.dfps_cmd_table`
+  (`{0xFE, 0x00}` lalu `{0x2F, 0x00 / 0x05 / 0x06}`), `cmd_null_pkt_len = 0`,
+  tabel QP 8bpc persis stock, dan hapus callback `mode_switch`/`ext_param_get`
+  non-stock.
+
+Catatan: bila setelah fix ini separuh kanan layar masih pink, `dmesg` dari
+`t=0 s` (yang sekarang bebas spam OC) akan dipakai untuk memeriksa jalur
+dual-pipe PQ (`disp_c3d`/`disp_ccorr`/`disp_gamma` di `mediatek_drm_v1.ko`).
+
+### Artefak (ketiga partisi terdampak modul yang diubah)
+
+- `vendor_dlkm`: `mtk_battery_oc_throttling.ko`
+- `odm_dlkm`: `mt6375-battery.ko` (boot normal Android memuatnya dari
+  `odm_dlkm`, bukan `vendor_boot`)
+- `vendor_boot`: `panel-rm69220-vdo-x6871.ko` + `mt6375-battery.ko`
+
+```text
+twrp-vendor_boot-allsrc-display-usb-v2.img  md5 e3a1fbe803361749d7fd28f1049d1ffa  67.108.864 B
+vendor_dlkm.img                             md5 ec627a474d09bb3303408e52211b6437  24.551.424 B
+odm_dlkm.img                                md5 c2c312b3374ebdb0e835db396663e924   4.206.592 B
+twrp-dlkm-ocfix-20261121.zip                md5 6fce24575faacd85164de86fc775495a
+release                                     dlkm-ocfix-20261121
+```
+
+Boot setelah fix ini belum diuji.
