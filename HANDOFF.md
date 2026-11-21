@@ -209,11 +209,19 @@ sama dengan partisi stock. Zip `twrp-dlkm-ocfix-20261121.zip` menulis
 `twrp-vendor_boot-allsrc-display-usb-v2.img` untuk panel fix. Detail:
 `PRETEST.md` §45–§49.
 
-**Langkah berikutnya**: flash `twrp-vendor_boot-allsrc-display-usb-v2.img`
-+ `twrp-dlkm-ocfix-20261121.zip` lalu ambil `dmesg` penuh dari `t=0 s` dan
-cek apakah separuh kanan pink hilang. Fitur dari 25 modul stock tanpa source (tranlog,
-thd, varian touch alternatif, dll) hilang; driver sensor kamera X6871
-juga belum ada di source.
+**Langkah berikutnya**: flash `twrp-vendor_boot-allsrc-display-usb-v7.img`
++ `twrp-dlkm-qpabi-fpgest-20261121.zip`, lalu uji:
+1. rekam video 1080p dan putar ulang; kalau masih hitam, ambil dmesg dan cari
+   `first frame:`, `bitstream buffer has no DMA address`, atau
+   `mtk_venc_translation_fault_callback`;
+2. double-tap saat layar mati; dmesg harus memuat `gesture irq: suspended=...`
+   dan `got valid gesture type 0xcc`, lalu key 198;
+3. FOD saat layar mati; sysfs `/sys/kernel/tran_fp/vendor_name` harus
+   `goodix_opt_tee` dan log probe/`TRAN_IOC_INIT` terlihat.
+Ambil dmesg segera setelah boot (ring buffer penuh oleh spam kamera/vcodec
+sehingga `dmesg1` baru mulai t=83 s). Fitur dari 25 modul stock tanpa source
+(tranlog, thd, varian touch alternatif, dll) hilang; driver sensor kamera X6871
+sudah ada di source.
 
 ### Kamera
 
