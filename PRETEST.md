@@ -3640,3 +3640,44 @@ release                                     touchfix-20261121
 ```
 
 Kernel `a453c308cc33`. `vendor_dlkm` tidak berubah dari `qpabi-fpgest-20261121`.
+
+## 58. `dmesg3`: wake sebelum baca gestur, SLBC gagal registrasi, diagnosa VENC
+
+Status uji user: touch normal, video tetap gagal, FOD/DT2W tetap rusak.
+
+1. **Touch normal** sudah terbukti (`goodix_ts_report_finger` banyak, tidak ada
+   storm 0xcc). Gate `suspended` benar.
+2. **DT2W**: dmesg3 hanya punya 2 IRQ gestur, keduanya
+   `brl_event_handler: touch_head 00 24 07 38 c6 08 64 1f` (checksum error),
+   lalu layar resume. Penyebab: `pm_wakeup_event()` dipindah ke **setelah** loop
+   modul, sehingga pembacaan gestur terjadi saat bus SPI masih suspend. Stock
+   memanggil `pm_wakeup_dev_event()` di **awal** `goodix_ts_threadirq_func`,
+   sebelum loop. Fix `a92c1df2d2`: wake di awal, satu `event_handler()` seperti
+   stock, dan `after_event_handler()` juga pada path error/invalid (stock
+   membersihkan event di semua path).
+3. **SLBC**: dmesg3 menunjukkan `register cb slbc_register_activate_ops fail`
+   tetapi driver tetap `slbc_request()` dan memberi `slbc_addr=0xf000000` ke
+   VENC. Fix `587ecdcd3c`: kalau registrasi gagal, `use_slbc=0` dan SLBC tidak
+   dipakai. Ini juga penyebab `slbc 1` di log start-streaming.
+4. **VENC**: fault pertama tetap `mva=0x0` sebelum watchdog. Log baru
+   `VSI venc: input0/input1/bs_addr/bs_dma/cfg/slbc` (`90d09de3a7`) akan
+   menunjukkan apakah firmware menerima alamat yang sama dengan AP. Register
+   0x8C/0x90/0x1170 berisi work buffer valid; 0x64/0x6C/0x70 berisi alamat
+   sumber/bitstream. Jika `input1=0` dan `planes=1`, kandidat berikutnya adalah
+   penanganan NV12 satu-plane.
+5. **FOD**: `tran_fp` INFO diaktifkan (`6566cb27da`) supaya boot berikutnya
+   mencatat `TRAN_IOC_INIT`, power, IRQ, chip-id, dan netlink. dmesg2 hanya
+   menunjukkan `TRAN_FP_READ_FP_ID` + `tran_netlink_send invalid PID` (HAL belum
+   mengirim pesan netlink), bukan kegagalan deteksi chip.
+
+### Artefak (`video-touch-20261121`)
+
+```text
+twrp-vendor_boot-allsrc-display-usb-v9.img  md5 e6c1d4300ec7237de942444c02574890  67.108.864 B
+vendor_dlkm.img                             md5 af17ac6c8a9ab7769832264309919d06  24.551.424 B
+odm_dlkm.img                                md5 8eedcdc26ed7824fb3c1675fa1b92b09   4.206.592 B
+twrp-dlkm-video-touch-20261121.zip          md5 9de4714014cc820a068dd92b65cc7604
+release                                     video-touch-20261121
+```
+
+Kernel `6566cb27da18`.

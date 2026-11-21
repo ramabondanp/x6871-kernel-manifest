@@ -16,8 +16,8 @@ Ditulis 2026-11-19, diperbarui 2026-11-21 untuk sesi AI berikutnya. Baca ini dul
 | DLKM (`vendor_dlkm` + `odm_dlkm`) | **269**, 100% source, image siap |
 | Build target | `//kernel_device_modules-6.12:mgk_64_k612_customer_modules_install.user` |
 | Build terakhir | sukses (inkremental), 2026-11-21 |
-| Kernel HEAD | `a453c308cc33` (`w1vo36-6.12-port`) |
-| Runtime | **Android boot + layar + audio + AOD + kamera foto + video preview + Wi-Fi + GPU OK**; rilis `touchfix-20261121` mengembalikan touch dan memperbaiki DT2W; FOD/video-save masih perlu uji; layar hijau C3D diperbaiki, flashlight belum diverifikasi ulang |
+| Kernel HEAD | `6566cb27da18` (`w1vo36-6.12-port`) |
+| Runtime | **Android boot + layar + audio + AOD + kamera foto + video preview + Wi-Fi + GPU OK**; touch normal; rilis `video-touch-20261121` memperbaiki urutan wake gestur, menonaktifkan SLBC yang gagal registrasi, dan menambah log FOD/VENC; video-save, FOD, DT2W perlu uji ulang |
 
 ## Status per 2026-11-20 (TWRP final)
 
@@ -88,13 +88,30 @@ dibaca dari biner stock (`mov w3,#0x3b`). Fix kernel `5ba6fb6559ab`,
 hanya `vendor_dlkm` yang di-repack. Detail: `PRETEST.md` §46.
 
 ```text
-twrp-vendor_boot-allsrc-display-usb-v8.img  md5 1802940b36b1504e8e08835e063043d2  67.108.864 B
-vendor_dlkm.img                             md5 4b4f0bd5fba3d6b68d0b360bf6a905f3  24.551.424 B
-odm_dlkm.img                                md5 9034d036b6bcda3a0dcc0915a35ea373   4.206.592 B
-twrp-dlkm-touchfix-20261121.zip             md5 59b0907358fc2a80135d0df15aa1417a
-release terbaru                             touchfix-20261121 (vendor_boot v8 + vendor_dlkm + odm_dlkm)
+twrp-vendor_boot-allsrc-display-usb-v9.img  md5 e6c1d4300ec7237de942444c02574890  67.108.864 B
+vendor_dlkm.img                             md5 af17ac6c8a9ab7769832264309919d06  24.551.424 B
+odm_dlkm.img                                md5 8eedcdc26ed7824fb3c1675fa1b92b09   4.206.592 B
+twrp-dlkm-video-touch-20261121.zip          md5 9de4714014cc820a068dd92b65cc7604
+release terbaru                             video-touch-20261121 (vendor_boot v9 + vendor_dlkm + odm_dlkm)
 /srv path                                   /serverhive1/ramabondanp/tmp/dlkm-out/ (+ tmp/x6871/)
 ```
+
+**dmesg3 (rilis `touchfix-20261121`, kernel `a453c308cc33`)**:
+1. **Touch normal** (116 `goodix_ts_report_finger`, tidak ada storm 0xcc).
+2. **DT2W**: 2 IRQ gestur, keduanya checksum error (`touch_head 00 24 ...`),
+   karena `pm_wakeup_event` dipindah setelah loop modul sehingga SPI masih
+   suspend saat dibaca. Fix `a92c1df2d2`: wake di awal IRQ (stock), satu
+   `event_handler`, dan clear event di path valid maupun error/invalid.
+3. **SLBC**: `slbc_register_activate_ops fail` tetapi `slbc_request` tetap
+   dipanggil. Fix `587ecdcd3c`: SLBC hanya dipakai bila registrasi sukses.
+4. **VENC**: fault `mva=0x0` masih terjadi. `90d09de3a7` menambah log
+   `VSI venc: input0/input1/bs_addr/bs_dma/...` untuk uji berikutnya.
+5. **FOD**: `6566cb27da` mengaktifkan `TRAN_FP_INFO`; belum ada bukti baru
+   selain `TRAN_FP_READ_FP_ID` + netlink `invalid PID` di dmesg2.
+6. Detail: `PRETEST.md` §58.
+
+Kernel `6566cb27da18`. Artefak sebelumnya `touchfix-20261121` (v8) tetap
+tersedia di release GitHub.
 
 **dmesg2 (rilis `qpabi-fpgest-20261121`, kernel `6b2a88973414`)**:
 1. **Touch mati**: 170 `got valid gesture type 0xcc`, 0 `goodix_ts_report_finger`.
@@ -242,16 +259,16 @@ sama dengan partisi stock. Zip `twrp-dlkm-ocfix-20261121.zip` menulis
 `twrp-vendor_boot-allsrc-display-usb-v2.img` untuk panel fix. Detail:
 `PRETEST.md` §45–§49.
 
-**Langkah berikutnya**: flash `twrp-vendor_boot-allsrc-display-usb-v8.img`
-+ `twrp-dlkm-touchfix-20261121.zip`, lalu uji:
-1. touch biasa di launcher (harus ada `goodix_ts_report_finger`, bukan hanya
-   `gsx_gesture_ist`);
-2. rekam video 1080p dan putar ulang; kalau masih hitam, ambil dmesg dan cari
-   `first frame:`, `bitstream buffer has no DMA address`, atau
-   `mtk_venc_translation_fault_callback`;
-3. double-tap saat layar mati; dmesg harus memuat `gesture irq: suspended=1`
-   dan `got valid gesture type 0xcc`, lalu key 198 tanpa storm 0xcc;
-4. FOD saat layar mati; cek `tran_netlink_send` masih `invalid PID` atau tidak.
+**Langkah berikutnya**: flash `twrp-vendor_boot-allsrc-display-usb-v9.img`
++ `twrp-dlkm-video-touch-20261121.zip`, lalu uji:
+1. rekam video 1080p dan putar ulang; dmesg harus menunjukkan `slbc 0` di
+   `vb2ops_venc_start_streaming`, lalu `VSI venc: input0=... bs_addr=...`.
+   Kalau masih `mtk_venc_translation_fault_callback`, kirim baris VSI tersebut;
+2. double-tap saat layar mati; harus ada `got valid gesture type 0xcc` dan key
+   198, bukan `touch_head ...` checksum error;
+3. FOD saat layar mati; cari `TRAN_IOC_INIT`, `TRAN_IOC_ENABLE_POWER`,
+   `TRAN_FP_READ_FP_ID`, `tran_netlink_send` di dmesg;
+4. touch biasa tetap harus menghasilkan `goodix_ts_report_finger`.
 Ambil dmesg segera setelah boot (ring buffer penuh oleh spam kamera/vcodec
 sehingga `dmesg1` baru mulai t=83 s). Fitur dari 25 modul stock tanpa source
 (tranlog, thd, varian touch alternatif, dll) hilang; driver sensor kamera X6871

@@ -116,17 +116,19 @@ dan DT2W KEY 198 (`3c5e64704b34`). Rilis `qpabi-fpgest-20261121`
 identik stock (`f75c717036ac`; `vcp_enc_set_param` instruction-identik dengan
 stock), menolak buffer encode dengan DMA address 0 sebelum VENC fault ke
 IOVA 0, dan menambah fallback `tran_fp` `goodix_opt_tee` + retry chip-id.
-Rilis terbaru `touchfix-20261121` (`vendor_boot` v8 + `odm_dlkm`,
-`a453c308cc33`) mengembalikan gate `suspended` pada `gsx_gesture_ist`,
-membersihkan event gestur dengan `after_event_handler()`, dan menunda
-`pm_wakeup_event()` sampai event dikonsumsi. Tanpa ini touch mati karena
-170 IRQ gestur 0xcc beruntun dan 0 touch report (`PRETEST.md` §57).
+Rilis `touchfix-20261121` (`vendor_boot` v8, `a453c308cc33`) mengembalikan
+gate `suspended` pada `gsx_gesture_ist` dan membersihkan event gestur. Rilis
+terbaru `video-touch-20261121` (`vendor_boot` v9 + `vendor_dlkm` + `odm_dlkm`,
+`6566cb27da`) memindahkan wake ke awal IRQ seperti stock, memakai satu
+pembacaan gestur, membersihkan event pada path valid maupun error, menolak
+SLBC saat `slbc_register_activate_ops()` gagal, menambah log alamat VSI VENC,
+dan mengaktifkan `TRAN_FP_INFO` untuk diagnosis FOD (`PRETEST.md` §58).
 Rilis sebelumnya `cam4-fod-dt2w-20261121` memperbaiki mode video
 `s5khm6sx`, `vendor_name` `goodix_opt_tee`, dan retry bangun tidur. Detail:
-`HANDOFF.md`, `PRETEST.md` §40-§57.
+`HANDOFF.md`, `PRETEST.md` §40-§58.
 
-Verifikasi device untuk `touchfix-20261121` belum dilakukan: touch, video,
-DT2W, dan FOD masih harus diuji ulang.
+Verifikasi device untuk `video-touch-20261121` belum dilakukan: video, DT2W,
+dan FOD masih harus diuji ulang dengan dmesg baru.
 
 Catatan: hasil port di-push ke branch `w1vo36-6.12-port` di remote `alps`
 (bukan ke `mtk-base-latest`, yang sedang checked-out di working tree lokal).
