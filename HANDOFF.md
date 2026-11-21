@@ -144,7 +144,7 @@ sufiks `_v4l2` seperti DT; sudah diperbaiki di `flashlight/v4l2/*.c` dan
 diverifikasi lewat build.
 
 Repo kernel bersih dan ter-push: `alps`, branch `w1vo36-6.12-port`, HEAD
-`af55c9c00426`. Manifest `main` mengikuti commit dokumentasi terakhir.
+`07eb1dab07c2`. Manifest `main` mengikuti commit dokumentasi terakhir.
 
 ## Objective
 
@@ -367,9 +367,10 @@ impor tak terselesaikan, 0 CRC tak terpenuhi, 0 export ambigu**. Detail di
   balik ke region.
 
 ### Berikutnya paling siap
-- **System boot**: image dlkm sudah siap (`dlkm-20261120`); flash
-  `twrp-dlkm-source-20261120.zip` lewat TWRP lalu uji boot system dan
-  ambil dmesg/pstore. Detail di `PRETEST.md` §45 dan bagian dlkm di atas.
+- **System boot**: image dlkm terbaru sudah siap (`dlkm-gpu3-20261121`,
+  `vendor_dlkm` saja; `odm_dlkm` tetap dari `dlkm-20261120`). Flash
+  `twrp-dlkm-gpu3-20261121.zip` lewat TWRP lalu uji boot system dan
+  ambil dmesg/pstore. Detail di `PRETEST.md` §45–§48.1 dan bagian dlkm di atas.
 - `tkv_recovery` — sibling `tkv`, 20 KB, 11 ekspor / 24 impor; kandidat
   berikutnya yang paling kecil.
 - `tran_rhi` — health info storage (ECC/erase/suhu), 47 KB, tanpa source.
