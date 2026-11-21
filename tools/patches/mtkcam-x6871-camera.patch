@@ -39,6 +39,133 @@ index 04846ec..fbee4de 100644
  	/*  ADD before this line */
  	{0, 0, 0}       /*end of list */
  };
+diff --git a/camsys/isp7_1/cam/mtk_cam-raw.c b/camsys/isp7_1/cam/mtk_cam-raw.c
+index 2695a4e..84dd34f 100644
+--- a/camsys/isp7_1/cam/mtk_cam-raw.c
++++ b/camsys/isp7_1/cam/mtk_cam-raw.c
+@@ -311,10 +311,6 @@ static int mtk_raw_get_ctrl(struct v4l2_ctrl *ctrl)
+ 		user_res = (struct mtk_cam_resource *)ctrl->p_new.p;
+ 		user_res->sensor_res = pipeline->user_res.sensor_res;
+ 		user_res->raw_res = pipeline->user_res.raw_res;
+-		if (user_res->sink_fmt)
+-			ret = mtk_cam_res_copy_fmt_to_user(pipeline,
+-							   user_res,
+-							   pipeline->user_res.sink_fmt);
+ 	} else if (ctrl->id == V4L2_CID_MTK_CAM_RAW_RESOURCE_UPDATE) {
+ 		ctrl->val = pipeline->sensor_mode_update;
+ 		dev_info(dev,
+@@ -368,26 +364,10 @@ mtk_cam_res_copy_fmt_from_user(struct mtk_raw_pipeline *pipeline,
+ 			       struct mtk_cam_resource *res_user,
+ 			       struct v4l2_mbus_framefmt *dest)
+ {
+-	long bytes;
+-	struct device *dev = pipeline->raw->devs[pipeline->id];
+-
+-	if (!res_user->sink_fmt) {
+-		dev_info(dev,
+-			 "%s:pipe(%d): sink_fmt can't be NULL for res ctrl\n",
+-			 __func__, pipeline->id);
+-
+-		return -EINVAL;
+-	}
+-
+-	bytes = copy_from_user(dest, (void *)res_user->sink_fmt,
+-			       sizeof(*dest));
+-	if (bytes) {
+-		dev_info(dev,
+-			 "%s:pipe(%d): copy_from_user on sink_fmt failed (%ld)\n",
+-			 __func__, pipeline->id, bytes);
+-		return -EINVAL;
+-	}
+-
++	memset(dest, 0, sizeof(*dest));
++	dest->width = res_user->sensor_res.width;
++	dest->height = res_user->sensor_res.height;
++	dest->code = res_user->sensor_res.code;
+ 	return 0;
+ }
+ 
+@@ -396,19 +376,9 @@ mtk_cam_res_copy_fmt_to_user(struct mtk_raw_pipeline *pipeline,
+ 			     struct mtk_cam_resource *res_user,
+ 			     struct v4l2_mbus_framefmt *src)
+ {
+-	long bytes;
+-	struct device *dev = pipeline->raw->devs[pipeline->id];
+-
+-	/* return the fmt to the users */
+-	bytes = copy_to_user((void *)res_user->sink_fmt, src, sizeof(*src));
+-	if (bytes) {
+-		dev_info(dev,
+-			 "%s:pipe(%d): copy_to_user on sink_fmt failed (%ld)\n",
+-			 __func__, pipeline->id, bytes);
+-
+-		return -EINVAL;
+-	}
+-
++	res_user->sensor_res.width = src->width;
++	res_user->sensor_res.height = src->height;
++	res_user->sensor_res.code = src->code;
+ 	return 0;
+ }
+ 
+diff --git a/camsys/isp7s/cam_legacy/mtk_cam-raw.c b/camsys/isp7s/cam_legacy/mtk_cam-raw.c
+index 41f6ed0..d096f1a 100644
+--- a/camsys/isp7s/cam_legacy/mtk_cam-raw.c
++++ b/camsys/isp7s/cam_legacy/mtk_cam-raw.c
+@@ -401,26 +401,10 @@ mtk_cam_res_copy_fmt_from_user(struct mtk_raw_pipeline *pipeline,
+ 			       struct mtk_cam_resource *res_user,
+ 			       struct v4l2_mbus_framefmt *dest)
+ {
+-	long bytes;
+-	struct device *dev = pipeline->raw->devs[pipeline->id];
+-
+-	if (!res_user->sink_fmt) {
+-		dev_info(dev,
+-			 "%s:pipe(%d): sink_fmt can't be NULL for res ctrl\n",
+-			 __func__, pipeline->id);
+-
+-		return -EINVAL;
+-	}
+-
+-	bytes = copy_from_user(dest, (void *)res_user->sink_fmt,
+-			       sizeof(*dest));
+-	if (bytes) {
+-		dev_info(dev,
+-			 "%s:pipe(%d): copy_from_user on sink_fmt failed (%ld)\n",
+-			 __func__, pipeline->id, bytes);
+-		return -EINVAL;
+-	}
+-
++	memset(dest, 0, sizeof(*dest));
++	dest->width = res_user->sensor_res.width;
++	dest->height = res_user->sensor_res.height;
++	dest->code = res_user->sensor_res.code;
+ 	return 0;
+ }
+ 
+@@ -429,19 +413,9 @@ mtk_cam_res_copy_fmt_to_user(struct mtk_raw_pipeline *pipeline,
+ 			     struct mtk_cam_resource *res_user,
+ 			     struct v4l2_mbus_framefmt *src)
+ {
+-	long bytes;
+-	struct device *dev = pipeline->raw->devs[pipeline->id];
+-
+-	/* return the fmt to the users */
+-	bytes = copy_to_user((void *)res_user->sink_fmt, src, sizeof(*src));
+-	if (bytes) {
+-		dev_info(dev,
+-			 "%s:pipe(%d): copy_to_user on sink_fmt failed (%ld)\n",
+-			 __func__, pipeline->id, bytes);
+-
+-		return -EINVAL;
+-	}
+-
++	res_user->sensor_res.width = src->width;
++	res_user->sensor_res.height = src->height;
++	res_user->sensor_res.code = src->code;
+ 	return 0;
+ }
+ 
 diff --git a/imgsensor/src-v4l2/BUILD.bazel b/imgsensor/src-v4l2/BUILD.bazel
 index 3ca0844..44fa210 100644
 --- a/imgsensor/src-v4l2/BUILD.bazel
@@ -173,14 +300,24 @@ index f257226..713a494 100644
 +void i2c_table_cntinuburst_write(struct subdrv_ctx *ctx, u16 *list, u32 len);
  #endif
 diff --git a/include/mtk_camera-v4l2-controls.h b/include/mtk_camera-v4l2-controls.h
-index 721ae83..83605c4 100644
+index 721ae83..f6a27b5 100644
 --- a/include/mtk_camera-v4l2-controls.h
 +++ b/include/mtk_camera-v4l2-controls.h
-@@ -137,6 +137,7 @@ struct mtk_cam_hdr_timestamp_info {
+@@ -137,6 +137,9 @@ struct mtk_cam_hdr_timestamp_info {
   *
   */
  struct mtk_cam_resource_sensor {
-+	__u32 reserved;
++	__u32 width;
++	__u32 height;
++	__u32 code;
  	struct v4l2_fract interval;
  	__u32 hblank;
  	__u32 vblank;
+@@ -205,7 +208,6 @@ struct mtk_cam_resource_raw {
+  *
+  */
+ struct mtk_cam_resource {
+-	struct v4l2_mbus_framefmt *sink_fmt;
+ 	struct mtk_cam_resource_sensor sensor_res;
+ 	struct mtk_cam_resource_raw raw_res;
+ 	__u8 status;

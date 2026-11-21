@@ -104,10 +104,13 @@ serta bug layar setengah kanan pink/hijau akibat `disp_c3d_check_sram` right pip
 `mediatek_drm_v1.ko` (release `vendor-boot-c3dfix-20261121`, **layar normal
 penuh**). Driver kamera X6871 (4 sensor `s5khm6sx`/`gc32e1`/`gc02m3`/`gc02m3macro`
 + `camera_eeprom_v4l2`, `75ca1ac4a1ae` + `add-camera-x6871.sh`) di-repack di
-`dlkm-cam1-20261121`, lalu dilanjutkan fix audio FS1599 (`7aa967a7ba5a`,
-`b86a4c8cdca3`), AOD/screen-on panel (`a765870ac11f`), dan ABI `mtk-cam-isp`
-`0x68` (`mtkcam-x6871-camera.patch`) di release `audio-aod-cam2-20261121`
-(`vendor_boot` v4 + `vendor_dlkm`). Detail: `HANDOFF.md`, `PRETEST.md` §40-§52.
+`dlkm-cam1-20261121`; fix audio FS1599 (`7aa967a7ba5a`, `b86a4c8cdca3`) dan
+AOD/screen-on panel (`a765870ac11f`) **terkonfirmasi normal** di `audio-aod-cam2-20261121`;
+fix lanjutan `mtk-cam-isp` inline `sink_fmt`, `s5khm6sx` D-PHY 4-lane,
+Transsion `flashlight-core` (`1d3f17a21434`), dan DT2W/FOD touch
+`adaptive-ts`+`gt9916_common` (`466e4c1731c1`) ada di release
+`dlkm-cam3-dt2w-20261121` (`vendor_dlkm` + `odm_dlkm`). Detail: `HANDOFF.md`,
+`PRETEST.md` §40-§53.
 
 Catatan: hasil port di-push ke branch `w1vo36-6.12-port` di remote `alps`
 (bukan ke `mtk-base-latest`, yang sedang checked-out di working tree lokal).

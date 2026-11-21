@@ -3412,3 +3412,55 @@ twrp-dlkm-audio-cam2-20261121.zip           md5 e35bed55b35c613e801935ec39151947
 release                                     audio-aod-cam2-20261121
 ```
 
+**Hasil uji (`dmesg7.txt`):** Audio dan AOD/screen-on **FIXED**.
+
+## 53. Fix `dmesg7`: Camera (`mtk-cam-isp` inline `sink_fmt` + `s5khm6sx` D-PHY 4-lane), Flashlight (`flashlight-core`), dan DT2W/FOD Touch (`adaptive-ts` + `gt9916_common`)
+
+1. **Camera ISP ABI (`mtk-cam-isp.ko`, `vendor_dlkm`)**:
+   - Di `dmesg7.txt`, `mtk_cam_raw_res_store` sudah membaca parameter sensor secara
+     bersih (`6219/1864/1492114286/0/300/10`), namun `mtk_cam_res_copy_fmt_from_user`
+     masih gagal dengan `(48)` karena disassembly `mtk_raw_try_ctrl` (`0x21860`) &
+     `mtk_raw_s_ctrl` (`0x21bf0`) stock menunjukkan `struct mtk_cam_resource`
+     **tidak** memakai pointer `struct v4l2_mbus_framefmt *sink_fmt`; tiga field
+     awal (`+0x00`, `+0x04`, `+0x08`) adalah `width`, `height`, `code` inline di
+     `struct mtk_cam_resource_sensor`.
+   - Fix (`mtk_camera-v4l2-controls.h` + `mtk_cam-raw.c`, terekam di
+     `tools/patches/mtkcam-x6871-camera.patch`): ganti `sink_fmt` pointer dengan
+     `width`/`height`/`code` inline (tetap `sizeof == 0x68`). Verifikasi biner
+     `mtk-cam-isp.ko`: 0 string `copy_from_user on sink_fmt`.
+2. **Kamera belakang 108MP `s5khm6sx_mipi_raw` D-PHY 4-lane (`imgsensor.ko`, `vendor_dlkm`)**:
+   - Ekstrak seluruh 32 tabel register D-PHY 4-lane `*hm6*` (`addr_data_pair_init_hm6_*`,
+     `init_data_hm6_*`, `fmc_init_data_hm6`, `pre`/`cap`/`video`/`hs`/`slim`/`cus1..3`
+     plus varian `sf_*`) dari biner stock `imgsensor.ko` ke `s5khm6sx_Sensor_setting.h`.
+   - Ubah `s5khm6sxmipiraw_Sensor.c` ke `MIPI_OPHY_NCSI2`, `SENSOR_MIPI_4_LANE`,
+     `mipi_pixel_rate = 953600000`, dan urutan `s5khm6sx_sensor_init()` identik stock.
+3. **Flashlight (`flashlight.ko`, `vendor_dlkm`)**:
+   - Di `dmesg7.txt`, `ocp81375_ioctl` menolak perintah `110`/`130`/`131`/`210`/`225`/`251`
+     karena `flashlight-core.c` masih versi MTK polos (mengirim `FLASH_IOC_SET_DUTY`),
+     sedangkan `ocp81375_v4l2.ko` memakai `FLASH_IOC_SET_CURRENT` (`21`) dari
+     `flashlight-core.c` Transsion.
+   - Fix (kernel `1d3f17a21434`): port `flashlight-core.c`, `flashlight-core.h`,
+     `flashlight.h`, `tran_flash_custom.h` dari donor 6.1 `mt6897` +
+     `CONFIG_TRAN_FLASHLIGHT_TELE_SUPPORT=1`. Verifikasi simbol `flashlight.ko`:
+     `fl_set_current`, `torch_level_store`, `sub_torch_level_store`,
+     `tele_torch_level_store`, `sysfs_strobe_store`.
+4. **DT2W & FOD-touch (`adaptive-ts.ko` + `gt9916_common.ko`, `odm_dlkm`)**:
+   - Di `dmesg7.txt`, `goodix_ts_suspend()` masuk deep sleep tanpa mode gesture
+     karena `gt9916_common` tidak memiliki `goodix_ts_gesture.c` maupun
+     `/proc/fingerprint_status`, dan `adaptive-ts` tidak membuat proc node gesture.
+   - Fix (kernel `466e4c1731c1`): tambah proc node `main_gesture_function`,
+     `main_gesture_state`, `main_gesture_flag`, `gesture_function`, `gesture_state`,
+     `gesture_flag`, `touch_gesture` di `adaptive-ts`, serta `goodix_ts_gesture.c`
+     (`KEY_WAKEUP` untuk double-tap `0xCC`/single-tap `0x4C`, FOD `0x46`/`0x55`,
+     `/proc/fingerprint_status`, `enable_irq_wake`) di `gt9916_common`.
+
+### Artefak (hanya `vendor_dlkm` + `odm_dlkm`; `vendor_boot` v4 tetap)
+
+```text
+vendor_dlkm.img                   md5 48d318d18e95b43c700774f6fce06169  24.551.424 B
+odm_dlkm.img                      md5 96af18e1bdb9f2eaafa648f28902cfa8   4.206.592 B
+twrp-dlkm-cam3-dt2w-20261121.zip  md5 43e64846fc2b332b37dda65bf69a29db
+release                           dlkm-cam3-dt2w-20261121
+```
+
+

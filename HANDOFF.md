@@ -16,8 +16,8 @@ Ditulis 2026-11-19, diperbarui 2026-11-21 untuk sesi AI berikutnya. Baca ini dul
 | DLKM (`vendor_dlkm` + `odm_dlkm`) | **269**, 100% source, image siap |
 | Build target | `//kernel_device_modules-6.12:mgk_64_k612_customer_modules_install.user` |
 | Build terakhir | sukses (inkremental), 2026-11-21 |
-| Kernel HEAD | `a765870ac11f` (`w1vo36-6.12-port`) |
-| Runtime | **Android boot + layar normal + Wi-Fi + GPU**; fix Audio (FS1599), AOD/screen-on, & Camera ISP ABI (`0x68`) siap uji (`audio-aod-cam2-20261121`) |
+| Kernel HEAD | `466e4c1731c1` (`w1vo36-6.12-port`) |
+| Runtime | **Android boot + layar normal + audio + AOD/screen-on + Wi-Fi + GPU**; fix Camera (`mtk-cam-isp` + `s5khm6sx` D-PHY 4-lane), Flashlight (`flashlight-core`), & DT2W/FOD touch siap uji (`dlkm-cam3-dt2w-20261121`) |
 
 ## Status per 2026-11-20 (TWRP final)
 
@@ -88,13 +88,29 @@ dibaca dari biner stock (`mov w3,#0x3b`). Fix kernel `5ba6fb6559ab`,
 hanya `vendor_dlkm` yang di-repack. Detail: `PRETEST.md` §46.
 
 ```text
-twrp-vendor_boot-allsrc-display-usb-v4.img  md5 85d6451c42478fc83bf12ea77af9fba5  67.108.864 B
-vendor_dlkm.img                             md5 e6218bbd27315969523d637e91fe0396  24.551.424 B
-odm_dlkm.img    (tetap dari ocfix)          md5 c2c312b3374ebdb0e835db396663e924   4.206.592 B
-twrp-dlkm-audio-cam2-20261121.zip           md5 e35bed55b35c613e801935ec39151947
-release terbaru                             audio-aod-cam2-20261121 (vendor_boot v4 + vendor_dlkm)
+twrp-vendor_boot-allsrc-display-usb-v4.img  md5 85d6451c42478fc83bf12ea77af9fba5  67.108.864 B (tetap dari audio-aod-cam2)
+vendor_dlkm.img                             md5 48d318d18e95b43c700774f6fce06169  24.551.424 B
+odm_dlkm.img                                md5 96af18e1bdb9f2eaafa648f28902cfa8   4.206.592 B
+twrp-dlkm-cam3-dt2w-20261121.zip            md5 43e64846fc2b332b37dda65bf69a29db
+release terbaru                             dlkm-cam3-dt2w-20261121 (vendor_dlkm + odm_dlkm)
 /srv path                                   /serverhive1/ramabondanp/tmp/dlkm-out/ (+ tmp/x6871/)
 ```
+
+**dmesg7 (Audio + AOD fixed; fix Camera + Flashlight + DT2W/FOD touch, `dlkm-cam3-dt2w-20261121`)**:
+hanya me-repack `vendor_dlkm` + `odm_dlkm` (`vendor_boot` v4 tetap):
+1. **Camera ISP ABI** (`mtk-cam-isp.ko`): ganti pointer `sink_fmt` dengan
+   `width`/`height`/`code` inline di `struct mtk_cam_resource_sensor` (identik
+   stock `0x21860`/`0x21bf0`, 0 `copy_from_user on sink_fmt`).
+2. **Rear 108MP `s5khm6sx_mipi_raw`** (`imgsensor.ko`): ganti C-PHY 3-lane ke
+   D-PHY 4-lane (`MIPI_OPHY_NCSI2`, `SENSOR_MIPI_4_LANE`, `mipi_pixel_rate =
+   953600000`) dengan seluruh 32 tabel `*hm6*` hasil ekstrak dari `imgsensor.ko` stock.
+3. **Flashlight** (`flashlight.ko`): port Transsion `flashlight-core.c` +
+   `tran_flash_custom.h` dari donor 6.1 (`1d3f17a21434`) dengan `fl_set_current`
+   (`FLASH_IOC_SET_CURRENT = 21`) & sysfs `torch_level`/`sub_torch_level`/`tele_torch_level`.
+4. **DT2W & FOD touch** (`adaptive-ts.ko` + `gt9916_common.ko`, `odm_dlkm`):
+   tambah proc node `/proc/gesture_function`, `/proc/main_gesture_function`, dll.,
+   serta `goodix_ts_gesture.c` (`KEY_WAKEUP` untuk `0xCC`/`0x4C`, FOD `0x46`/`0x55`,
+   `/proc/fingerprint_status`) (`466e4c1731c1`). Detail: `PRETEST.md` §53.
 
 **dmesg6 (Audio + AOD/screen-on + Camera ISP ABI, `audio-aod-cam2-20261121`)**:
 tiga perbaikan sekaligus, hanya me-repack `vendor_boot` (`v4`) + `vendor_dlkm`:
