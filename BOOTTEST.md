@@ -322,7 +322,8 @@ twrp-dlkm-source-20261120.zip  (release dlkm-20261120)
   `vendor_dlkm`/`odm_dlkm`.
 - Fix SCP: `SCP_IPI_COUNT` 56 -> 59.
 - Fix GPU: Mali donor OPPO r54p1-11eac0 + gpufreq/ged/gpueb donor;
-  `vendor_dlkm.img` md5 `72f7e6dae2c25e0274008e69c2cf7fd1`,
-  zip `twrp-dlkm-gpufix-20261120.zip`.
+  shared-status layout stock (temperature 0x38, shader_present 0xe0):
+  `vendor_dlkm.img` md5 `f926ab750f16b1ef29002a336cf2eda9`,
+  zip `twrp-dlkm-gpu2-20261121.zip`.
 - Fitur dari 25 modul stock tanpa source (`transsion_tranlog`,
   `thd`, dll) tidak akan ada.

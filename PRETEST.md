@@ -3040,3 +3040,47 @@ release                         dlkm-gpufix-20261120
 
 Zip/flash hanya menulis `vendor_dlkm`; `odm_dlkm` tetap dari
 `dlkm-20261120`. Boot setelah fix ini belum diuji.
+
+## 48. dmesg3: shared-status gpufreq beda 8 byte dari stock
+
+Setelah GPU donor OPPO dipasang, `dmesg3` tetap panic di
+`kbase_backend_gpuprops_get()` dengan Mali **r54p1-11eac0** (versi stock).
+Jadi versi Mali bukan penyebabnya.
+
+Perbandingan getter `mtk_gpufreq_wrapper.ko` stock vs build kita:
+
+| Getter | Offset stock | Offset kita | Selisih |
+|---|---|---|---|
+| `gpufreq_get_cur_temperature` | 0x38 | 0x30 | +8 |
+| `gpufreq_get_cur_freq` | 0x50 | 0x48 | +8 |
+| `gpufreq_get_cur_out_freq` | 0x58 | 0x50 | +8 |
+| `gpufreq_get_cur_power` | 0x88 | 0x80 | +8 |
+| `gpufreq_get_dvfs_state` | 0xdc | 0xd4 | +8 |
+| `gpufreq_get_shader_present` | 0xe0 | 0xd8 | +8 |
+| `gpufreq_get_segment_id` | 0x11c | 0x114 | +8 |
+| `gpufreq_get_cur_oppidx` | 0x8 | 0x8 | sama |
+| `gpufreq_get_opp_num` | 0x10 | 0x10 | sama |
+
+Artinya `struct gpufreq_shared_status` stock punya **dua field 4-byte
+tambahan** antara `active_count` dan `temperature`. GPUEB firmware
+menulis `shader_present` di 0xe0; wrapper kita membacanya di 0xd8
+(field lain yang bernilai 0), sehingga Mali melihat `SW: 0x0` dan
+memanggil `BUG_ON(1)`.
+
+### Perbaikan (kernel `974ef93c0c1f`)
+
+Tambahkan dua field reserved di posisi yang sama. Setelah rebuild,
+seluruh getter wrapper memakai offset stock (0x38/0x50/0x58/0x88/0xdc/
+0xe0/0x11c). Ini bukan mematikan BUG; layout shared memory sekarang
+sama dengan firmware stock.
+
+### Artefak (hanya vendor_dlkm)
+
+```text
+vendor_dlkm.img                md5 f926ab750f16b1ef29002a336cf2eda9
+odm_dlkm.img (tidak berubah)   md5 0ffbb42985d445f7c12808df3b50960e
+twrp-dlkm-gpu2-20261121.zip    md5 8b211f609d6c9744d29fc89ee362510f
+release                        dlkm-gpu2-20261121
+```
+
+Boot setelah fix ini belum diuji.
