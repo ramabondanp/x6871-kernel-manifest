@@ -3463,4 +3463,51 @@ twrp-dlkm-cam3-dt2w-20261121.zip  md5 43e64846fc2b332b37dda65bf69a29db
 release                           dlkm-cam3-dt2w-20261121
 ```
 
+**Hasil uji (`dmesg8.txt` + `logcat1.txt`):** Foto kamera & flashlight **WORKING**.
+
+## 54. Fix `dmesg8`/`logcat1`: Video kamera (`s5khm6sx` `4000x2248`), FOD (`tran_fp` `goodix_opt_tee`), dan DT2W/FOD keycodes (`190`/`195`/`198`)
+
+1. **Kamera video hang (`s5khm6sx_mipi_raw` di `imgsensor.ko`, `vendor_dlkm`)**:
+   - Di `dmesg8.txt` (`t=80,888 s`), switch ke mode video (`sid:2`) mengatur
+     `SENINF` ke `4000x2252` (donor 6.1), sedangkan tabel register stock
+     `addr_data_pair_video_hm6` mengeluarkan `4000x2248` (beda 4 baris,
+     sehingga frame ditolak/hang).
+   - Fix (`s5khm6sxmipiraw_Sensor.c`, terekam di `mtkcam-x6871-camera.patch`):
+     samakan `frame_desc_vid` (`4000x2248`, PDAF `2000x1124`), `WINSIZE_INFO_VID`
+     & `mode_struct[2]` (`4000x2248`), `hs_video` (`1920x1080`, `ll=5728`,
+     `fl=2384`, `120 fps`), `slim_video` (`ll=5728`, `fl=1192`, `240 fps`), dan
+     `custom3` 108MP (`ll=22200`, `fl=9228`, `8 fps`) dengan `imgsensor_info_struct`
+     stock.
+2. **FOD Fingerprint (`tran_fp.ko`, `vendor_boot` v5)**:
+   - `logcat1.txt` menampilkan `vendor.fingerprint.init.error` saat boot dan
+     `AcquisitionClient: onErrorInternal code: 8` (`FINGERPRINT_ERROR_VENDOR`).
+   - Disassembly `tran_get_fp_sensor_chip_id` di `tran_fp.ko` stock menunjukkan
+     `/sys/kernel/tran_fp/vendor_name` harus berisi **`goodix_opt_tee`** untuk
+     sensor optikal FOD (`GW9578`/`GW9598`) dan **`goodix_tee`** untuk
+     kapasitif (`GF3956`/`GF3976`/`GF3986`), bukan `common_goodix`.
+   - Fix (kernel `6432a8d60ee7`): perbarui `setVendorName()` di `tran_fp_ext.c`
+     ke nama TEE stock (`goodix_opt_tee`, `goodix_tee`, `silead_opt_tee`,
+     `anc_opt_tee`, `focaltech_tee`).
+3. **DT2W & FOD Touch (`gt9916_common.ko`, `odm_dlkm`)**:
+   - Disassembly `GestureHandle` di `adaptive-ts.ko` stock membuktikan Android
+     Transsion mendengarkan keycode **`190` (`0xbe`)** untuk double-tap to wake,
+     **`195` (`0xc3`)** down/up untuk FOD (`0x46`/`0x55`), dan **`198` (`0xc6`)**
+     untuk single-tap (`0x4c`) — bukan `KEY_WAKEUP` (`143`).
+   - Selain itu `gsx_gesture_ist` gagal baca SPI pertama sesaat bangun tidur
+     (`failed get gesture data`).
+   - Fix (kernel `831ee7ca4762`): daftarkan bit `190`/`195`/`198` di
+     `input_dev->keybit`, kirim keycode stock tersebut di `gsx_gesture_ist`, dan
+     tambahkan `pm_wakeup_event(2000)` + 5x retry (`msleep(10)`).
+
+### Artefak (`vendor_boot` v5 + `vendor_dlkm` + `odm_dlkm`)
+
+```text
+twrp-vendor_boot-allsrc-display-usb-v5.img  md5 6b9db37f101262c220696321d5fda896  67.108.864 B
+vendor_dlkm.img                             md5 fabc4903098905d793af5cc7985608f0  24.551.424 B
+odm_dlkm.img                                md5 5add223fe6599a2014de88e6c7e45166   4.206.592 B
+twrp-dlkm-cam4-fod-dt2w-20261121.zip        md5 0605a3b4529ef7640436fa4a39893cac
+release                                     cam4-fod-dt2w-20261121
+```
+
+
 

@@ -16,8 +16,8 @@ Ditulis 2026-11-19, diperbarui 2026-11-21 untuk sesi AI berikutnya. Baca ini dul
 | DLKM (`vendor_dlkm` + `odm_dlkm`) | **269**, 100% source, image siap |
 | Build target | `//kernel_device_modules-6.12:mgk_64_k612_customer_modules_install.user` |
 | Build terakhir | sukses (inkremental), 2026-11-21 |
-| Kernel HEAD | `466e4c1731c1` (`w1vo36-6.12-port`) |
-| Runtime | **Android boot + layar normal + audio + AOD/screen-on + Wi-Fi + GPU**; fix Camera (`mtk-cam-isp` + `s5khm6sx` D-PHY 4-lane), Flashlight (`flashlight-core`), & DT2W/FOD touch siap uji (`dlkm-cam3-dt2w-20261121`) |
+| Kernel HEAD | `831ee7ca4762` (`w1vo36-6.12-port`) |
+| Runtime | **Android boot + layar normal + audio + AOD + kamera foto + Wi-Fi + GPU**; fix video kamera (`4000x2248`), FOD (`goodix_opt_tee`), & DT2W/FOD keycodes (`190`/`195`/`198`) siap uji (`cam4-fod-dt2w-20261121`) |
 
 ## Status per 2026-11-20 (TWRP final)
 
@@ -88,13 +88,18 @@ dibaca dari biner stock (`mov w3,#0x3b`). Fix kernel `5ba6fb6559ab`,
 hanya `vendor_dlkm` yang di-repack. Detail: `PRETEST.md` §46.
 
 ```text
-twrp-vendor_boot-allsrc-display-usb-v4.img  md5 85d6451c42478fc83bf12ea77af9fba5  67.108.864 B (tetap dari audio-aod-cam2)
-vendor_dlkm.img                             md5 48d318d18e95b43c700774f6fce06169  24.551.424 B
-odm_dlkm.img                                md5 96af18e1bdb9f2eaafa648f28902cfa8   4.206.592 B
-twrp-dlkm-cam3-dt2w-20261121.zip            md5 43e64846fc2b332b37dda65bf69a29db
-release terbaru                             dlkm-cam3-dt2w-20261121 (vendor_dlkm + odm_dlkm)
+twrp-vendor_boot-allsrc-display-usb-v5.img  md5 6b9db37f101262c220696321d5fda896  67.108.864 B
+vendor_dlkm.img                             md5 fabc4903098905d793af5cc7985608f0  24.551.424 B
+odm_dlkm.img                                md5 5add223fe6599a2014de88e6c7e45166   4.206.592 B
+twrp-dlkm-cam4-fod-dt2w-20261121.zip        md5 0605a3b4529ef7640436fa4a39893cac
+release terbaru                             cam4-fod-dt2w-20261121 (vendor_boot v5 + vendor_dlkm + odm_dlkm)
 /srv path                                   /serverhive1/ramabondanp/tmp/dlkm-out/ (+ tmp/x6871/)
 ```
+
+**dmesg8/logcat1 (Kamera foto working; fix Video kamera + FOD + DT2W, `cam4-fod-dt2w-20261121`)**:
+1. **Video kamera (`s5khm6sx`, `vendor_dlkm`)**: ubah `normal_video` `4000x2252` -> `4000x2248` (PDAF `2000x1124`) plus timing `hs_video`/`slim_video`/`custom3` agar cocok dengan tabel register stock.
+2. **FOD (`tran_fp.ko`, `vendor_boot` v5)**: `6432a8d60ee7` — ganti `vendor_name` dari `common_goodix` menjadi `goodix_opt_tee` (untuk `GW9578`/`GW9598`) / `goodix_tee` seperti stock.
+3. **DT2W & FOD touch (`gt9916_common.ko`, `odm_dlkm`)**: `831ee7ca4762` — kirim keycode stock `190` (`0xbe`) untuk double-tap, `195` (`0xc3`) untuk FOD down/up, `198` (`0xc6`) untuk single-tap, plus `pm_wakeup_event` + 5x retry baca SPI. Detail: `PRETEST.md` §54.
 
 **dmesg7 (Audio + AOD fixed; fix Camera + Flashlight + DT2W/FOD touch, `dlkm-cam3-dt2w-20261121`)**:
 hanya me-repack `vendor_dlkm` + `odm_dlkm` (`vendor_boot` v4 tetap):
