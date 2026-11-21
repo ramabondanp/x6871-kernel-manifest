@@ -1,6 +1,6 @@
 # HANDOFF — W1VO36 / X6871 kernel device modules
 
-Ditulis 2026-11-19, diperbarui 2026-11-20 untuk sesi AI berikutnya. Baca ini dulu, lalu `PLAN.md`
+Ditulis 2026-11-19, diperbarui 2026-11-21 untuk sesi AI berikutnya. Baca ini dulu, lalu `PLAN.md`
 (bagian §6.1b, §6.2k, §6.2m, §6.2n, §6.2o, §6.2p, §6.2q, §6.2r, §6.2s,
 §6.2t, §6.2u) dan `PRETEST.md`.
 
@@ -15,8 +15,8 @@ Ditulis 2026-11-19, diperbarui 2026-11-20 untuk sesi AI berikutnya. Baca ini dul
 | Modul recovery vendor_boot | **222**, 100% source |
 | DLKM (`vendor_dlkm` + `odm_dlkm`) | **269**, 100% source, image siap |
 | Build target | `//kernel_device_modules-6.12:mgk_64_k612_customer_modules_install.user` |
-| Build terakhir | sukses (inkremental), 2026-11-20 |
-| Kernel HEAD | `974ef93c0c1f` (`w1vo36-6.12-port`) |
+| Build terakhir | sukses (inkremental), 2026-11-21 |
+| Kernel HEAD | `07eb1dab07c2` (`w1vo36-6.12-port`) |
 | Runtime | **TWRP 100% modul source**, layar + USB replug terverifikasi |
 
 ## Status per 2026-11-20 (TWRP final)
@@ -88,17 +88,22 @@ dibaca dari biner stock (`mov w3,#0x3b`). Fix kernel `5ba6fb6559ab`,
 hanya `vendor_dlkm` yang di-repack. Detail: `PRETEST.md` §46.
 
 ```text
-vendor_dlkm.img  md5 f926ab750f16b1ef29002a336cf2eda9  24.551.424 B
+vendor_dlkm.img  md5 d68e9a2b95c56e3e0cac17143b1dd412  24.551.424 B
 odm_dlkm.img     md5 0ffbb42985d445f7c12808df3b50960e   4.206.592 B  (tidak berubah)
-twrp-dlkm-gpu2-20261121.zip   md5 8b211f609d6c9744d29fc89ee362510f
-release          dlkm-gpu2-20261121
+twrp-dlkm-gpu3-20261121.zip   md5 28b43f8b8c169289a1d4451a7d43ac14
+release          dlkm-gpu3-20261121
 /srv path         /serverhive1/ramabondanp/tmp/dlkm-out/
 ```
 
 **dmesg3**: Mali sudah r54p1-11eac0 tetapi tetap BUG; RE getter
 wrapper menunjukkan struct `gpufreq_shared_status` stock 8 byte lebih
-besar (temperature 0x38, shader_present 0xe0). Dua field reserved
-ditambahkan; commit `974ef93c0c1f`. Detail: `PRETEST.md` §48.
+besar. `974ef93c0c1f` menaruh padding setelah `active_count`, yang
+menyelaraskan temperature (0x38) dan shader_present (0xe0) tetapi
+membiarkan lima counter meleset 8 byte. Koreksi `07eb1dab07c2`
+memindahkan padding ke sebelum `power_count`: power/buck/mtcmos/cg/
+active = 0x24/0x28/0x2c/0x30/0x34, temperature 0x38, shader_present
+0xe0. Seluruh getter shared-status sekarang identik dengan stock;
+detail `PRETEST.md` §48/§48.1.
 
 **dmesg2**: setelah SCP fix, Mali panic di
 `kbase_backend_gpuprops_get()` (`HW 0x130013, SW 0x0`). Stock memakai
@@ -111,8 +116,8 @@ Image memakai EROFS persis opsi stock + AVB hashtree footer; ukurannya
 sama dengan partisi stock. Zip TWRP hanya menulis `vendor_dlkm`; `odm_dlkm`
 tetap dari release `dlkm-20261120`. Detail: `PRETEST.md` §45/§46.
 
-**Belum**: boot system belum diuji — langkah berikutnya flash zip lalu
-ambil dmesg/pstore. Fitur dari 25 modul stock tanpa source (tranlog,
+**Belum**: boot system belum diuji — langkah berikutnya flash
+`twrp-dlkm-gpu3-20261121.zip` lalu ambil dmesg/pstore. Fitur dari 25 modul stock tanpa source (tranlog,
 thd, varian touch alternatif, dll) hilang; driver sensor kamera X6871
 juga belum ada di source.
 

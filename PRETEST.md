@@ -3062,10 +3062,11 @@ Perbandingan getter `mtk_gpufreq_wrapper.ko` stock vs build kita:
 | `gpufreq_get_opp_num` | 0x10 | 0x10 | sama |
 
 Artinya `struct gpufreq_shared_status` stock punya **dua field 4-byte
-tambahan** antara `active_count` dan `temperature`. GPUEB firmware
-menulis `shader_present` di 0xe0; wrapper kita membacanya di 0xd8
-(field lain yang bernilai 0), sehingga Mali melihat `SW: 0x0` dan
-memanggil `BUG_ON(1)`.
+tambahan**. GPUEB firmware menulis `shader_present` di 0xe0; wrapper
+kita membacanya di 0xd8 (field lain yang bernilai 0), sehingga Mali
+melihat `SW: 0x0` dan memanggil `BUG_ON(1)`. Posisi persis kedua field
+dikoreksi di §48.1: keduanya berada **sebelum `power_count`**, bukan
+setelah `active_count`.
 
 ### Perbaikan (kernel `974ef93c0c1f`)
 
@@ -3084,3 +3085,60 @@ release                        dlkm-gpu2-20261121
 ```
 
 Boot setelah fix ini belum diuji.
+
+## 48.1 Koreksi §48: padding ada sebelum `power_count`
+
+Perbaikan §48 menaruh dua field reserved setelah `active_count`. Itu
+membuat semua field mulai `temperature` (0x38) selaras dengan stock,
+tetapi **lima counter di depannya tetap meleset 8 byte**. Getter yang
+menunjukkan hal ini adalah `gpufreq_get_power_state`:
+
+```text
+stock  b9402508  ldr w8, [x8, #0x24]
+kita   b9401d08  ldr w8, [x8, #0x1c]     (setelah 974ef93c0c1f)
+```
+
+`gpufreq_status_proc_show` stock membaca counter untuk format
+`PowerCount/Active/CG/MTCMOS/BUCK` di 0x24/0x34/0x30/0x2c/0x28. Jadi
+layout stock adalah:
+
+| field | offset stock | §48 (salah) | 07eb1dab07c2 |
+|---|---|---|---|
+| `reserved0` | 0x1c | 0x30 | 0x1c |
+| `reserved1` | 0x20 | 0x34 | 0x20 |
+| `power_count` | 0x24 | 0x1c | 0x24 |
+| `buck_count` | 0x28 | 0x20 | 0x28 |
+| `mtcmos_count` | 0x2c | 0x24 | 0x2c |
+| `cg_count` | 0x30 | 0x28 | 0x30 |
+| `active_count` | 0x34 | 0x2c | 0x34 |
+| `temperature` | 0x38 | 0x38 | 0x38 |
+| `shader_present` | 0xe0 | 0xe0 | 0xe0 |
+
+Dua field 0x1c/0x20 hanya ditulis GPUEB; stock wrapper tidak punya
+satu pun `str` ke offset itu, jadi field tersebut tetap dinamai
+`reserved`.
+
+### Perbaikan (kernel `07eb1dab07c2`)
+
+Padding dipindah ke antara `signed_opp_num_stack` dan `power_count`.
+Verifikasi terhadap `mtk_gpufreq_wrapper.ko` stock:
+
+- seluruh getter shared-status memakai offset yang sama
+  (0x24/0x28/0x2c/0x30/0x34/0x38/0xdc/0xe0/0x11c);
+- `gpufreq_get_power_state` **byte-identik** dengan stock;
+- 88 dari 99 fungsi yang sama byte-identik. Sisa 11 berbeda karena
+  virtual OPP table, tabel histori, dan CFI pada jalur `fix_*`, bukan
+  layout shared status (offset shared-status di
+  `gpufreq_status_proc_show` juga identik).
+
+### Artefak (hanya vendor_dlkm)
+
+```text
+vendor_dlkm.img               md5 d68e9a2b95c56e3e0cac17143b1dd412
+odm_dlkm.img (tidak berubah)  md5 0ffbb42985d445f7c12808df3b50960e
+twrp-dlkm-gpu3-20261121.zip   md5 28b43f8b8c169289a1d4451a7d43ac14
+release                       dlkm-gpu3-20261121
+```
+
+Zip TWRP hanya menulis `vendor_dlkm`. Boot system setelah fix ini belum
+diuji.

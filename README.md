@@ -62,7 +62,7 @@ Branch ini dibuat baru (bukan di atas `android16`) supaya riwayat `android16`
 tidak tersentuh. `android16` (`30a0466a`) memang ancestor dari baseline
 w1vo36.88-36-7 (`06079c2`), jadi branch ini juga fast-forward-able ke sana.
 
-Branch berisi **58 commit** di atas `06079c2`, satu commit per fitur.
+Branch berisi **62 commit** di atas `06079c2`, satu commit per fitur.
 Ringkasan commit awal dan commit final yang penting:
 
 | commit | isi |
@@ -78,7 +78,7 @@ Ringkasan commit awal dan commit final yang penting:
 
 Daftar lengkap: `git log --oneline 06079c2..HEAD`.
 
-## Status runtime (2026-11-20)
+## Status runtime (2026-11-21)
 
 TWRP memakai **222 modul, 100% hasil build sendiri**. Image final yang
 sudah diuji:
@@ -91,11 +91,14 @@ md5 0ecdaa1edb3d405954331539b24c911b
 Yang sudah terverifikasi: layar mati -> nyala (0 buffer underrun) dan
 cabut-colok USB berulang (setiap colok kembali `online=1, type=1` SDP,
 `pullup D+`, `gadget RESET`). Image dlkm 100% source juga sudah siap
-(release `dlkm-20261120`, 269 modul; detail `PRETEST.md` §45) dan tinggal
-diuji boot system. Boot pertama berhenti di SCP; fix `SCP_IPI_COUNT` 59
-ada di kernel `5ba6fb6559ab` dan release `dlkm-scpfix-20261120`
-(`vendor_dlkm` saja, `PRETEST.md` §46). Berikutnya: uji system boot, lalu
-port driver kamera. Detail: `HANDOFF.md`, `PRETEST.md` §40-§46.
+(release `dlkm-20261120`, 269 modul; detail `PRETEST.md` §45).
+Percobaan boot system berhenti berurutan di SCP, Mali, lalu
+shared-status gpufreq: `SCP_IPI_COUNT` 59 (`5ba6fb6559ab`), GPU donor
+OPPO r54p1-11eac0 (`5462a6d118a6`), dan padding gpufreq sebelum
+`power_count` (`07eb1dab07c2`). Artefak terbaru
+`twrp-dlkm-gpu3-20261121.zip` (`vendor_dlkm` saja; `PRETEST.md`
+§46-§48.1). Berikutnya: uji system boot dengan zip itu, lalu port
+driver kamera. Detail: `HANDOFF.md`, `PRETEST.md` §40-§48.1.
 
 Catatan: hasil port di-push ke branch `w1vo36-6.12-port` di remote `alps`
 (bukan ke `mtk-base-latest`, yang sedang checked-out di working tree lokal).
