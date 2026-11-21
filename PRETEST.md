@@ -3336,5 +3336,79 @@ twrp-dlkm-cam1-20261121.zip  md5 41e402b08f61576e1a5acd6e0622b188
 release                      dlkm-cam1-20261121
 ```
 
-`vendor_boot` (`v3`) dan `odm_dlkm` (`ocfix`) tidak berubah. Boot kamera belum
-diuji.
+`vendor_boot` (`v3`) dan `odm_dlkm` (`ocfix`) tidak berubah.
+
+## 52. Fix `dmesg6`: Audio (FS1599 + `mt6895-mt6368`), AOD/screen-on (`panel-rm69220-vdo-x6871`), dan Camera ISP ABI (`mtk-cam-isp`)
+
+Hasil uji `vendor-boot-c3dfix-20261121` + `dlkm-cam1-20261121` (`dmesg6.txt`):
+layar utama normal, `s5khm6sx_mipi_raw` sudah probe dan dipanggil userspace,
+namun ada tiga keluhan baru: **audio mati**, **AOD rusak lalu layar tidak mau
+menyala lagi**, dan **kamera masih gagal**.
+
+### 52.1 Audio (`tran_audio_control.ko` + `mt6895-mt6368.ko`, `vendor_dlkm`)
+
+- `adspsys@1e000000` berstatus `disabled` di DT X6871, sehingga
+  `adsp_system_bootup fail ret(-14)` adalah normal. Dual speaker PA
+  `foursemi,fs15xx` (`6-0034`, `6-0035`) sudah probe lewat `snd-soc-fs1599.ko`.
+- Dua mata rantai yang hilang dibandingkan stock:
+  1. `sound/soc/transsion/tran_audio_control/BUILD.bazel` belum mendefinisikan
+     `CONFIG_SND_SOC_FS1599=1` dan `ko_deps` ke `snd-soc-fs1599`, sehingga
+     seluruh callback PA di `tran_audio_control.ko` terkompilasi kosong.
+     Fix: kernel `7aa967a7ba5a`. Verifikasi simbol `tran_audio_control.ko`:
+     mengimpor `fsm_add_card_controls`, `fsm_set_scene`, `fsm_speaker_off`,
+     `fsm_speaker_onn` (identik stock).
+  2. `sound/soc/mediatek/mt6895/mt6895-mt6368.c` + `BUILD.bazel` belum
+     memanggil `tran_audio_add_card_controls(card)` sesudah
+     `devm_snd_soc_register_card()` dan `tran_audio_pa_switch(true/false)` di
+     `mt6895_mt6368_spk_amp_event()`.
+     Fix: kernel `b86a4c8cdca3`. Verifikasi simbol `mt6895-mt6368.ko`:
+     mengimpor `tran_audio_add_card_controls` dan `tran_audio_pa_switch`
+     (identik stock).
+
+### 52.2 AOD / layar tidak mau menyala lagi (`panel-rm69220-vdo-x6871.ko`, `vendor_boot`)
+
+- Disassembly stock `rm69220_fhdp_dsi_vdo_dsc_csot_csot_144hz_x6871.ko`
+  (`panel_doze_enable` `0x196c`, `panel_doze_disable` `0x19d8`,
+  `panel_set_aod_light_mode` `0x1598`) menunjukkan stock **tidak** mengirim
+  perintah idle-mode `0x39`/`0x38` saat masuk/keluar doze (hanya menyetel
+  `g_aod_enable = 1/0`); mengirim `0x39` mengunci panel VDO sehingga gagal
+  bangun dari AOD.
+- `panel_set_aod_light_mode()` stock mengirim `{0xFE, 0x00}` lalu
+  `{0x51, hi, lo}` dengan tier kecerahan `1..99 -> 0x03e`,
+  `100..299 -> 0x057`, lainnya `0x158`.
+- Fix: kernel `a765870ac11f`. Verifikasi disassembly `panel-rm69220-vdo-x6871.ko`:
+  0 panggilan `push_table_cb` di `panel_doze_enable`/`panel_doze_disable`.
+
+### 52.3 Camera ISP ABI (`mtk-cam-isp.ko`, `vendor_dlkm`) & temuan `s5khm6sx`
+
+- Di `dmesg6.txt`: `mtk_cam_res_copy_fmt_from_user: copy_from_user on sink_fmt
+  failed (48)` disertai garbage `raw_res` dan warning vb2 `plane size is too
+  small`. Disassembly `mtk-cam-isp.ko` stock (`cfg_res_ctrl` +
+  `mtk_cam_raw_res_store`) menunjukkan `sizeof(struct mtk_cam_resource)` stock
+  adalah `0x68` (bukan `0x60`), dengan field `interval` di `+0x0c`,
+  `pixel_rate` di `+0x20`, `raw_res.feature` di `+0x38`, `hw_mode` di `+0x50`.
+- Fix (`vendor/mediatek/kernel_modules/mtkcam/include/mtk_camera-v4l2-controls.h`,
+  direkam di `tools/patches/mtkcam-x6871-camera.patch`): tambah `__u32 reserved;`
+  di awal `struct mtk_cam_resource_sensor`. Verifikasi biner `mtk-cam-isp.ko`:
+  `cfg_res_ctrl.elem_size == 0x68` (identik stock).
+- **Temuan lanjutan (kamera belakang 108MP `s5khm6sx_mipi_raw`)**:
+  - `s5khm6sx` dari donor 6.1 (baik `common/` maupun `camera_project/tran_x6873/`)
+    menggunakan **C-PHY 3-lane** (`MIPI_CPHY`, `SENSOR_MIPI_3_LANE`), yang
+    menghasilkan `SENINF4_PkCnt(0x0)` (0 paket, watchdog timeout) dan
+    `check_stream_off: stream off fail!`.
+  - Disassembly `imgsensor.ko` stock (`s5khm6sx` `get_info` `0x521d8` +
+    `.data+0x40380`) membuktikan `s5khm6sx` stock X6871 memakai **D-PHY 4-lane**
+    (`MIPI_OPHY_NCSI2`, `SENSOR_MIPI_4_LANE`, `SensorMIPILaneNumber = 4`).
+  - Kamera depan (`gc32e1_mipi_raw`) dan macro/depth (`gc02m3*`) sudah D-PHY,
+    sehingga siap diuji setelah fix `mtk-cam-isp.ko`; kamera belakang 108MP
+    `s5khm6sx` masih membutuhkan tabel register D-PHY 4-lane di iterasi berikut.
+
+### Artefak (hanya `vendor_boot` v4 + `vendor_dlkm`; `odm_dlkm` tidak berubah)
+
+```text
+twrp-vendor_boot-allsrc-display-usb-v4.img  md5 85d6451c42478fc83bf12ea77af9fba5  67.108.864 B
+vendor_dlkm.img                             md5 e6218bbd27315969523d637e91fe0396  24.551.424 B
+twrp-dlkm-audio-cam2-20261121.zip           md5 e35bed55b35c613e801935ec39151947
+release                                     audio-aod-cam2-20261121
+```
+

@@ -103,9 +103,11 @@ serta bug layar setengah kanan pink/hijau akibat `disp_c3d_check_sram` right pip
 (`1799bf13b78b`) dan ukuran `PQ_VIRTUAL_SET_PROPERTY` (`e84137d0e2aa`) di
 `mediatek_drm_v1.ko` (release `vendor-boot-c3dfix-20261121`, **layar normal
 penuh**). Driver kamera X6871 (4 sensor `s5khm6sx`/`gc32e1`/`gc02m3`/`gc02m3macro`
-+ `camera_eeprom_v4l2`, `75ca1ac4a1ae` + `add-camera-x6871.sh`) sudah di-repack
-di release `dlkm-cam1-20261121` (`vendor_dlkm` saja). Detail: `HANDOFF.md`,
-`PRETEST.md` §40-§51.
++ `camera_eeprom_v4l2`, `75ca1ac4a1ae` + `add-camera-x6871.sh`) di-repack di
+`dlkm-cam1-20261121`, lalu dilanjutkan fix audio FS1599 (`7aa967a7ba5a`,
+`b86a4c8cdca3`), AOD/screen-on panel (`a765870ac11f`), dan ABI `mtk-cam-isp`
+`0x68` (`mtkcam-x6871-camera.patch`) di release `audio-aod-cam2-20261121`
+(`vendor_boot` v4 + `vendor_dlkm`). Detail: `HANDOFF.md`, `PRETEST.md` §40-§52.
 
 Catatan: hasil port di-push ke branch `w1vo36-6.12-port` di remote `alps`
 (bukan ke `mtk-base-latest`, yang sedang checked-out di working tree lokal).

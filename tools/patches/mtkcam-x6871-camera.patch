@@ -172,3 +172,15 @@ index f257226..713a494 100644
  	struct mtk_ebd_dump *obj);
 +void i2c_table_cntinuburst_write(struct subdrv_ctx *ctx, u16 *list, u32 len);
  #endif
+diff --git a/include/mtk_camera-v4l2-controls.h b/include/mtk_camera-v4l2-controls.h
+index 721ae83..83605c4 100644
+--- a/include/mtk_camera-v4l2-controls.h
++++ b/include/mtk_camera-v4l2-controls.h
+@@ -137,6 +137,7 @@ struct mtk_cam_hdr_timestamp_info {
+  *
+  */
+ struct mtk_cam_resource_sensor {
++	__u32 reserved;
+ 	struct v4l2_fract interval;
+ 	__u32 hblank;
+ 	__u32 vblank;

@@ -16,8 +16,8 @@ Ditulis 2026-11-19, diperbarui 2026-11-21 untuk sesi AI berikutnya. Baca ini dul
 | DLKM (`vendor_dlkm` + `odm_dlkm`) | **269**, 100% source, image siap |
 | Build target | `//kernel_device_modules-6.12:mgk_64_k612_customer_modules_install.user` |
 | Build terakhir | sukses (inkremental), 2026-11-21 |
-| Kernel HEAD | `e6d0ab2fb66a` (`w1vo36-6.12-port`) |
-| Runtime | **Android boot sampai launcher + Wi-Fi + GPU** (`dmesg4`); fix spam OC + mode switch panel siap uji |
+| Kernel HEAD | `a765870ac11f` (`w1vo36-6.12-port`) |
+| Runtime | **Android boot + layar normal + Wi-Fi + GPU**; fix Audio (FS1599), AOD/screen-on, & Camera ISP ABI (`0x68`) siap uji (`audio-aod-cam2-20261121`) |
 
 ## Status per 2026-11-20 (TWRP final)
 
@@ -88,14 +88,29 @@ dibaca dari biner stock (`mov w3,#0x3b`). Fix kernel `5ba6fb6559ab`,
 hanya `vendor_dlkm` yang di-repack. Detail: `PRETEST.md` §46.
 
 ```text
-twrp-vendor_boot-allsrc-display-usb-v3.img  md5 c4362d3312ab41356bc6eb2cc6f509b8  67.108.864 B
-vendor_dlkm.img                             md5 bfd96feb71d3f53fcc0c045b896809e6  24.551.424 B
+twrp-vendor_boot-allsrc-display-usb-v4.img  md5 85d6451c42478fc83bf12ea77af9fba5  67.108.864 B
+vendor_dlkm.img                             md5 e6218bbd27315969523d637e91fe0396  24.551.424 B
 odm_dlkm.img    (tetap dari ocfix)          md5 c2c312b3374ebdb0e835db396663e924   4.206.592 B
-twrp-dlkm-cam1-20261121.zip                 md5 41e402b08f61576e1a5acd6e0622b188
-release vendor_boot terbaru                 vendor-boot-c3dfix-20261121
-release dlkm terbaru                        dlkm-cam1-20261121 (vendor_dlkm saja)
+twrp-dlkm-audio-cam2-20261121.zip           md5 e35bed55b35c613e801935ec39151947
+release terbaru                             audio-aod-cam2-20261121 (vendor_boot v4 + vendor_dlkm)
 /srv path                                   /serverhive1/ramabondanp/tmp/dlkm-out/ (+ tmp/x6871/)
 ```
+
+**dmesg6 (Audio + AOD/screen-on + Camera ISP ABI, `audio-aod-cam2-20261121`)**:
+tiga perbaikan sekaligus, hanya me-repack `vendor_boot` (`v4`) + `vendor_dlkm`:
+1. **Audio**: `tran_audio_control/BUILD.bazel` diberi `CONFIG_SND_SOC_FS1599=1` +
+   `ko_deps` `snd-soc-fs1599` (`7aa967a7ba5a`), dan `mt6895-mt6368.c` dihubungkan
+   ke `tran_audio_add_card_controls()` + `tran_audio_pa_switch()` (`b86a4c8cdca3`).
+2. **AOD / screen-on**: `panel-rm69220-vdo-x6871.c` menghapus kirim `0x39`/`0x38`
+   di `panel_doze_enable`/`panel_doze_disable` dan menyamakan
+   `panel_set_aod_light_mode()` (`{0xFE,0x00}` + tier `0x03e`/`0x057`/`0x158`)
+   dengan stock (`a765870ac11f`).
+3. **Camera ISP ABI**: `struct mtk_cam_resource_sensor` diberi `__u32 reserved`
+   sehingga `cfg_res_ctrl.elem_size == 0x68` identik stock (menghilangkan
+   `copy_from_user on sink_fmt failed (48)`). Catatan sisa: kamera depan `gc32e1`
+   dan `gc02m3*` sudah D-PHY dan siap diuji, sedangkan kamera belakang 108MP
+   `s5khm6sx` masih memakai tabel C-PHY 3-lane dari donor 6.1 padahal stock
+   X6871 adalah D-PHY 4-lane (`SENINF4_PkCnt(0x0)`). Detail: `PRETEST.md` §52.
 
 **Kamera v1 (`dlkm-cam1-20261121`)**: layar sudah normal penuh setelah `v3`.
 Empat sensor X6871 (`s5khm6sx_mipi_raw` 0x1AD6, `gc32e1_mipi_raw` 0x32E1,
