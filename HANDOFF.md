@@ -16,8 +16,8 @@ Ditulis 2026-11-19, diperbarui 2026-11-21 untuk sesi AI berikutnya. Baca ini dul
 | DLKM (`vendor_dlkm` + `odm_dlkm`) | **269**, 100% source, image siap |
 | Build target | `//kernel_device_modules-6.12:mgk_64_k612_customer_modules_install.user` |
 | Build terakhir | sukses (inkremental), 2026-11-21 |
-| Kernel HEAD | `6b2a88973414` (`w1vo36-6.12-port`) |
-| Runtime | **Android boot + layar + audio + AOD + kamera foto + video preview + Wi-Fi + GPU OK**; DT2W/FOD/video-save masih dalam verifikasi rilis `qpabi-fpgest-20261121`; layar hijau C3D diperbaiki, flashlight belum diverifikasi ulang |
+| Kernel HEAD | `a453c308cc33` (`w1vo36-6.12-port`) |
+| Runtime | **Android boot + layar + audio + AOD + kamera foto + video preview + Wi-Fi + GPU OK**; rilis `touchfix-20261121` mengembalikan touch dan memperbaiki DT2W; FOD/video-save masih perlu uji; layar hijau C3D diperbaiki, flashlight belum diverifikasi ulang |
 
 ## Status per 2026-11-20 (TWRP final)
 
@@ -88,17 +88,50 @@ dibaca dari biner stock (`mov w3,#0x3b`). Fix kernel `5ba6fb6559ab`,
 hanya `vendor_dlkm` yang di-repack. Detail: `PRETEST.md` §46.
 
 ```text
+twrp-vendor_boot-allsrc-display-usb-v8.img  md5 1802940b36b1504e8e08835e063043d2  67.108.864 B
+vendor_dlkm.img                             md5 4b4f0bd5fba3d6b68d0b360bf6a905f3  24.551.424 B
+odm_dlkm.img                                md5 9034d036b6bcda3a0dcc0915a35ea373   4.206.592 B
+twrp-dlkm-touchfix-20261121.zip             md5 59b0907358fc2a80135d0df15aa1417a
+release terbaru                             touchfix-20261121 (vendor_boot v8 + vendor_dlkm + odm_dlkm)
+/srv path                                   /serverhive1/ramabondanp/tmp/dlkm-out/ (+ tmp/x6871/)
+```
+
+**dmesg2 (rilis `qpabi-fpgest-20261121`, kernel `6b2a88973414`)**:
+1. **Touch mati**: 170 `got valid gesture type 0xcc`, 0 `goodix_ts_report_finger`.
+   Gate `tools_ctrl_sync` selalu false sehingga IRQ screen-on dikonsumsi sebagai
+   gestur; `after_event_handler` tidak jalan karena core early-return pada
+   `EVT_CANCEL_IRQEVT`, jadi event 0xcc tidak pernah dibersihkan.
+2. **Fix `a453c308cc33`**: kembalikan gate `suspended` (stock field `[core+908]`),
+   panggil `after_event_handler()` setelah gestur valid, dan pindahkan
+   `pm_wakeup_event()` ke setelah loop modul eksternal supaya gesture dibaca
+   sebelum display resume mereset IC.
+3. **FOD**: `tran_fp` probe berhasil (tidak ada error chip-id); `tran_netlink_send`
+   gagal dengan `invalid PID` pada t=13.77 karena HAL belum mengirim pesan
+   netlink. HAL lalu set `vendor.fingerprint.init.error` (ditolak SELinux).
+   Ini kandidat utama FOD berikutnya, bukan deteksi chip.
+4. **VENC**: `mtk-vcodec-enc 17800000.venc_gcon` gagal probe `-22` (tidak ada
+   `mediatek,platform`); device utama `17020000.venc` tetap bisa dibuka. Belum
+   ada rekaman video di dmesg2, jadi perbaikan QP belum teruji.
+5. Detail: `PRETEST.md` §57.
+
+Artefak sebelumnya `qpabi-fpgest-20261121`:
+
+```text
 twrp-vendor_boot-allsrc-display-usb-v7.img  md5 15b501d2c18931cf620bbc9e9422978c  67.108.864 B
 vendor_dlkm.img                             md5 4b4f0bd5fba3d6b68d0b360bf6a905f3  24.551.424 B
 odm_dlkm.img                                md5 843e5b8169131dc1333715dbdc332759   4.206.592 B
 twrp-dlkm-qpabi-fpgest-20261121.zip         md5 bb5981102e3824fa3f44b8fb83ca7b96
-release terbaru                             qpabi-fpgest-20261121 (vendor_boot v7 + vendor_dlkm + odm_dlkm)
+release                                     qpabi-fpgest-20261121 (vendor_boot v7 + vendor_dlkm + odm_dlkm)
 /srv path                                   /serverhive1/ramabondanp/tmp/dlkm-out/ (+ tmp/x6871/)
 ```
 
 **dmesg1/logcat1 (rilis `vid-fl-dt2w5-20261121`, kernel `f75c717036ac` + `6b2a88973414`)**:
 1. **Video**: encoder sekarang benar-benar start (`vb2ops_venc_start_streaming`, AFBC 1920x1080) lalu VENC fault di `LARB7_PORT24`, `mva=0x0`, VCP watchdog reset, dan decoder ikut mati (`vdec_vcp_decode` IPI ack fail). Ini bukan lagi `bs_va=0`. Hipotesis utama: ABI QP lama membuat firmware menerima nilai min/max yang tertukar dan memprogram alamat nol. Fix `f75c717036ac`: enam field `i/i/p/p/b/b max/min qp` yang identik stock (`vcp_enc_set_param` sekarang 824 B dan instruction-identik dengan stock), kontrol V4L2 3-elemen, plus guard `dma_addr == 0` supaya VENC tidak pernah fault ke IOVA 0. Bukti akhir butuh uji device.
-2. **DT2W**: `gsx_gesture_ist` mensyaratkan `core_data->suspended == 1`, padahal layar sudah resume dan flag itu sudah 0 saat threaded IRQ jalan; event gestur yang membangunkan layar dibuang. Fix `6b2a88973414`: ikuti stock, cek `tools_ctrl_sync` saja, log state, dan kirim kode gestur untuk single-tap/FOD juga.
+2. **DT2W**: hipotesis awal (gate `suspended` dibuang) salah. Gate stock memang
+   `suspended`; masalah sebenarnya `pm_wakeup_event()` dipanggil sebelum event
+   dibaca dan event gestur tidak dibersihkan. Fix final `a453c308cc33`:
+   gate `suspended` dikembalikan, `after_event_handler()` dipanggil setelah
+   gestur valid, wake dilakukan setelah event dikonsumsi. Lihat §57.
 3. **FOD**: `vendor.fingerprint.init.error` tetap muncul di logcat1; probe `tran_fp` tidak terlihat karena dmesg mulai t=83 s. `tran_fp` sekarang menerima chip-id dua endian, retry 5x, dan memakai fallback `goodix_opt_tee` bila deteksi gagal (tetap perlu bukti log probe dari t=0).
 4. **Flashlight** belum diuji ulang di log ini.
 
@@ -209,15 +242,16 @@ sama dengan partisi stock. Zip `twrp-dlkm-ocfix-20261121.zip` menulis
 `twrp-vendor_boot-allsrc-display-usb-v2.img` untuk panel fix. Detail:
 `PRETEST.md` §45–§49.
 
-**Langkah berikutnya**: flash `twrp-vendor_boot-allsrc-display-usb-v7.img`
-+ `twrp-dlkm-qpabi-fpgest-20261121.zip`, lalu uji:
-1. rekam video 1080p dan putar ulang; kalau masih hitam, ambil dmesg dan cari
+**Langkah berikutnya**: flash `twrp-vendor_boot-allsrc-display-usb-v8.img`
++ `twrp-dlkm-touchfix-20261121.zip`, lalu uji:
+1. touch biasa di launcher (harus ada `goodix_ts_report_finger`, bukan hanya
+   `gsx_gesture_ist`);
+2. rekam video 1080p dan putar ulang; kalau masih hitam, ambil dmesg dan cari
    `first frame:`, `bitstream buffer has no DMA address`, atau
    `mtk_venc_translation_fault_callback`;
-2. double-tap saat layar mati; dmesg harus memuat `gesture irq: suspended=...`
-   dan `got valid gesture type 0xcc`, lalu key 198;
-3. FOD saat layar mati; sysfs `/sys/kernel/tran_fp/vendor_name` harus
-   `goodix_opt_tee` dan log probe/`TRAN_IOC_INIT` terlihat.
+3. double-tap saat layar mati; dmesg harus memuat `gesture irq: suspended=1`
+   dan `got valid gesture type 0xcc`, lalu key 198 tanpa storm 0xcc;
+4. FOD saat layar mati; cek `tran_netlink_send` masih `invalid PID` atau tidak.
 Ambil dmesg segera setelah boot (ring buffer penuh oleh spam kamera/vcodec
 sehingga `dmesg1` baru mulai t=83 s). Fitur dari 25 modul stock tanpa source
 (tranlog, thd, varian touch alternatif, dll) hilang; driver sensor kamera X6871

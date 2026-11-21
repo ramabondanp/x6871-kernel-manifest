@@ -3598,3 +3598,45 @@ release                                     qpabi-fpgest-20261121
 ```
 
 Kernel: `f75c717036ac` (vcodec) + `6b2a88973414` (fingerprint/touch).
+
+## 57. Regresi `dmesg2`: touch mati karena gesture IRQ storm (gate `suspended` + event tidak dibersihkan)
+
+Status uji user: touch mati setelah release `qpabi-fpgest-20261121`.
+
+1. **Gejala**: dmesg2 memuat **170** `gsx_gesture_ist: got valid gesture type 0xcc`
+   dan **0** `goodix_ts_report_finger`. Semua IRQ sentuh dikonsumsi sebagai
+   gestur; tidak ada touch down/up yang sampai ke input subsystem.
+2. **Kesalahan gate**: stock `suspend`/`resume` menyimpan flag di `[core_data+908]`;
+   `gsx_gesture_ist` stock memeriksa field itu dan `cbz` keluar bila nol. Field
+   tersebut adalah `suspended`, bukan `tools_ctrl_sync`. Perubahan `6b2a88973414`
+   mengganti gate ke `tools_ctrl_sync` (selalu false) sehingga IRQ screen-on
+   diproses sebagai gestur.
+3. **Event tidak dibersihkan**: core `goodix_ts_threadirq_func` langsung
+   `return IRQ_HANDLED` saat modul mengembalikan `EVT_CANCEL_IRQEVT`, jadi
+   `hw_ops->after_event_handler()` tidak pernah menulis clear ke
+   `touch_data_addr`. Event 0xcc tetap pending dan setiap IRQ berikutnya
+   membaca gestur yang sama.
+4. **Race wake**: `gsx_gesture_ist` memanggil `pm_wakeup_event()` sebelum membaca
+   event. Display resume menjalankan notifier dan mereset IC lebih dulu,
+   sehingga data gestur hilang (terlihat di dmesg1: `touch_head` checksum
+   error).
+5. **Fix `a453c308cc33`**:
+   - kembalikan gate `atomic_read(&cd->suspended) == 0 -> EVT_CONTINUE`;
+   - panggil `hw_ops->after_event_handler(cd)` setelah gestur valid;
+   - pindahkan `pm_wakeup_event()` ke **setelah** loop modul eksternal di
+     `goodix_ts_threadirq_func`, sehingga gestur dibaca sebelum resume.
+6. **Verifikasi objek**: `gsx_gesture_ist` membaca `[x0,#900]` (`suspended`) dan
+   ukurannya 1292 B; `gt9916_common.ko` di vendor_boot v8 dan `odm_dlkm.img`
+   cocok dengan staging.
+
+### Artefak (`touchfix-20261121`)
+
+```text
+twrp-vendor_boot-allsrc-display-usb-v8.img  md5 1802940b36b1504e8e08835e063043d2  67.108.864 B
+vendor_dlkm.img                             md5 4b4f0bd5fba3d6b68d0b360bf6a905f3  24.551.424 B
+odm_dlkm.img                                md5 9034d036b6bcda3a0dcc0915a35ea373   4.206.592 B
+twrp-dlkm-touchfix-20261121.zip             md5 59b0907358fc2a80135d0df15aa1417a
+release                                     touchfix-20261121
+```
+
+Kernel `a453c308cc33`. `vendor_dlkm` tidak berubah dari `qpabi-fpgest-20261121`.
