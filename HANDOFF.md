@@ -16,8 +16,8 @@ Ditulis 2026-11-19, diperbarui 2026-11-21 untuk sesi AI berikutnya. Baca ini dul
 | DLKM (`vendor_dlkm` + `odm_dlkm`) | **269**, 100% source, image siap |
 | Build target | `//kernel_device_modules-6.12:mgk_64_k612_customer_modules_install.user` |
 | Build terakhir | sukses (inkremental), 2026-11-21 |
-| Kernel HEAD | `3c5e64704b34` (`w1vo36-6.12-port`) |
-| Runtime | **Android boot + layar + audio + AOD + kamera foto + video preview + Wi-Fi + GPU OK**; DT2W, flashlight, simpan video, FOD masih rusak; fix layar hijau intermiten (C3D), video save (`max_qp[3]`), flashlight, DT2W (KEY 198) siap uji (`vid-fl-dt2w5-20261121`) |
+| Kernel HEAD | `6b2a88973414` (`w1vo36-6.12-port`) |
+| Runtime | **Android boot + layar + audio + AOD + kamera foto + video preview + Wi-Fi + GPU OK**; DT2W/FOD/video-save masih dalam verifikasi rilis `qpabi-fpgest-20261121`; layar hijau C3D diperbaiki, flashlight belum diverifikasi ulang |
 
 ## Status per 2026-11-20 (TWRP final)
 
@@ -88,18 +88,23 @@ dibaca dari biner stock (`mov w3,#0x3b`). Fix kernel `5ba6fb6559ab`,
 hanya `vendor_dlkm` yang di-repack. Detail: `PRETEST.md` §46.
 
 ```text
-twrp-vendor_boot-allsrc-display-usb-v6.img  md5 993a8cfe970e9b8a21a4e61ed9d229a9  67.108.864 B
-vendor_dlkm.img                             md5 78a047fe3de5541abd3a956862862552  24.551.424 B
-odm_dlkm.img                                md5 67af71ce2301af658b94f445257b054a   4.206.592 B
-twrp-dlkm-vid-fl-dt2w5-20261121.zip         md5 4d188e48956d0fd698083a7dc6b83ae9
-release terbaru                             vid-fl-dt2w5-20261121 (vendor_boot v6 + vendor_dlkm + odm_dlkm)
+twrp-vendor_boot-allsrc-display-usb-v7.img  md5 15b501d2c18931cf620bbc9e9422978c  67.108.864 B
+vendor_dlkm.img                             md5 4b4f0bd5fba3d6b68d0b360bf6a905f3  24.551.424 B
+odm_dlkm.img                                md5 843e5b8169131dc1333715dbdc332759   4.206.592 B
+twrp-dlkm-qpabi-fpgest-20261121.zip         md5 bb5981102e3824fa3f44b8fb83ca7b96
+release terbaru                             qpabi-fpgest-20261121 (vendor_boot v7 + vendor_dlkm + odm_dlkm)
 /srv path                                   /serverhive1/ramabondanp/tmp/dlkm-out/ (+ tmp/x6871/)
 ```
 
+**dmesg1/logcat1 (rilis `vid-fl-dt2w5-20261121`, kernel `f75c717036ac` + `6b2a88973414`)**:
+1. **Video**: encoder sekarang benar-benar start (`vb2ops_venc_start_streaming`, AFBC 1920x1080) lalu VENC fault di `LARB7_PORT24`, `mva=0x0`, VCP watchdog reset, dan decoder ikut mati (`vdec_vcp_decode` IPI ack fail). Ini bukan lagi `bs_va=0`. Hipotesis utama: ABI QP lama membuat firmware menerima nilai min/max yang tertukar dan memprogram alamat nol. Fix `f75c717036ac`: enam field `i/i/p/p/b/b max/min qp` yang identik stock (`vcp_enc_set_param` sekarang 824 B dan instruction-identik dengan stock), kontrol V4L2 3-elemen, plus guard `dma_addr == 0` supaya VENC tidak pernah fault ke IOVA 0. Bukti akhir butuh uji device.
+2. **DT2W**: `gsx_gesture_ist` mensyaratkan `core_data->suspended == 1`, padahal layar sudah resume dan flag itu sudah 0 saat threaded IRQ jalan; event gestur yang membangunkan layar dibuang. Fix `6b2a88973414`: ikuti stock, cek `tools_ctrl_sync` saja, log state, dan kirim kode gestur untuk single-tap/FOD juga.
+3. **FOD**: `vendor.fingerprint.init.error` tetap muncul di logcat1; probe `tran_fp` tidak terlihat karena dmesg mulai t=83 s. `tran_fp` sekarang menerima chip-id dua endian, retry 5x, dan memakai fallback `goodix_opt_tee` bila deteksi gagal (tetap perlu bukti log probe dari t=0).
+4. **Flashlight** belum diuji ulang di log ini.
 
 **dmesg9/logcat2 (`vid-fl-dt2w5-20261121`)**:
 1. **Layar separuh hijau intermiten** (`mediatek_drm_v1`, `vendor_boot` v6): C3D tidak di-un-bypass bila 3DLUT SRAM gagal (`d46c6e7de494`).
-2. **Video tidak tersimpan** (`mtk-vcodec-enc`): `max_qp`/`min_qp` jadi array `[3]` sesuai ABI VCP stock (`79cacb884584`).
+2. **Video tidak tersimpan** (`mtk-vcodec-enc`): `max_qp`/`min_qp` diubah menjadi array `[3]` (`79cacb884584`). **Koreksi**: total ukuran cocok tetapi urutan field salah; stock memakai enam field terpisah `i_max/i_min/p_max/p_min/b_max/b_min`. Digantikan `f75c717036ac`.
 3. **Flashlight** (`ocp81375_v4l2`): nama subdev stock + `IS_CHARGER_READY` (`b2de4bc7507e`).
 4. **DT2W**: gestur double-tap = KEY 198, single-tap = 190, `/proc/gesture_function` mengembalikan karakter gestur (`3c5e64704b34`).
 5. Belum: FOD (`vendor.fingerprint.init.error`), verifikasi flashlight; butuh dmesg penuh dari t=0 dengan siklus suspend/tap. Detail: `PRETEST.md` §55.

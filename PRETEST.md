@@ -3519,7 +3519,7 @@ Status uji user sebelum fix: foto OK, video tidak hang tapi tidak tersimpan, fla
    - `mediatek_drm_v1.ko` dan `panel-rm69220-vdo-x6871.ko` byte-identik antara v4 dan v5, jadi penyebabnya race runtime.
    - `disp_c3d_cfg_set_lut()` mengabaikan return `disp_c3d_set_3dlut()` (yang mengembalikan `false`=0 saat `disp_c3d_check_sram()` gagal) lalu tetap un-bypass C3D0/C3D1 saat SRAM C3D1 kanan belum init. Stock hanya un-bypass bila return 0.
    - Fix (kernel `d46c6e7de494`): `disp_c3d_set_3dlut()` mengembalikan `-EAGAIN`; `disp_c3d_cfg_set_lut()` hanya un-bypass dan set `c3d_sram_hw_init` bila ret == 0.
-2. **Video tidak tersimpan** (`mtk-vcodec-enc.ko`): dmesg9 menunjukkan `mtk_venc_encode_header: venc_if_encode failed=0` (`enc_result.bs_va == 0`). Pembandingan disassembly `venc_vcp_set_param` stock vs source: offset field `struct venc_vsi`/`venc_vcu_config` bergeser 16 byte setelah `max_qp`. Di stock `max_qp` dan `min_qp` adalah array `[3]`, di source skalar. Fix (`79cacb884584`): ubah ke `__u32 max_qp[3]; __u32 min_qp[3]` dan isi ketiga elemen di `venc_vcp_if.c` + `venc_common_if.c`. Offset `0xaf0/0xaf8` pada `venc_vcp_encode` kini sama dengan stock.
+2. **Video tidak tersimpan** (`mtk-vcodec-enc.ko`): dmesg9 menunjukkan `mtk_venc_encode_header: venc_if_encode failed=0` (`enc_result.bs_va == 0`). Pembandingan disassembly `venc_vcp_set_param` stock vs source: offset field `struct venc_vsi`/`venc_vcu_config` bergeser 16 byte setelah `max_qp`. Di stock blok itu berukuran 24 byte; fix `79cacb884584` menggantinya dengan `__u32 max_qp[3]; __u32 min_qp[3]`. Ukuran total menjadi benar, tetapi **urutan fieldnya salah**; stock memakai enam field terpisah (`i_max/i_min/p_max/p_min/b_max/b_min`). Lihat §56 untuk koreksi `f75c717036ac`.
 3. **Flashlight** (`ocp81375_v4l2.ko`): nama subdev stock `ocp81375_v4l2-led0/-led1(-f)` dan prefix log `ocp81375_v4l2`; `FLASH_IOC_IS_CHARGER_READY` (210) kini ditangani (sebelumnya `No such command`). Fix `b2de4bc7507e`. Belum terbukti menghilangkan `Find no flashlight device`; perlu verifikasi di perangkat.
 4. **DT2W** (`adaptive-ts.ko`, `gt9916_common.ko`): disassembly `GestureHandle` stock: keycode `190` (`0xbe`) = single-tap, `198` (`0xc6`, `KEY_F26`) = gestur double-tap/`0xcc`, `195` = FOD. Rilis sebelumnya menukar 190 dan 198. `/proc/gesture_function` stock mengembalikan karakter gestur (`0xcc` -> `f`); kini diimplementasikan lewat `tran_gesture_set_code()`. Fix `3c5e64704b34`. Log dmesg9 mulai t=211s sehingga siklus suspend/tap belum terlihat; perlu dmesg penuh dari t=0.
 5. **FOD** (`tran_fp`): tidak diubah; `vendor.fingerprint.init.error` masih ada di logcat2. Perlu bandingkan `tran_fp_probe`/`tran_fp_ioctl` dengan stock.
@@ -3533,3 +3533,68 @@ odm_dlkm.img                                md5 67af71ce2301af658b94f445257b054a
 twrp-dlkm-vid-fl-dt2w5-20261121.zip         md5 4d188e48956d0fd698083a7dc6b83ae9
 release                                     vid-fl-dt2w5-20261121
 ```
+
+## 56. Analisis `dmesg1`/`logcat1`: VENC fault IOVA 0 (QP ABI salah urutan), gesture IRQ pasca-resume, FOD probe
+
+Status uji user: video tidak tersimpan, video tersimpan tampil hitam, FOD rusak, DT2W rusak.
+
+1. **Video (`mtk-vcodec-enc.ko`, `vendor_dlkm`)**
+   - dmesg1 menunjukkan encoder sudah start: `vb2ops_venc_start_streaming`, AFBC 1920x1080,
+     `slbc 1 maxqp -1 minqp -1`. Sekitar 60 ms kemudian:
+     `mtk_venc_translation_fault_callback: larb port 7 of m4u port 24`,
+     `mva 0x0`, `mtk_iommu ... iova=0x0`, lalu `vcp_A_wdt_handler` dan
+     `venc_check_release_lock: daemon killed when holding lock`.
+   - Decoder sesudahnya gagal (`vdec_vcp_decode IPI msg ack fail -1`) karena VCP
+     sudah di-reset; jadi video hitam adalah efek lanjutan, bukan decoder ABI.
+   - Koreksi §55: `max_qp[3]`/`min_qp[3]` memang menambah 16 byte, tetapi **urutan
+     fieldnya salah**. Stock `struct venc_vcu_config` dan `struct venc_enc_param`
+     memakai enam field: `i_max_qp, i_min_qp, p_max_qp, p_min_qp, b_max_qp,
+     b_min_qp`. Dengan array, firmware menerima `i_min=max`, `p_max=max`,
+     `b_max=min`, `b_min=min` (nilai min/max tertukar untuk I/P/B).
+   - Fix `f75c717036ac`: samakan kedua struct + `struct mtk_enc_params`, kontrol
+     `V4L2_CID_MTK_VIDEO_ENC_RC_MAX_QP`/`MIN_QP` jadi 3 elemen (`dims[0]=3`) seperti
+     HAL vendor, `VENC_SET_PARAM_ADJUST_MAX_QP/MIN_QP` mengirim `data_item=3`.
+     Verifikasi objek: `vcp_enc_set_param` 824 byte dan instruction-identik dengan
+     stock (hanya nomor baris printk yang beda); `venc_enc_param` 472 B,
+     `venc_vcu_config` 556 B, `venc_vsi` 3016 B.
+   - Tambahan pengaman: `vcp_enc_encode()` menolak `frm_buf->fb_addr[0].dma_addr == 0`
+     atau `bs_buf->dma_addr == 0` sebelum mengirim IPI, dan mencetak alamat
+     frame/bitstream pada frame pertama. Tanpa guard, VENC fault ke IOVA 0 dan
+     mematikan VCP/decoder.
+2. **DT2W (`gt9916_common.ko`, `odm_dlkm`)**
+   - dmesg1: `gsx_gesture_before_suspend` masuk gesture mode (`type 0x07`), lalu
+     hanya ada `brl_event_handler: touch_head ...` dan resume; tidak ada
+     `got valid gesture` maupun `failed get gesture data`.
+   - Perbedaan dengan stock: `gsx_gesture_ist` source mensyaratkan
+     `atomic_read(&cd->suspended) == 1`. Jalur resume display menjalankan
+     `goodix_ts_resume` dan mengeset `suspended=0` sebelum threaded IRQ gestur
+     selesai, sehingga event double-tap/FOD yang membangunkan layar dibuang.
+     Stock hanya memeriksa `tools_ctrl_sync`.
+   - Fix `6b2a88973414`: ganti gate ke `tools_ctrl_sync`, log state suspend,
+     kirim `tran_gesture_set_code()` untuk single-tap/FOD juga.
+3. **FOD (`tran_fp.ko`, `vendor_boot` v7)**
+   - `vendor.fingerprint.init.error` di logcat1 tetap ada (HAL, pid 1872, t=26 s);
+     dmesg1 mulai t=83 s sehingga log probe hilang. Belum ada bukti langsung
+     apakah probe gagal, chip-id gagal, atau TEE menolak.
+   - Perbaikan defensif `6b2a88973414`: terima chip-id Goodix dua endian
+     (`0x1231`/`0x3112`, `0x1261`/`0x6112`), retry deteksi 5x, dan bila deteksi
+     gagal gunakan `goodix_opt_tee` dari properti DT `goodix` supaya
+     `/sys/kernel/tran_fp/vendor_name` tidak kosong saat HAL init.
+   - Gap yang masih terbuka: `tran_fp_irq_init()` masih dinonaktifkan di probe
+     (IRQ baru di-request oleh `TRAN_IOC_INIT`), dan probe belum punya log
+     persistent. Uji berikutnya harus mengambil dmesg dari t=0.
+4. **Log dmesg1 mulai t=83 s** karena spam kamera/CCU/vcodec memenuhi ring
+   buffer. Untuk diagnosis berikutnya: reboot lalu ambil dmesg segera setelah
+   layar hidup, atau naikkan `log_buf_len`.
+
+### Artefak (`vendor_boot` v7 + `vendor_dlkm` + `odm_dlkm`)
+
+```text
+twrp-vendor_boot-allsrc-display-usb-v7.img  md5 15b501d2c18931cf620bbc9e9422978c  67.108.864 B
+vendor_dlkm.img                             md5 4b4f0bd5fba3d6b68d0b360bf6a905f3  24.551.424 B
+odm_dlkm.img                                md5 843e5b8169131dc1333715dbdc332759   4.206.592 B
+twrp-dlkm-qpabi-fpgest-20261121.zip         md5 bb5981102e3824fa3f44b8fb83ca7b96
+release                                     qpabi-fpgest-20261121
+```
+
+Kernel: `f75c717036ac` (vcodec) + `6b2a88973414` (fingerprint/touch).
