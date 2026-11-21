@@ -1,0 +1,174 @@
+diff --git a/cam_cal/src_v4l2/common/v2/eeprom_driver.c b/cam_cal/src_v4l2/common/v2/eeprom_driver.c
+index 0976854..56f797c 100644
+--- a/cam_cal/src_v4l2/common/v2/eeprom_driver.c
++++ b/cam_cal/src_v4l2/common/v2/eeprom_driver.c
+@@ -26,7 +26,8 @@
+ 
+ #include "cam_cal.h"
+ 
+-#define DEV_NODE_NAME_PREFIX "camera-eeprom"
++#define DEV_NODE_NAME_PREFIX "camera_eeprom"
++#define DEV_NODE_NAME_PREFIX_ALT "camera-eeprom"
+ #define DEV_NAME_FMT "camera_eeprom%u"
+ #define DEV_CLASS_NAME_FMT "camera_eepromdrv%u"
+ #define EEPROM_DEVICE_NNUMBER 255
+@@ -333,6 +334,12 @@ static inline int retrieve_index(struct i2c_client *client,
+ 		must_log("index = %u\n", *index);
+ 		return 0;
+ 	}
++	if (strncmp(node_name, DEV_NODE_NAME_PREFIX_ALT,
++		    strlen(DEV_NODE_NAME_PREFIX_ALT)) == 0 &&
++	    kstrtouint(node_name + strlen(DEV_NODE_NAME_PREFIX_ALT), 10, index) == 0) {
++		must_log("index = %u\n", *index);
++		return 0;
++	}
+ 
+ 	pr_err("invalid node name format\n");
+ 	*index = 0;
+diff --git a/cam_cal/src_v4l2/custom/cam_cal_list.c b/cam_cal/src_v4l2/custom/cam_cal_list.c
+index 04846ec..fbee4de 100644
+--- a/cam_cal/src_v4l2/custom/cam_cal_list.c
++++ b/cam_cal/src_v4l2/custom/cam_cal_list.c
+@@ -37,6 +37,9 @@ struct stCAM_CAL_LIST_STRUCT g_camCalList[] = {
+ 	{IMX350_SENSOR_ID, 0xA0, Common_read_region},
+ 	{IMX386_MONO_SENSOR_ID, 0xA0, Common_read_region},
+ 	{IMX499_SENSOR_ID, 0xA0, Common_read_region},
++	/* Infinix X6871 */
++	{GC32E1_SENSOR_ID, 0xA2, Common_read_region, MAX_EEPROM_SIZE_16K},
++	{S5KHM6SX_SENSOR_ID, 0xA0, Common_read_region, MAX_EEPROM_SIZE_16K},
+ 	/*  ADD before this line */
+ 	{0, 0, 0}       /*end of list */
+ };
+diff --git a/imgsensor/src-v4l2/BUILD.bazel b/imgsensor/src-v4l2/BUILD.bazel
+index 3ca0844..44fa210 100644
+--- a/imgsensor/src-v4l2/BUILD.bazel
++++ b/imgsensor/src-v4l2/BUILD.bazel
+@@ -21,7 +21,7 @@ filegroup(
+ ## ddk ko
+ 
+ # driver list to included
+-config_cust_kernel_imgsensor = "s5khp9sp_mipi_raw s5k4h7sub_mipi_raw s5k4h7_mipi_raw imx06a_mipi_raw imx06c_mipi_raw imx858_mipi_raw imx858dual_mipi_raw imx989_mipi_raw imx989lite_mipi_raw imx758_mipi_raw imx758lite_mipi_raw imx598_mipi_raw imx598lite_mipi_raw imx866rgb_mipi_raw s5kjd1_mipi_raw imx686_mipi_raw imx519_mipi_raw s5k2t7sp_mipi_raw s5k2p7_mipi_raw ov8856_mipi_raw imx386_mipi_raw imx398_mipi_raw s5k2l7_mipi_raw imx586_mipi_raw imx576_mipi_raw imx481_mipi_raw s5khp3sp_mipi_raw s5k3m5sx_mipi_raw ov48b_mipi_raw ov50d_mipi_raw ov50ddual_mipi_raw ov64b_mipi_raw imx766_mipi_raw s5k3p9sp_mipi_raw imx766dual_mipi_raw imx766o_mipi_raw imx709o_mipi_raw imx766dualo_mipi_raw s5k3m5sxo_mipi_raw imx499_mipi_raw imx709_mipi_raw imx866_mipi_raw imx800_mipi_raw s5kgd2_mipi_raw imx6632x_mipi_raw hi847_mipi_raw imx966_mipiw_raw fake_mipi_raw"
++config_cust_kernel_imgsensor = "s5khm6sx_mipi_raw gc32e1_mipi_raw gc02m3_mipi_raw gc02m3macro_mipi_raw s5khp9sp_mipi_raw s5k4h7sub_mipi_raw s5k4h7_mipi_raw imx06a_mipi_raw imx06c_mipi_raw imx858_mipi_raw imx858dual_mipi_raw imx989_mipi_raw imx989lite_mipi_raw imx758_mipi_raw imx758lite_mipi_raw imx598_mipi_raw imx598lite_mipi_raw imx866rgb_mipi_raw s5kjd1_mipi_raw imx686_mipi_raw imx519_mipi_raw s5k2t7sp_mipi_raw s5k2p7_mipi_raw ov8856_mipi_raw imx386_mipi_raw imx398_mipi_raw s5k2l7_mipi_raw imx586_mipi_raw imx576_mipi_raw imx481_mipi_raw s5khp3sp_mipi_raw s5k3m5sx_mipi_raw ov48b_mipi_raw ov50d_mipi_raw ov50ddual_mipi_raw ov64b_mipi_raw imx766_mipi_raw s5k3p9sp_mipi_raw imx766dual_mipi_raw imx766o_mipi_raw imx709o_mipi_raw imx766dualo_mipi_raw s5k3m5sxo_mipi_raw imx499_mipi_raw imx709_mipi_raw imx866_mipi_raw imx800_mipi_raw s5kgd2_mipi_raw imx6632x_mipi_raw hi847_mipi_raw imx966_mipiw_raw fake_mipi_raw"
+ 
+ config_subdrvs = config_cust_kernel_imgsensor.split(" ")
+ 
+diff --git a/imgsensor/src-v4l2/adaptor-subdrv-ctrl.c b/imgsensor/src-v4l2/adaptor-subdrv-ctrl.c
+index 311a1d7..f0b63d0 100644
+--- a/imgsensor/src-v4l2/adaptor-subdrv-ctrl.c
++++ b/imgsensor/src-v4l2/adaptor-subdrv-ctrl.c
+@@ -4083,3 +4083,105 @@ int common_parse_ebd_line(struct subdrv_ctx *ctx, struct mtk_recv_sensor_ebd_lin
+ 
+ 	return 0;
+ }
++
++void i2c_table_cntinuburst_write(struct subdrv_ctx *ctx, u16 *list, u32 len)
++{
++#define MAXLEN_CONTINUEDATA 252
++	char puSdContinCmd[MAXLEN_CONTINUEDATA];
++	u32 continlen = 0, item = 0, nextItem, IDX;
++	u32 continStartItem = 0, continCount = 0;
++	u32 unContinStartItem = 0, unContinCount = 0;
++	u32 continNextAddr = 0, continCurAddr = 0;
++	u32 dataOffset = 2;
++	u8 endflag = 0;
++	u8 lastContinStat = 0, continStat = 0;
++	u16 *pRegSrc, regaddr;
++	u16 tempdata;
++
++	switch (ctx->s_ctx.i2c_transfer_data_type) {
++	case I2C_DT_ADDR_16_DATA_16:
++		dataOffset = 2;
++		break;
++	case I2C_DT_ADDR_16_DATA_8:
++	default:
++		dataOffset = 1;
++		break;
++	}
++	DRV_LOG(ctx, "dataOffset=%d.\n", dataOffset);
++
++	for (item = 0; item < len; item = nextItem) {
++		continCurAddr = list[item];
++		nextItem = item + 2;
++		if (nextItem < len)
++			continNextAddr = list[nextItem];
++		else
++			endflag = 1;
++
++		if (endflag == 0) {
++			if ((continCurAddr + dataOffset) == continNextAddr) {
++				if (continStat != 1) {
++					continCount = 2;
++					continStartItem = item;
++					continStat = 1;
++				}
++				continCount += 2;
++			} else {
++				if (continStat == 0) {
++					unContinCount = 0;
++					unContinStartItem = item;
++					continStat = 2;
++					unContinCount += 2;
++				} else if (continStat == 1) {
++					continStat = 0;
++				} else {
++					unContinCount += 2;
++				}
++			}
++		} else {
++			if (continStat == 2) {
++				unContinCount += 2;
++			} else if (continStat == 0) {
++				unContinCount = 0;
++				unContinStartItem = item;
++				continStat = 2;
++				unContinCount += 2;
++			}
++		}
++
++		if ((lastContinStat != continStat) || endflag == 1) {
++			if ((lastContinStat == 1 && (continStat != 1)) ||
++			    (endflag == 1 && continStat == 1)) {
++				continlen = 0;
++				pRegSrc = list + continStartItem;
++				regaddr = pRegSrc[0];
++				for (IDX = 1; IDX < continCount;) {
++					tempdata = pRegSrc[IDX];
++					if (dataOffset == 2) {
++						puSdContinCmd[continlen++] = (char)(tempdata >> 8);
++						puSdContinCmd[continlen++] = (char)(tempdata & 0xFF);
++					} else {
++						puSdContinCmd[continlen++] = (char)(tempdata & 0xFF);
++					}
++					IDX += 2;
++					if ((continlen >= MAXLEN_CONTINUEDATA) ||
++					    (continCount <= IDX)) {
++						subdrv_i2c_wr_seq_p8(ctx, regaddr,
++								     puSdContinCmd, continlen);
++						continlen = 0;
++						if (continCount > IDX)
++							regaddr = pRegSrc[IDX - 1];
++					}
++				}
++			} else if ((lastContinStat == 2 && (continStat != 2)) ||
++				   (endflag == 1 && continStat == 2)) {
++				pRegSrc = list + unContinStartItem;
++				if (dataOffset == 2)
++					subdrv_i2c_wr_regs_u16(ctx, pRegSrc, unContinCount);
++				else
++					subdrv_i2c_wr_regs_u8(ctx, pRegSrc, unContinCount);
++			}
++			lastContinStat = continStat;
++		}
++	}
++#undef MAXLEN_CONTINUEDATA
++}
+diff --git a/imgsensor/src-v4l2/adaptor-subdrv-ctrl.h b/imgsensor/src-v4l2/adaptor-subdrv-ctrl.h
+index f257226..713a494 100644
+--- a/imgsensor/src-v4l2/adaptor-subdrv-ctrl.h
++++ b/imgsensor/src-v4l2/adaptor-subdrv-ctrl.h
+@@ -201,4 +201,5 @@ int common_get_csi_param(struct subdrv_ctx *ctx,
+ int common_update_sof_cnt(struct subdrv_ctx *ctx, u32 sof_cnt);
+ int common_parse_ebd_line(struct subdrv_ctx *ctx, struct mtk_recv_sensor_ebd_line *data,
+ 	struct mtk_ebd_dump *obj);
++void i2c_table_cntinuburst_write(struct subdrv_ctx *ctx, u16 *list, u32 len);
+ #endif

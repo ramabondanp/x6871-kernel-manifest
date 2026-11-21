@@ -89,12 +89,23 @@ hanya `vendor_dlkm` yang di-repack. Detail: `PRETEST.md` §46.
 
 ```text
 twrp-vendor_boot-allsrc-display-usb-v3.img  md5 c4362d3312ab41356bc6eb2cc6f509b8  67.108.864 B
-vendor_dlkm.img (tetap dari ocfix)          md5 ec627a474d09bb3303408e52211b6437  24.551.424 B
+vendor_dlkm.img                             md5 bfd96feb71d3f53fcc0c045b896809e6  24.551.424 B
 odm_dlkm.img    (tetap dari ocfix)          md5 c2c312b3374ebdb0e835db396663e924   4.206.592 B
+twrp-dlkm-cam1-20261121.zip                 md5 41e402b08f61576e1a5acd6e0622b188
 release vendor_boot terbaru                 vendor-boot-c3dfix-20261121
-release dlkm terbaru                        dlkm-ocfix-20261121
-/srv path                                   /serverhive1/ramabondanp/tmp/x6871/ (+ tmp/dlkm-out/)
+release dlkm terbaru                        dlkm-cam1-20261121 (vendor_dlkm saja)
+/srv path                                   /serverhive1/ramabondanp/tmp/dlkm-out/ (+ tmp/x6871/)
 ```
+
+**Kamera v1 (`dlkm-cam1-20261121`)**: layar sudah normal penuh setelah `v3`.
+Empat sensor X6871 (`s5khm6sx_mipi_raw` 0x1AD6, `gc32e1_mipi_raw` 0x32E1,
+`gc02m3_mipi_raw` 0x0202 dengan mask `0xFFFC == 0x0200` seperti stock,
+`gc02m3macro_mipi_raw` 0x0203) + `i2c_table_cntinuburst_write()` diport ke
+`imgsensor.ko`, plus fix prefix `camera_eeprom` dan `g_camCalList` (`S5KHM6SX`
+0xA0 / `GC32E1` 0xA2 16K) di `camera_eeprom_v4l2.ko`. Kernel `75ca1ac4a1ae`
+(`kd_imgsensor.h`), `mtkcam` direkam lewat `add-camera-x6871.sh` +
+`tools/patches/mtkcam-x6871-camera.patch`. Hanya `vendor_dlkm` yang di-repack.
+Detail: `PRETEST.md` §51.
 
 **dmesg5**: spam battery OC 65 Hz hilang 100% (`battery_oc_level count: 0`,
 `r_fg=50`), dan dmesg bersih dari `t=5 s`. Layar setengah kanan berubah dari

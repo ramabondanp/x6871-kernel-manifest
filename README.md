@@ -101,9 +101,11 @@ Wi-Fi + Mali GPU** (`dmesg4`). Fix berikutnya menutup spam IRQ battery OC
 mode switch 144/120/60/40 Hz panel (`e6d0ab2fb66a`, release `dlkm-ocfix-20261121`),
 serta bug layar setengah kanan pink/hijau akibat `disp_c3d_check_sram` right pipe
 (`1799bf13b78b`) dan ukuran `PQ_VIRTUAL_SET_PROPERTY` (`e84137d0e2aa`) di
-`mediatek_drm_v1.ko` (release `vendor-boot-c3dfix-20261121`, hanya `vendor_boot`
-`twrp-vendor_boot-allsrc-display-usb-v3.img`). Berikutnya: uji layar normal
-penuh, lalu port driver kamera. Detail: `HANDOFF.md`, `PRETEST.md` §40-§50.
+`mediatek_drm_v1.ko` (release `vendor-boot-c3dfix-20261121`, **layar normal
+penuh**). Driver kamera X6871 (4 sensor `s5khm6sx`/`gc32e1`/`gc02m3`/`gc02m3macro`
++ `camera_eeprom_v4l2`, `75ca1ac4a1ae` + `add-camera-x6871.sh`) sudah di-repack
+di release `dlkm-cam1-20261121` (`vendor_dlkm` saja). Detail: `HANDOFF.md`,
+`PRETEST.md` §40-§51.
 
 Catatan: hasil port di-push ke branch `w1vo36-6.12-port` di remote `alps`
 (bukan ke `mtk-base-latest`, yang sedang checked-out di working tree lokal).

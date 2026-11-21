@@ -3278,4 +3278,63 @@ release                                     vendor-boot-c3dfix-20261121
 ```
 
 `vendor_dlkm.img` dan `odm_dlkm.img` dari `dlkm-ocfix-20261121` tidak berubah.
-Boot setelah fix ini belum diuji.
+**Hasil uji:** layar normal penuh (separuh kanan tidak lagi pink/hijau).
+
+## 51. Port driver kamera X6871 (`imgsensor.ko` + `camera_eeprom_v4l2.ko`)
+
+Dari `dmesg5.txt`, keempat sensor DT X6871 gagal probe (`not found`) dan kedua
+EEPROM kamera gagal dengan `-EINVAL` (`-22`):
+
+```text
+imgsensor 2-0010: [search_sensor] gc02m3macro_mipi_raw not found
+imgsensor 4-004a: [search_sensor] gc32e1_mipi_raw not found
+imgsensor 8-0010: [search_sensor] gc02m3_mipi_raw not found
+imgsensor 9-0010: [search_sensor] s5khm6sx_mipi_raw not found
+mediatek,camera_eeprom 4-0051: probe ... failed with error -22
+mediatek,camera_eeprom 9-0050: probe ... failed with error -22
+```
+
+### 51.1 Empat subdriver sensor (`imgsensor.ko`)
+
+- **ID & nama sensor** di `kd_imgsensor.h` (kernel `75ca1ac4a1ae`):
+  - `S5KHM6SX_SENSOR_ID = 0x1AD6` (`s5khm6sx_mipi_raw`, i2c9 `@0x10`)
+  - `GC32E1_SENSOR_ID = 0x32E1` (`gc32e1_mipi_raw`, i2c4 `@0x4A`)
+  - `GC02M3_SENSOR_ID = 0x0202` (`gc02m3_mipi_raw`, i2c8 `@0x10`)
+  - `GC02M3MACRO_SENSOR_ID = 0x0203` (`gc02m3macro_mipi_raw`, i2c2 `@0x10`)
+- Tiga subdriver (`s5khm6sx_mipi_raw`, `gc32e1_mipi_raw`, `gc02m3macro_mipi_raw`)
+  diport dari donor 6.1 `mt6897` (`vendor/mediatek/kernel_modules/mtkcam/imgsensor/src-v4l2/common/`),
+  ditambah helper `i2c_table_cntinuburst_write()` di `adaptor-subdrv-ctrl.c/.h`
+  (burst write I2C 252 byte untuk tabel init S5KHM6SX).
+- `gc02m3_mipi_raw` diturunkan dari `gc02m3macro_mipi_raw` setelah verifikasi
+  biner `imgsensor.ko` stock:
+  - `pw_seq` dan tabel init identik (baris `(0x0100, 0x00)` sudah dikomentari);
+  - `get_imgsensor_id` stock `gc02m3` (`0x3a3bc..0x3a3c8`) memakai
+    `(*sensor_id & 0xFFFC) == 0x0200` agar chip GC02M3 (`0x0203`) cocok di slot
+    `gc02m3_mipi_raw` (`0x0202`).
+- Verifikasi biner `imgsensor.ko` hasil build: keempat `*_mipi_raw_entry` ada
+  dengan ID `0x1ad6`/`0x32e1`/`0x202`/`0x203` dan `i2c_table_cntinuburst_write`
+  terkompilasi.
+
+### 51.2 `camera_eeprom_v4l2.ko`
+
+- `eeprom_driver.c`: prefix DT kita `"camera-eeprom"` (tanda hubung), sedangkan
+  DT X6871 & stock memakai `"camera_eeprom"` (`camera_eeprom0@50`,
+  `camera_eeprom1@51`), sehingga `retrieve_index()` mengembalikan `-EINVAL`.
+  Diperbaiki agar menerima keduanya (`"camera_eeprom"` dan `"camera-eeprom"`).
+- `cam_cal_list.c`: tambahkan entri stock `g_camCalList`:
+  - `{GC32E1_SENSOR_ID, 0xA2, Common_read_region, MAX_EEPROM_SIZE_16K}`
+  - `{S5KHM6SX_SENSOR_ID, 0xA0, Common_read_region, MAX_EEPROM_SIZE_16K}`
+- Reproduksibilitas: `add-camera-x6871.sh` +
+  `tools/patches/mtkcam-x6871-camera.patch` di repo manifest (karena
+  `vendor/mediatek/kernel_modules/mtkcam` memakai remote `moto`).
+
+### Artefak (hanya `vendor_dlkm`)
+
+```text
+vendor_dlkm.img              md5 bfd96feb71d3f53fcc0c045b896809e6  24.551.424 B
+twrp-dlkm-cam1-20261121.zip  md5 41e402b08f61576e1a5acd6e0622b188
+release                      dlkm-cam1-20261121
+```
+
+`vendor_boot` (`v3`) dan `odm_dlkm` (`ocfix`) tidak berubah. Boot kamera belum
+diuji.

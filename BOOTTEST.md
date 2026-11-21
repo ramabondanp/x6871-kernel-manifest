@@ -335,6 +335,12 @@ twrp-dlkm-source-20261120.zip  (release dlkm-20261120)
 - Fix dmesg5 (layar setengah kanan pink/hijau — C3D dual-pipe SRAM +
   `PQ_VIRTUAL_SET_PROPERTY` 12 B di `mediatek_drm_v1.ko`): hanya `vendor_boot`
   di-repack: `twrp-vendor_boot-allsrc-display-usb-v3.img` md5
-  `c4362d3312ab41356bc6eb2cc6f509b8` (release `vendor-boot-c3dfix-20261121`).
+  `c4362d3312ab41356bc6eb2cc6f509b8` (release `vendor-boot-c3dfix-20261121`) —
+  **terverifikasi normal**.
+- Port kamera X6871 (`s5khm6sx`/`gc32e1`/`gc02m3`/`gc02m3macro` di
+  `imgsensor.ko` + prefix `camera_eeprom` & `g_camCalList` di
+  `camera_eeprom_v4l2.ko`): hanya `vendor_dlkm` di-repack: `vendor_dlkm.img`
+  md5 `bfd96feb71d3f53fcc0c045b896809e6`, zip `twrp-dlkm-cam1-20261121.zip`
+  (release `dlkm-cam1-20261121`).
 - Fitur dari 25 modul stock tanpa source (`transsion_tranlog`,
   `thd`, dll) tidak akan ada.
