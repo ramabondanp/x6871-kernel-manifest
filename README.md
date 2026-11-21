@@ -109,11 +109,12 @@ AOD/screen-on panel (`a765870ac11f`) **terkonfirmasi normal** di `audio-aod-cam2
 fix lanjutan `mtk-cam-isp` inline `sink_fmt`, `s5khm6sx` D-PHY 4-lane,
 Transsion `flashlight-core` (`1d3f17a21434`), dan DT2W/FOD touch
 `adaptive-ts`+`gt9916_common` (`466e4c1731c1`) menghidupkan kamera foto;
-release terbaru `cam4-fod-dt2w-20261121` (`vendor_boot` v5 + `vendor_dlkm` +
-`odm_dlkm`) memperbaiki mode video `s5khm6sx` (`4000x2248`), `vendor_name`
-`goodix_opt_tee` di `tran_fp` (`6432a8d60ee7`), serta keycode DT2W/FOD stock
-(`190`/`195`/`198`) + retry bangun tidur (`831ee7ca4762`). Detail: `HANDOFF.md`,
-`PRETEST.md` §40-§54.
+release terbaru `vid-fl-dt2w5-20261121` (`vendor_boot` v6 + `vendor_dlkm` +
+`odm_dlkm`) memperbaiki layar hijau intermiten (C3D, `d46c6e7de494`), simpan video
+(`max_qp[3]`, `79cacb884584`), flashlight `ocp81375_v4l2` (`b2de4bc7507e`), dan DT2W
+KEY 198 (`3c5e64704b34`); rilis sebelumnya `cam4-fod-dt2w-20261121` memperbaiki mode video
+`s5khm6sx`, `vendor_name` `goodix_opt_tee`, dan retry bangun tidur. Detail: `HANDOFF.md`,
+`PRETEST.md` §40-§55.
 
 Catatan: hasil port di-push ke branch `w1vo36-6.12-port` di remote `alps`
 (bukan ke `mtk-base-latest`, yang sedang checked-out di working tree lokal).

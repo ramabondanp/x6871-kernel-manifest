@@ -3511,3 +3511,25 @@ release                                     cam4-fod-dt2w-20261121
 
 
 
+## 55. Fix `dmesg9`/`logcat2`: layar separuh hijau permanen (C3D), video tidak tersimpan (`mtk-vcodec-enc`), flashlight, DT2W
+
+Status uji user sebelum fix: foto OK, video tidak hang tapi tidak tersimpan, flashlight dan DT2W masih rusak, layar separuh hijau muncul lagi sesekali (hilang setelah 2x reboot).
+
+1. **Layar separuh hijau intermiten** (`mediatek_drm_v1.ko`, `vendor_boot` v6):
+   - `mediatek_drm_v1.ko` dan `panel-rm69220-vdo-x6871.ko` byte-identik antara v4 dan v5, jadi penyebabnya race runtime.
+   - `disp_c3d_cfg_set_lut()` mengabaikan return `disp_c3d_set_3dlut()` (yang mengembalikan `false`=0 saat `disp_c3d_check_sram()` gagal) lalu tetap un-bypass C3D0/C3D1 saat SRAM C3D1 kanan belum init. Stock hanya un-bypass bila return 0.
+   - Fix (kernel `d46c6e7de494`): `disp_c3d_set_3dlut()` mengembalikan `-EAGAIN`; `disp_c3d_cfg_set_lut()` hanya un-bypass dan set `c3d_sram_hw_init` bila ret == 0.
+2. **Video tidak tersimpan** (`mtk-vcodec-enc.ko`): dmesg9 menunjukkan `mtk_venc_encode_header: venc_if_encode failed=0` (`enc_result.bs_va == 0`). Pembandingan disassembly `venc_vcp_set_param` stock vs source: offset field `struct venc_vsi`/`venc_vcu_config` bergeser 16 byte setelah `max_qp`. Di stock `max_qp` dan `min_qp` adalah array `[3]`, di source skalar. Fix (`79cacb884584`): ubah ke `__u32 max_qp[3]; __u32 min_qp[3]` dan isi ketiga elemen di `venc_vcp_if.c` + `venc_common_if.c`. Offset `0xaf0/0xaf8` pada `venc_vcp_encode` kini sama dengan stock.
+3. **Flashlight** (`ocp81375_v4l2.ko`): nama subdev stock `ocp81375_v4l2-led0/-led1(-f)` dan prefix log `ocp81375_v4l2`; `FLASH_IOC_IS_CHARGER_READY` (210) kini ditangani (sebelumnya `No such command`). Fix `b2de4bc7507e`. Belum terbukti menghilangkan `Find no flashlight device`; perlu verifikasi di perangkat.
+4. **DT2W** (`adaptive-ts.ko`, `gt9916_common.ko`): disassembly `GestureHandle` stock: keycode `190` (`0xbe`) = single-tap, `198` (`0xc6`, `KEY_F26`) = gestur double-tap/`0xcc`, `195` = FOD. Rilis sebelumnya menukar 190 dan 198. `/proc/gesture_function` stock mengembalikan karakter gestur (`0xcc` -> `f`); kini diimplementasikan lewat `tran_gesture_set_code()`. Fix `3c5e64704b34`. Log dmesg9 mulai t=211s sehingga siklus suspend/tap belum terlihat; perlu dmesg penuh dari t=0.
+5. **FOD** (`tran_fp`): tidak diubah; `vendor.fingerprint.init.error` masih ada di logcat2. Perlu bandingkan `tran_fp_probe`/`tran_fp_ioctl` dengan stock.
+
+### Artefak (`vendor_boot` v6 + `vendor_dlkm` + `odm_dlkm`)
+
+```text
+twrp-vendor_boot-allsrc-display-usb-v6.img  md5 993a8cfe970e9b8a21a4e61ed9d229a9  67.108.864 B
+vendor_dlkm.img                             md5 78a047fe3de5541abd3a956862862552  24.551.424 B
+odm_dlkm.img                                md5 67af71ce2301af658b94f445257b054a   4.206.592 B
+twrp-dlkm-vid-fl-dt2w5-20261121.zip         md5 4d188e48956d0fd698083a7dc6b83ae9
+release                                     vid-fl-dt2w5-20261121
+```

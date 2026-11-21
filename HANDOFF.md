@@ -16,8 +16,8 @@ Ditulis 2026-11-19, diperbarui 2026-11-21 untuk sesi AI berikutnya. Baca ini dul
 | DLKM (`vendor_dlkm` + `odm_dlkm`) | **269**, 100% source, image siap |
 | Build target | `//kernel_device_modules-6.12:mgk_64_k612_customer_modules_install.user` |
 | Build terakhir | sukses (inkremental), 2026-11-21 |
-| Kernel HEAD | `831ee7ca4762` (`w1vo36-6.12-port`) |
-| Runtime | **Android boot + layar normal + audio + AOD + kamera foto + Wi-Fi + GPU**; fix video kamera (`4000x2248`), FOD (`goodix_opt_tee`), & DT2W/FOD keycodes (`190`/`195`/`198`) siap uji (`cam4-fod-dt2w-20261121`) |
+| Kernel HEAD | `3c5e64704b34` (`w1vo36-6.12-port`) |
+| Runtime | **Android boot + layar + audio + AOD + kamera foto + video preview + Wi-Fi + GPU OK**; DT2W, flashlight, simpan video, FOD masih rusak; fix layar hijau intermiten (C3D), video save (`max_qp[3]`), flashlight, DT2W (KEY 198) siap uji (`vid-fl-dt2w5-20261121`) |
 
 ## Status per 2026-11-20 (TWRP final)
 
@@ -88,14 +88,21 @@ dibaca dari biner stock (`mov w3,#0x3b`). Fix kernel `5ba6fb6559ab`,
 hanya `vendor_dlkm` yang di-repack. Detail: `PRETEST.md` §46.
 
 ```text
-twrp-vendor_boot-allsrc-display-usb-v5.img  md5 6b9db37f101262c220696321d5fda896  67.108.864 B
-vendor_dlkm.img                             md5 fabc4903098905d793af5cc7985608f0  24.551.424 B
-odm_dlkm.img                                md5 5add223fe6599a2014de88e6c7e45166   4.206.592 B
-twrp-dlkm-cam4-fod-dt2w-20261121.zip        md5 0605a3b4529ef7640436fa4a39893cac
-release terbaru                             cam4-fod-dt2w-20261121 (vendor_boot v5 + vendor_dlkm + odm_dlkm)
+twrp-vendor_boot-allsrc-display-usb-v6.img  md5 993a8cfe970e9b8a21a4e61ed9d229a9  67.108.864 B
+vendor_dlkm.img                             md5 78a047fe3de5541abd3a956862862552  24.551.424 B
+odm_dlkm.img                                md5 67af71ce2301af658b94f445257b054a   4.206.592 B
+twrp-dlkm-vid-fl-dt2w5-20261121.zip         md5 4d188e48956d0fd698083a7dc6b83ae9
+release terbaru                             vid-fl-dt2w5-20261121 (vendor_boot v6 + vendor_dlkm + odm_dlkm)
 /srv path                                   /serverhive1/ramabondanp/tmp/dlkm-out/ (+ tmp/x6871/)
 ```
 
+
+**dmesg9/logcat2 (`vid-fl-dt2w5-20261121`)**:
+1. **Layar separuh hijau intermiten** (`mediatek_drm_v1`, `vendor_boot` v6): C3D tidak di-un-bypass bila 3DLUT SRAM gagal (`d46c6e7de494`).
+2. **Video tidak tersimpan** (`mtk-vcodec-enc`): `max_qp`/`min_qp` jadi array `[3]` sesuai ABI VCP stock (`79cacb884584`).
+3. **Flashlight** (`ocp81375_v4l2`): nama subdev stock + `IS_CHARGER_READY` (`b2de4bc7507e`).
+4. **DT2W**: gestur double-tap = KEY 198, single-tap = 190, `/proc/gesture_function` mengembalikan karakter gestur (`3c5e64704b34`).
+5. Belum: FOD (`vendor.fingerprint.init.error`), verifikasi flashlight; butuh dmesg penuh dari t=0 dengan siklus suspend/tap. Detail: `PRETEST.md` §55.
 **dmesg8/logcat1 (Kamera foto working; fix Video kamera + FOD + DT2W, `cam4-fod-dt2w-20261121`)**:
 1. **Video kamera (`s5khm6sx`, `vendor_dlkm`)**: ubah `normal_video` `4000x2252` -> `4000x2248` (PDAF `2000x1124`) plus timing `hs_video`/`slim_video`/`custom3` agar cocok dengan tabel register stock.
 2. **FOD (`tran_fp.ko`, `vendor_boot` v5)**: `6432a8d60ee7` — ganti `vendor_name` dari `common_goodix` menjadi `goodix_opt_tee` (untuk `GW9578`/`GW9598`) / `goodix_tee` seperti stock.
