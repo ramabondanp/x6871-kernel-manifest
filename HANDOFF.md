@@ -88,13 +88,30 @@ dibaca dari biner stock (`mov w3,#0x3b`). Fix kernel `5ba6fb6559ab`,
 hanya `vendor_dlkm` yang di-repack. Detail: `PRETEST.md` §46.
 
 ```text
-twrp-vendor_boot-allsrc-display-usb-v2.img  md5 e3a1fbe803361749d7fd28f1049d1ffa  67.108.864 B
-vendor_dlkm.img                             md5 ec627a474d09bb3303408e52211b6437  24.551.424 B
-odm_dlkm.img                                md5 c2c312b3374ebdb0e835db396663e924   4.206.592 B
-twrp-dlkm-ocfix-20261121.zip                md5 6fce24575faacd85164de86fc775495a
-release                                     dlkm-ocfix-20261121
-/srv path                                   /serverhive1/ramabondanp/tmp/dlkm-out/ (+ tmp/x6871/)
+twrp-vendor_boot-allsrc-display-usb-v3.img  md5 c4362d3312ab41356bc6eb2cc6f509b8  67.108.864 B
+vendor_dlkm.img (tetap dari ocfix)          md5 ec627a474d09bb3303408e52211b6437  24.551.424 B
+odm_dlkm.img    (tetap dari ocfix)          md5 c2c312b3374ebdb0e835db396663e924   4.206.592 B
+release vendor_boot terbaru                 vendor-boot-c3dfix-20261121
+release dlkm terbaru                        dlkm-ocfix-20261121
+/srv path                                   /serverhive1/ramabondanp/tmp/x6871/ (+ tmp/dlkm-out/)
 ```
+
+**dmesg5**: spam battery OC 65 Hz hilang 100% (`battery_oc_level count: 0`,
+`r_fg=50`), dan dmesg bersih dari `t=5 s`. Layar setengah kanan berubah dari
+pink (`dmesg4`) menjadi hijau (`dmesg5`) dengan dua baris kunci di log:
+1. `disp_c3d_flip_3dlut_sram: sram_apb = sram_int = 0, skip flip!`: di
+   `v1/mtk_disp_c3d.c`, `disp_c3d_set_3dlut()` hanya memanggil
+   `disp_c3d_check_sram(comp, true)` pada left pipe (`C3D0`) dan lupa
+   memanggilnya pada right pipe (`C3D1`), sedangkan biner stock memanggilnya
+   untuk kedua pipe. Akibatnya `C3D1` tidak pernah flip dan membaca SRAM
+   power-on acak (separuh kanan pink/hijau). Fix: `1799bf13b78b`.
+2. `mtk_drm_ioctl_pq_proxy cmd 900 usize 12, ksize 128 not match!`:
+   `PQ_VIRTUAL_SET_PROPERTY` di `v1/mtk_disp_pq_helper.c` memakai `32 * u32`
+   (128 B) padahal stock dan userspace memakai `DISP_PQ_PROPERTY_MAX` (`3 * u32`
+   = 12 B). Fix: `e84137d0e2aa`.
+Hanya `vendor_boot` yang di-repack (`twrp-vendor_boot-allsrc-display-usb-v3.img`,
+md5 `c4362d3312ab41356bc6eb2cc6f509b8`, release `vendor-boot-c3dfix-20261121`)
+karena `mediatek_drm_v1.ko` hanya berada di `vendor_boot`. Detail: `PRETEST.md` §50.
 
 **dmesg4**: Android boot sampai launcher, Mali r54p1-11eac0, Wi-Fi, touch,
 haptic, dan charger berjalan. Dua bug teridentifikasi:

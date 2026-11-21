@@ -332,5 +332,9 @@ twrp-dlkm-source-20261120.zip  (release dlkm-20261120)
   `vendor_dlkm.img` md5 `ec627a474d09bb3303408e52211b6437`,
   `odm_dlkm.img` md5 `c2c312b3374ebdb0e835db396663e924`,
   zip `twrp-dlkm-ocfix-20261121.zip` (release `dlkm-ocfix-20261121`).
+- Fix dmesg5 (layar setengah kanan pink/hijau — C3D dual-pipe SRAM +
+  `PQ_VIRTUAL_SET_PROPERTY` 12 B di `mediatek_drm_v1.ko`): hanya `vendor_boot`
+  di-repack: `twrp-vendor_boot-allsrc-display-usb-v3.img` md5
+  `c4362d3312ab41356bc6eb2cc6f509b8` (release `vendor-boot-c3dfix-20261121`).
 - Fitur dari 25 modul stock tanpa source (`transsion_tranlog`,
   `thd`, dll) tidak akan ada.

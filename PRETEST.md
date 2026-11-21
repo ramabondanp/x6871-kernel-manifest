@@ -3219,4 +3219,63 @@ twrp-dlkm-ocfix-20261121.zip                md5 6fce24575faacd85164de86fc775495a
 release                                     dlkm-ocfix-20261121
 ```
 
+## 50. dmesg5: spam OC hilang 100%, akar layar setengah kanan pink/hijau = C3D dual-pipe SRAM (`mediatek_drm_v1.ko`)
+
+Dengan `dlkm-ocfix-20261121`, spam IRQ OC 65 Hz hilang total (`battery_oc_level
+count: 0`, `r_fg=50 car_tune=1000 DEFAULT_RFG=50`), dan `dmesg5.txt` merekam
+sejak `t=5,02 s`. Layar setengah kanan berganti warna dari **pink** (`dmesg4`)
+menjadi **hijau** (`dmesg5`) — ciri khas SRAM belum terinisialisasi pada
+right pipe (`mt6895` dual-pipe: kiri 540px = `C3D0`, kanan 540px = `C3D1`).
+
+Dua baris penentu di `dmesg5.txt`:
+
+```text
+[   14.702534] [DISP]mtk_drm_ioctl_pq_proxy cmd 900 usize 12, ksize 128 not match!
+[   14.715977] disp_c3d_flip_3dlut_sram: sram_apb = sram_int = 0, skip flip!
+```
+
+### 50.1 C3D right pipe tidak pernah dicek/di-flip (`v1/mtk_disp_c3d.c`)
+
+- Di `drivers/gpu/drm/mediatek/mediatek_v2/v1/mtk_disp_c3d.c` baris 509,
+  `disp_c3d_set_3dlut()` hanya memanggil `disp_c3d_check_sram(comp, true)`
+  untuk `C3D0` (left pipe), tidak pernah untuk `comp_c3d1` (`C3D1`, right
+  pipe).
+- Padahal disassembly `disp_c3d_cfg_set_lut` pada `mediatek_drm_v1.ko` stock
+  memanggil `disp_c3d_check_sram` **dua kali** (`0x1b1e4` untuk `comp`,
+  `0x1b204` untuk `comp_c3d1`, lalu `and w8, w25, w0`).
+- Tanpa `disp_c3d_check_sram(comp_c3d1, true)`, `C3D1` tetap pada
+  `sram_apb == sram_int == 0` (bukan ping-pong), sehingga
+  `disp_c3d_flip_3dlut_sram(comp_c3d1)` mencetak `skip flip!` dan keluar.
+  Ketika `disp_c3d_bypass(comp, 0)` melepas relay kedua pipe, `C3D0` memakai
+  3D LUT valid sedangkan `C3D1` membaca bank SRAM power-on acak → separuh
+  kanan layar pink/hijau.
+- Cek donor 6.1 (`mt6897`): masih memakai `disp_c3d_update_sram()` lama per
+  pipe, sehingga regresi ini khusus hasil refactor 6.12 di `v1/mtk_disp_c3d.c`.
+
+Perbaikan (kernel `1799bf13b78b`): panggil `disp_c3d_check_sram(comp_c3d1, true)`
+tanpa short-circuit ketika `is_dual_pipe && comp_c3d1` lalu gabungkan hasilnya.
+Verifikasi disassembly `disp_c3d_cfg_set_lut` hasil build: dua panggilan
+`bl <disp_c3d_check_sram>` (`0x50d54` dan `0x50d78`), cocok dengan stock.
+
+### 50.2 Ukuran `PQ_VIRTUAL_SET_PROPERTY` (`v1/mtk_disp_pq_helper.c`)
+
+- Userspace dan stock `mediatek_drm_v1.ko` memakai `12` byte (`3 * u32` =
+  `DISP_PQ_PROPERTY_MAX`) untuk `cmd 900` (`PQ_VIRTUAL_SET_PROPERTY`),
+  sedangkan `v1/mtk_disp_pq_helper.c` memakai `sizeof(unsigned int) * 32`
+  (128 byte).
+- Perbaikan (kernel `e84137d0e2aa`): pakai `DISP_PQ_PROPERTY_MAX` di
+  `g_pq_cmd_map` dan buffer lokal `disp_pq_proxy_virtual_get_persist_property`.
+  Verifikasi `.rodata` `g_pq_cmd_map`: `cmd 900` = `(12, 1)` identik stock.
+
+Catatan: `WARNING: rcu_note_context_switch` di `t=26,268 s` berasal dari modul
+eksternal `susfs_guard_lkm` (`sus_mount_learn_work`), bukan modul build kita.
+
+### Artefak (hanya `vendor_boot`, karena `mediatek_drm_v1.ko` hanya di `vendor_boot`)
+
+```text
+twrp-vendor_boot-allsrc-display-usb-v3.img  md5 c4362d3312ab41356bc6eb2cc6f509b8  67.108.864 B
+release                                     vendor-boot-c3dfix-20261121
+```
+
+`vendor_dlkm.img` dan `odm_dlkm.img` dari `dlkm-ocfix-20261121` tidak berubah.
 Boot setelah fix ini belum diuji.

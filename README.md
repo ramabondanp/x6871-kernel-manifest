@@ -97,12 +97,13 @@ shared-status gpufreq: `SCP_IPI_COUNT` 59 (`5ba6fb6559ab`), GPU donor
 OPPO r54p1-11eac0 (`5462a6d118a6`), dan padding gpufreq sebelum
 `power_count` (`07eb1dab07c2`), hingga akhirnya **boot sampai launcher +
 Wi-Fi + Mali GPU** (`dmesg4`). Fix berikutnya menutup spam IRQ battery OC
-65 Hz (`8d38cd08a65c`), skala gauge `r-fg-value` (`0f7ce1ce8f7e`), dan
-timing/VFP mode switch 144/120/60/40 Hz panel (`e6d0ab2fb66a`). Artefak
-terbaru release `dlkm-ocfix-20261121` (`twrp-vendor_boot-allsrc-display-usb-v2.img`
-+ `twrp-dlkm-ocfix-20261121.zip`; `PRETEST.md` §46-§49). Berikutnya: uji
-ulang system boot + ambil dmesg dari `t=0 s`, lalu port driver kamera.
-Detail: `HANDOFF.md`, `PRETEST.md` §40-§49.
+65 Hz (`8d38cd08a65c`), skala gauge `r-fg-value` (`0f7ce1ce8f7e`), timing/VFP
+mode switch 144/120/60/40 Hz panel (`e6d0ab2fb66a`, release `dlkm-ocfix-20261121`),
+serta bug layar setengah kanan pink/hijau akibat `disp_c3d_check_sram` right pipe
+(`1799bf13b78b`) dan ukuran `PQ_VIRTUAL_SET_PROPERTY` (`e84137d0e2aa`) di
+`mediatek_drm_v1.ko` (release `vendor-boot-c3dfix-20261121`, hanya `vendor_boot`
+`twrp-vendor_boot-allsrc-display-usb-v3.img`). Berikutnya: uji layar normal
+penuh, lalu port driver kamera. Detail: `HANDOFF.md`, `PRETEST.md` §40-§50.
 
 Catatan: hasil port di-push ke branch `w1vo36-6.12-port` di remote `alps`
 (bukan ke `mtk-base-latest`, yang sedang checked-out di working tree lokal).
