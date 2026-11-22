@@ -10,26 +10,23 @@ Pakai:
 Output: "berkas:compatible" per baris (siap dipakai dt-device-table.py).
 """
 
+import argparse
 import os
 import re
-import subprocess
-import sys
 
 TOKEN_RE = re.compile(rb'"([A-Za-z0-9_.,+\- ]{4,})"')
-WANTED_EXT = (".c", ".h")  # diisi dari --ext
+SKIP_DIRS = {".git", "out", "out_bazel", "bazel-out", "bazel-bin"}
 
 
 def main(list_path, trees, exts):
-    wanted = {
-        line.strip().lower() for line in open(list_path, errors="replace") if line.strip()
-    }
+    with open(list_path, errors="replace") as fh:
+        wanted = {line.strip().lower() for line in fh if line.strip()}
 
     # 1. kumpulkan berkas yang mungkin relevan
     files = set()
     for tree in trees:
-        for root, _dirs, names in os.walk(tree):
-            if "/out/" in root or root.endswith("/out"):
-                continue
+        for root, dirs, names in os.walk(tree):
+            dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
             for n in names:
                 if n.endswith(exts):
                     files.add(os.path.join(root, n))
@@ -37,7 +34,8 @@ def main(list_path, trees, exts):
     # 2. pindai token, cocokkan persis, hanya pada baris ber-'compatible'
     for f in sorted(files):
         try:
-            data = open(f, "rb").read()
+            with open(f, "rb") as fh:
+                data = fh.read()
         except OSError:
             continue
         if b"," not in data:
@@ -57,7 +55,6 @@ def main(list_path, trees, exts):
 
 
 if __name__ == "__main__":
-    import argparse
     ap = argparse.ArgumentParser()
     ap.add_argument("list")
     ap.add_argument("trees", nargs="+")

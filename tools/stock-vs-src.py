@@ -2,7 +2,7 @@
 """Bandingkan .ko stock vs .ko hasil build sendiri, per section + simbol + relokasi.
 
 Dipakai untuk membuktikan apakah modul stock identik dengan hasil build kita
-(PRETEST.md 26). Modul yang "identik" di sini bukan cuma .text sama, tapi
+(docs/PRETEST.md §26). Modul yang "identik" di sini bukan cuma .text sama, tapi
 seluruh section yang dimuat, tabel simbol, relokasi section kode, dan modinfo.
 
 Contoh:
@@ -60,14 +60,20 @@ MODINFO_KEYS = (
 
 
 def run(cmd, binary=False):
-    out = subprocess.run(cmd, shell=True, capture_output=True).stdout
+    out = subprocess.run(cmd, capture_output=True).stdout
     return out if binary else out.decode("utf-8", "replace")
 
 
 def section_bytes(path, section):
     return run(
-        f"aarch64-linux-gnu-objcopy -O binary --only-section='{section}' "
-        f"'{path}' /dev/stdout 2>/dev/null",
+        [
+            "aarch64-linux-gnu-objcopy",
+            "-O",
+            "binary",
+            f"--only-section={section}",
+            path,
+            "/dev/stdout",
+        ],
         binary=True,
     )
 
@@ -75,7 +81,7 @@ def section_bytes(path, section):
 def modinfo(path):
     """Dict key -> daftar nilai (alias bisa lebih dari satu)."""
     out = {}
-    for line in run(f"strings -a '{path}'").splitlines():
+    for line in run(["strings", "-a", path]).splitlines():
         key, sep, value = line.partition("=")
         if sep and key in MODINFO_KEYS:
             out.setdefault(key, []).append(value)
@@ -85,7 +91,7 @@ def modinfo(path):
 def section_names(path):
     """Indeks section (string, mis. '34') -> nama section."""
     out = {}
-    for line in run(f"aarch64-linux-gnu-readelf -SW '{path}'").splitlines():
+    for line in run(["aarch64-linux-gnu-readelf", "-SW", path]).splitlines():
         parts = line.split()
         if len(parts) >= 3 and parts[0].startswith("["):
             idx = parts[0].strip("[]")
@@ -101,7 +107,7 @@ def symbols(path):
     """name -> (section, offset, size, type, bind) untuk simbol global."""
     secs = section_names(path)
     out = {}
-    for line in run(f"aarch64-linux-gnu-readelf -sW '{path}'").splitlines():
+    for line in run(["aarch64-linux-gnu-readelf", "-sW", path]).splitlines():
         parts = line.split()
         if len(parts) < 8 or not parts[0].rstrip(":").isdigit():
             continue
@@ -118,7 +124,7 @@ def code_relocs(path):
     """Hash relokasi, dibatasi section kode (relokasi debug diabaikan)."""
     keep = []
     current = None
-    for line in run(f"aarch64-linux-gnu-objdump -r '{path}'").splitlines():
+    for line in run(["aarch64-linux-gnu-objdump", "-r", path]).splitlines():
         if line.startswith("RELOCATION RECORDS FOR ["):
             current = line.split("[")[1].rstrip("]")
             if current in CODE_SECS:

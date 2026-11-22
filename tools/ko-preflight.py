@@ -179,7 +179,8 @@ def import_crcs(path):
 
 def _elf_sections(path):
     """Minimal ELF64 section reader: returns list of {name,name_off,offset,size,index}."""
-    data = open(path, "rb").read()
+    with open(path, "rb") as fh:
+        data = fh.read()
     if data[:4] != b"\x7fELF" or data[4] != 2:
         raise ValueError("not ELF64: " + path)
     e_shoff = struct.unpack_from("<Q", data, 0x28)[0]
@@ -373,13 +374,14 @@ def parse_symvers(path):
     out = {}
     if not path or not os.path.exists(path):
         return out
-    for line in open(path):
-        parts = line.split()
-        if len(parts) >= 2:
-            try:
-                out[parts[1]] = int(parts[0], 16)
-            except ValueError:
-                pass
+    with open(path) as fh:
+        for line in fh:
+            parts = line.split()
+            if len(parts) >= 2:
+                try:
+                    out[parts[1]] = int(parts[0], 16)
+                except ValueError:
+                    pass
     return out
 
 
@@ -558,9 +560,23 @@ def pair_markdown(rep, built_root, fw_root):
     return "\n".join(lines)
 
 
+def index_ko(root):
+    """Map basename -> path (supports both flat and nested staging trees)."""
+    index = {}
+    for dirpath, _dirs, files in os.walk(root):
+        for name in sorted(files):
+            if not name.endswith(".ko"):
+                continue
+            path = os.path.join(dirpath, name)
+            prev = index.get(name)
+            if prev is None or ("/kernel/" in path and "/kernel/" not in prev):
+                index[name] = path
+    return index
+
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--built", required=True, help="staging module directory")
+    ap.add_argument("--built", required=True, help="staging or flat built module directory")
     ap.add_argument("--fw", required=True, help="stock firmware module directory")
     ap.add_argument(
         "--modules",
@@ -572,22 +588,24 @@ def main():
     ap.add_argument("--markdown", default="", help="write Markdown report")
     args = ap.parse_args()
 
+    built_idx = index_ko(args.built)
+    fw_idx = index_ko(args.fw)
     modules = [m.strip() for m in args.modules.split(",") if m.strip()]
-    built_paths = [os.path.join(args.built, m + ".ko") for m in modules]
-    fw_paths = [os.path.join(args.fw, m + ".ko") for m in modules]
-    for p in built_paths + fw_paths:
-        if not os.path.exists(p):
-            sys.exit("missing module: " + p)
+    built_paths, fw_paths = [], []
+    for m in modules:
+        ko = m if m.endswith(".ko") else m + ".ko"
+        if ko not in built_idx:
+            sys.exit("missing built module: " + os.path.join(args.built, ko))
+        if ko not in fw_idx:
+            sys.exit("missing firmware module: " + os.path.join(args.fw, ko))
+        built_paths.append(built_idx[ko])
+        fw_paths.append(fw_idx[ko])
 
     pair_reports = {}
     for b, f in zip(built_paths, fw_paths):
         pair_reports[os.path.basename(b)[:-3]] = compare_pair(b, f)
 
-    staging_paths = sorted(
-        os.path.join(args.built, x)
-        for x in os.listdir(args.built)
-        if x.endswith(".ko")
-    )
+    staging_paths = sorted(built_idx.values())
     glob = global_checks(staging_paths, args.symvers)
 
     report = {"pairs": pair_reports, "global": glob}

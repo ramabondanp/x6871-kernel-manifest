@@ -17,51 +17,6 @@ import sys
 
 NODE_RE = re.compile(r"^\s*([A-Za-z0-9_,.\-]+)\s*(@[0-9A-Fa-f,]+)?\s*\{\s*$")
 PROP_RE = re.compile(r'^\s*([A-Za-z0-9_,.\-#]+)\s*=\s*(.+);\s*$')
-LABEL_RE = re.compile(r"^\s*([A-Za-z0-9_]+)\s*:\s*")
-
-
-def parse(path, root=""):
-    """Kembalikan list (nodepath, compat, status, parent_status)."""
-    stack = []  # list of (name, ctx)
-    out = []
-    ctx = {"compatible": None, "status": None}
-    file_out = []
-
-    with open(path, "r", errors="replace") as fh:
-        text = fh.read()
-
-    # buang komentar /* */ dan //
-    text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
-    text = re.sub(r"//[^\n]*", "", text)
-
-    for raw in text.splitlines():
-        line = raw.strip()
-        if not line:
-            continue
-        if line in ("};", "}"):
-            if stack:
-                name, parent_ctx = stack.pop()
-                ctx = parent_ctx
-            continue
-        m = NODE_RE.match(line)
-        if m:
-            name = m.group(1) + (m.group(2) or "")
-            stack.append((name, ctx))
-            ctx = {"compatible": None, "status": None, "path": "/".join(
-                [s[0] for s in stack])}
-            continue
-        m = PROP_RE.match(line)
-        if m:
-            key, val = m.group(1), m.group(2)
-            if key == "compatible":
-                vals = re.findall(r'"([^"]+)"', val)
-                ctx["compatible"] = "|".join(vals) if vals else None
-            elif key == "status":
-                vals = re.findall(r'"([^"]+)"', val)
-                ctx["status"] = vals[0] if vals else None
-            continue
-
-    return out
 
 
 def split_compat(value):
@@ -76,7 +31,8 @@ def split_compat(value):
 
 
 def walk(path):
-    text = open(path, "r", errors="replace").read()
+    with open(path, "r", errors="replace") as fh:
+        text = fh.read()
     text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
     text = re.sub(r"//[^\n]*", "", text)
 

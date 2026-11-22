@@ -157,8 +157,8 @@ def compare(built_path, fw_path):
     rec["depends_same"] = rec["depends_built"] == rec["depends_stock"]
 
     try:
-        bt = KP.parse_sections(built_path).get(".text", 0)
-        ft = KP.parse_sections(fw_path).get(".text", 0)
+        bt = KP.parse_sections(built_path).get(".text", {}).get("size", 0)
+        ft = KP.parse_sections(fw_path).get(".text", {}).get("size", 0)
         rec["text_built"] = bt
         rec["text_stock"] = ft
         rec["text_delta_pct"] = round((bt - ft) * 100.0 / ft, 1) if ft else None
@@ -167,7 +167,10 @@ def compare(built_path, fw_path):
 
     rec["hw_built"] = sorted(hw_apis(b_syms))
     rec["hw_new"] = sorted(hw_apis(b_syms) - hw_apis(f_syms))
-    rec["stack_over_1k"] = KP.stack_frames(built_path)
+    rec["stack_over_1k"] = sorted(
+        ((n, s) for n, s in KP.stack_frames(built_path).items() if s >= 1024),
+        key=lambda x: -x[1],
+    )
     rec["status"] = "ok"
     rec["notes"] = []
     return rec

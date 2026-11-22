@@ -5,7 +5,6 @@ Pakai: ./tools/src-to-module.py <tree> [<tree> ...] > map.tsv
 Output TSV: berkas.c<TAB>nama_modul<TAB>BUILD.bazel
 """
 
-import glob
 import os
 import re
 import sys
@@ -15,6 +14,7 @@ SRCS_RE = re.compile(r"srcs\s*=\s*\[(.*?)\]", re.S)
 QUOTED_RE = re.compile(r'"([^"]+)"')
 OBJ_RE = re.compile(r"^obj-\$\((\w+)\)\s*\+?=\s*([\w./-]+)\.o")
 Y_RE = re.compile(r"^([\w-]+)-(?:y|objs|\$\()\s*[:+]?=\s*(.+)$")
+SKIP_DIRS = {".git", "out", "out_bazel", "bazel-out", "bazel-bin"}
 
 
 MOD_RULES = (
@@ -27,7 +27,8 @@ MOD_RULES = (
 
 
 def bazel_map(path):
-    text = open(path, errors="replace").read()
+    with open(path, errors="replace") as fh:
+        text = fh.read()
     out = []
     for m in NAME_RE.finditer(text):
         name = m.group(1)
@@ -48,8 +49,8 @@ def bazel_map(path):
 
 def makefile_map(path):
     out = []
-    text = open(path, errors="replace").read()
-    d = os.path.dirname(path)
+    with open(path, errors="replace") as fh:
+        text = fh.read()
     objs = {}
     for line in text.splitlines():
         line = line.strip()
@@ -72,23 +73,25 @@ def makefile_map(path):
 def main(trees):
     seen = set()
     for tree in trees:
-        for path in glob.glob(os.path.join(tree, "**", "BUILD.bazel"), recursive=True):
-            for f, mod, p in bazel_map(path):
-                key = (f, mod)
-                if key in seen:
+        for root, dirs, files in os.walk(tree):
+            dirs[:] = sorted(d for d in dirs if d not in SKIP_DIRS)
+            for fn in sorted(files):
+                path = os.path.join(root, fn)
+                if fn == "BUILD.bazel":
+                    entries = bazel_map(path)
+                elif fn == "Makefile":
+                    try:
+                        entries = makefile_map(path)
+                    except OSError:
+                        continue
+                else:
                     continue
-                seen.add(key)
-                print(f"{f}\t{mod}\t{p}")
-        for path in glob.glob(os.path.join(tree, "**", "Makefile"), recursive=True):
-            try:
-                for f, mod, p in makefile_map(path):
+                for f, mod, p in entries:
                     key = (f, mod)
                     if key in seen:
                         continue
                     seen.add(key)
                     print(f"{f}\t{mod}\t{p}")
-            except OSError:
-                continue
 
 
 if __name__ == "__main__":

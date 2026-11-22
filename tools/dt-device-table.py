@@ -18,8 +18,8 @@ import os
 import re
 import sys
 
-L = "/serverhive1/ramabondanp/tmp"
-KD = "6.12.38-android16-5-g2c4fd33ae6d8-4k"
+L = os.environ.get("TMPDIR", "/serverhive1/ramabondanp/tmp")
+KD = os.environ.get("KERNEL_VER", "6.12.38-android16-5-g2c4fd33ae6d8-4k")
 
 SRC_DIRS = [
     f"{L}/twrp-src/lib/modules/{KD}",
@@ -276,5 +276,11 @@ def main(dev_tsv, map_tsv, src_tsv, srcmod_tsv, dtsi_tsv=None, only=None):
 
 
 if __name__ == "__main__":
+    if len(sys.argv) < 5:
+        sys.exit(
+            "Pakai: ./tools/dt-device-table.py <devices.tsv> <compat-map.tsv> "
+            "<compat-src.txt> <src-module.tsv> [dtsi-compat.txt] [filter]"
+        )
+    dtsi_tsv = sys.argv[5] if len(sys.argv) > 5 else None
     only = sys.argv[6] if len(sys.argv) > 6 else None
-    main(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], only)
+    main(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], dtsi_tsv, only)

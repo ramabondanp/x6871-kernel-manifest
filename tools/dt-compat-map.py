@@ -22,7 +22,7 @@ def aliases(path):
     if path in CACHE:
         return CACHE[path]
     text = subprocess.run(
-        f"strings -a '{path}'", shell=True, capture_output=True
+        ["strings", "-a", path], capture_output=True
     ).stdout.decode("utf-8", "replace")
     name = None
     comps = []
