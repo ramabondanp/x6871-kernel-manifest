@@ -1,0 +1,97 @@
+From 8eaf234d68766e91ec331a09ef35eece009a3657 Mon Sep 17 00:00:00 2001
+From: Ulises Mendez Martinez <umendez@google.com>
+Date: Wed, 7 Jan 2026 17:02:35 +0000
+Subject: [PATCH] Kleaf: Add rule to update multiple ABIs at once.
+
+... with the main benefit being the parallelization of the underlying
+builds.
+
+Bug: 287199267
+Change-Id: Ieb24bfa28e8b55b68cc4f8f529ba0b5ce50fc37a
+(cherry picked from commit 96438e7a11a42158db2598bdc28e9e9db95b5448)
+Bug: 549036773
+---
+ kleaf/impl/abi/abi_update.bzl | 52 +++++++++++++++++++++++++++++++++++++++++++
+ kleaf/kernel.bzl              |  2 ++
+ 2 files changed, 54 insertions(+)
+
+diff --git a/kleaf/impl/abi/abi_update.bzl b/kleaf/impl/abi/abi_update.bzl
+index 706a5f7..0835096 100644
+--- a/kleaf/impl/abi/abi_update.bzl
++++ b/kleaf/impl/abi/abi_update.bzl
+@@ -100,3 +100,55 @@ abi_update = rule(
+     toolchains = [hermetic_toolchain.type],
+     executable = True,
+ )
++
++STGDIFF_CHANGE_CODE = 4
++
++def _multi_abi_update_impl(ctx):
++    hermetic_tools = hermetic_toolchain.get(ctx)
++
++    # When there are ABI differences, the update returns a non-zero
++    #   code, so we need to make sure to run all updates.
++    script = hermetic_tools.setup + """
++        (
++        set +e
++    """
++
++    runfiles = ctx.runfiles(transitive_files = hermetic_tools.deps)
++    transitive_runfiles = []
++    for target in ctx.attr.targets:
++        script += """
++            {update} "$@"
++            rc=$?
++            if [[ $rc -ne 0 && $rc -ne {change_code} ]]; then
++                echo "Command failed with an unexpected error: $rc" >&2
++                exit $rc
++            fi
++        """.format(
++            update = target[DefaultInfo].files_to_run.executable.short_path,
++            change_code = STGDIFF_CHANGE_CODE,
++        )
++        transitive_runfiles.append(target[DefaultInfo].default_runfiles)
++
++    script += """
++        set -e
++        )
++    """
++    executable = ctx.actions.declare_file("{}.sh".format(ctx.attr.name))
++    ctx.actions.write(executable, script, is_executable = True)
++
++    return DefaultInfo(
++        files = depset([executable]),
++        executable = executable,
++        runfiles = runfiles.merge_all(transitive_runfiles),
++    )
++
++multi_abi_update = rule(
++    implementation = _multi_abi_update_impl,
++    attrs = {
++        "targets": attr.label_list(
++            doc = """A list of abi_update targets (e.g. [":kernel_aarch64_abi_update"])""",
++        ),
++    },
++    toolchains = [hermetic_toolchain.type],
++    executable = True,
++)
+diff --git a/kleaf/kernel.bzl b/kleaf/kernel.bzl
+index 3133341..2041fbe 100644
+--- a/kleaf/kernel.bzl
++++ b/kleaf/kernel.bzl
+@@ -23,6 +23,7 @@ load(
+     _initramfs_modules_lists_test = "initramfs_modules_lists_test",
+     _kernel_module_test = "kernel_module_test",
+ )
++load("//build/kernel/kleaf/impl:abi/abi_update.bzl", _multi_abi_update = "multi_abi_update")
+ load(
+     "//build/kernel/kleaf/impl:abi/dependency_graph.bzl",
+     _dependency_graph = "dependency_graph",
+@@ -112,6 +113,7 @@ merge_kzip = _merge_kzip
+ merge_module_symvers = _merge_module_symvers
+ merged_kernel_uapi_headers = _merged_kernel_uapi_headers
+ modinfo_summary_report = _modinfo_summary_report
++multi_abi_update = _multi_abi_update
+ super_image = _super_image
+ system_dlkm_image = _system_dlkm_image
+ unsparsed_image = _unsparsed_image
