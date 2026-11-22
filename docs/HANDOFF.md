@@ -311,6 +311,28 @@ TMPDIR=~/tmp BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1 \
 Staging hasil build:
 `out_bazel/e3662dd3043d825281b1dcd92c77f735/execroot/_main/bazel-out/k8-fastbuild/bin/kernel_device_modules-6.12/mgk_64_k612_customer_modules_install.user/`
 
+### Build baseline MTK tanpa driver X6871
+
+Gunakan langkah ini untuk memverifikasi baseline MTK. Mulai dari workspace
+terpisah yang sudah di-sync seperti di [README](../README.md#build-dari-source),
+agar checkout port X6871 tetap utuh. Contoh ini memakai
+`~/x6871-mtk-baseline/kernel` sebagai root workspace terpisah.
+
+```bash
+~/x6871-kernel-manifest/scripts/reproduce-cleanup.sh ~/kernel-kernel_device_modules-6.12
+
+cd ~/x6871-mtk-baseline/kernel/kernel_device_modules-6.12
+git fetch ~/kernel-kernel_device_modules-6.12 mtk-base-latest
+git checkout -B mtk-base-latest FETCH_HEAD
+cd ..
+
+~/x6871-kernel-manifest/setup.sh
+OVERLAYS="" ~/x6871-kernel-manifest/build.sh user
+```
+
+Ini mengganti tree `kernel_device_modules-6.12` dengan baseline MTK; manifest
+vendor tidak berubah. Untuk mengganti SoC build, set `PLATFORM` (default `mt6895`).
+
 ### Repack vendor_boot (WAJIB dari build terbaru)
 
 ```bash

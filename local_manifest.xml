@@ -42,7 +42,7 @@
            remote="moto" revision="android-16-release-w1vo36.88-36-7" />
 
   <!-- GKI murni AOSP (tanpa edit) + device modules port Infinix X6871.
-       Untuk baseline MTK murni tanpa driver X6871, lihat README.md bagian B. -->
+       Untuk build baseline MTK, lihat docs/HANDOFF.md. -->
   <project path="kernel-6.12" name="kernel/common"
            remote="aosp" revision="refs/tags/android16-6.12-2026-09_r16" />
   <project path="kernel_device_modules-6.12" name="alps-kernel_device_modules-6.12"
