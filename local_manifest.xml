@@ -3,13 +3,15 @@
   Overlay untuk manifest AOSP kernel (Infinix GT 20 Pro / X6871, MT6895):
 
     repo init -u https://android.googlesource.com/kernel/manifest \
-              -b common-android16-6.12-2025-09
+              -b common-android16-6.12-2026-09
     cp local_manifest.xml .repo/local_manifests/x6871.xml
     repo sync -j16
 
-  Mengganti kernel/common dan kernel/build AOSP dengan tree MTK 6.12 +
-  port Infinix X6871, total 6 project:
-    - 4 repo Motorola w1vo/w2we (Kleaf/MGK build rules + kernel-6.12)
+  Mengganti kernel/build AOSP dengan Kleaf/MGK rules, mem-pin GKI murni ke
+  tag android16-6.12-2026-09_r16 (6.12.92, KMI 6) di path kernel-6.12, dan
+  menambahkan 2 repo port Infinix X6871:
+    - 3 repo Kleaf/MGK build rules (build/kernel, bazel_common_rules, bazel_mgk_rules)
+    - 1 repo GKI upstream AOSP (kernel/common @ android16-6.12-2026-09_r16, tanpa patch)
     - 2 repo port X6871 (alps-kernel_device_modules-6.12 dan
       alps-vendor_mediatek_kernel_modules, keduanya di branch
       x6871-android16-6.12)
@@ -39,10 +41,10 @@
   <project path="build/bazel_mgk_rules" name="kernel-build-bazel_mgk_rules"
            remote="moto" revision="android-16-release-w1vo36.88-36-7" />
 
-  <!-- Kernel + device modules (langsung ke branch port Infinix X6871).
+  <!-- GKI murni AOSP (tanpa edit) + device modules port Infinix X6871.
        Untuk baseline MTK murni tanpa driver X6871, lihat README.md bagian B. -->
-  <project path="kernel-6.12" name="kernel-mtk"
-           remote="moto" revision="android-16-release-w1vo36.88-36-7" />
+  <project path="kernel-6.12" name="kernel/common"
+           remote="aosp" revision="refs/tags/android16-6.12-2026-09_r16" />
   <project path="kernel_device_modules-6.12" name="alps-kernel_device_modules-6.12"
            remote="alps" revision="x6871-android16-6.12" />
 
