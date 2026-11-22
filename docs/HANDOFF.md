@@ -294,6 +294,7 @@ kalau memang tidak ada source.
 
 ### Unduhan referensi
 
+- **Source donor OPPO MT6896 (kernel 6.12):** [repo modul kernel OPPO Reno12, branch `oppo/mt6896_b_16.0_reno12`](https://github.com/oppo-source/android_kernel_modules_oppo_mt6896/tree/oppo/mt6896_b_16.0_reno12). Modul donor yang dipakai sudah disertakan di repo modul vendor X6871; tidak perlu clone terpisah untuk build.
 - **Source donor Transsion 6.1:** [unduh `android15_kernel_modules_and_devicetree_mt6897.tar.gz`](https://d1wd32b69guoqm.cloudfront.net/opensource/android15_kernel_modules_and_devicetree_mt6897.tar.gz) dari [Infinix Open Source Center](https://opensource.dev.infinixmobility.com/). Tarball ini hanya untuk referensi porting driver, bukan basis atau prasyarat build 6.12. Path lokal di catatan audit: `~/tmp/mt6897-full.tar.gz`, diekstrak ke `~/tmp/ts61-src/`.
 - **Firmware stock X6871:** [dump firmware di GitLab](https://gitlab.com/rama-firmware-dumps/infinix/Infinix-X6871), versi referensi `X6871-16.3.0.155SP20`. Dipakai untuk mencari image bawaan serta membandingkan modul dan DTB/DTBO. Untuk rollback, gunakan firmware bawaan yang sesuai dengan perangkat dan versi yang dipakai sebelumnya.
 
