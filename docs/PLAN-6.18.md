@@ -98,11 +98,14 @@ Fase 5: Repack penuh + verify-kmi-abi.py --kver 6.18 (8 gerbang) + uji boot penu
 ## 5. Rincian Teknis per Fase
 
 ### Fase 0 — Manifest, Branch, & Workspace Terisolasi
-- Tambah `local_manifest-6.18.xml` di repo manifest:
+- Tambah `local_manifest-6.18.xml` di repo manifest (basis: `common-android17-6.18-2026-09/default.xml`):
   - `repo init -u https://android.googlesource.com/kernel/manifest -b common-android17-6.18-2026-09 --depth=1`
-  - Pin `kernel/common` → path `kernel-6.18`, `revision="refs/tags/android17-6.18-2026-09_r13"`.
+  - **Pin tag GKI eksplisit**: branch `android17-6.18-2026-09` di `default.xml` sudah bergerak melewati `r13` (`r14`+), sehingga wajib `<remove-project name="kernel/common" />` lalu pin `path="kernel-6.18" revision="refs/tags/android17-6.18-2026-09_r13"` (`ecdaacc9...`).
+  - **Hemat disk via `groups="ddk,ddk-external"` / `<remove-project>`**: buang ~24 repo berat non-DDK di `default.xml` (stack GBL `bootable/libbootloader`, `prebuilts/fuchsia_sdk`, `prebuilts/vmm`, `external/rust/android-crates-io`, `u-boot` + GCC 4.9, `devices/google/raviole`, `common-modules/*`, `test/ltp`, `prebuilts/jdk/jdk11`) untuk menghemat puluhan GB di `/serverhive1`.
+  - **Perubahan struktur AOSP 6.18**: `WORKSPACE.bzlmod` linkfile dihapus (murni Bzlmod); `prebuilts/rust` → `prebuilts/rust-toolchain/linux-x86`; `prebuilts/ndk-r26` → `prebuilts/ndk-r27`; tambahan dep DDK `external/{dwarves,kmod,zstd,argp-standalone,obstack,bazel-contrib-rules_devicetree,bazel-contrib-supply-chain}`.
   - Buat branch `x6871-android17-6.18` dari HEAD stabil `x6871-android16-6.12` pada `alps-kernel_device_modules-6.12` (`20a8f5d`) dan `alps-vendor_mediatek_kernel_modules` (`83b4fa6`).
-- Parameterisasi `KVER=${KVER:-6.12}` / `--kver 6.18` pada `setup.sh`, `build.sh`, `tools/repack-vendor-boot-latest.sh`, `tools/repack-dlkm-latest.sh`, dan `tools/verify-kmi-abi.py` (default tetap `6.12`).
+- Parameterisasi `KVER=${KVER:-6.12}` / `--kver 6.18` pada `setup.sh`, `build.sh`, `tools/repack-vendor-boot-latest.sh`, `tools/repack-dlkm-latest.sh`, dan `tools/verify-kmi-abi.py` (default tetap `6.12`):
+  - **Path prebuilt tools 6.18 berubah**: di `main-kernel-2026`, `tools/mkbootimg` dihapus sebagai repo terpisah dan dipindahkan sebagai binary prebuilt ke **`prebuilts/kernel-build-tools/linux_musl-x86/bin/`** (menggantikan `linux-x86/bin/`), berisi sekaligus `mkbootimg`, `unpack_bootimg`, `mkfs.erofs`, `fsck.erofs`, `avbtool`, dan `fec`. Kedua skrip repack harus mendukung fallback `linux_musl-x86/bin` → `linux-x86/bin` (dan `unpack_bootimg` binary → `tools/mkbootimg/unpack_bootimg.py`).
 
 ### Fase 1 — Adaptasi Kleaf & `bazel_mgk_rules`
 - Buat `patches/bazel_mgk_rules-6.18.patch`:
