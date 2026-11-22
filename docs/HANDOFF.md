@@ -9,15 +9,15 @@ Ditulis 2026-11-19, diperbarui 2026-11-22 untuk sesi AI berikutnya. Baca ini dul
 | Item | Nilai |
 |---|---|
 | GKI base (`kernel-6.12`) | AOSP murni `android16-6.12-2026-09_r16` (`6.12.92-android16-6-g7cc745542612-4k`, **KMI 6**, tanpa patch) |
-| `.ko` flat customer install | **679** |
-| `.ko` di staging (file / nama unik) | **813 / 812** (`mtk-socinfo` dobel) |
+| `.ko` flat customer install | **419** (di-trim via `kernel/kleaf/x6871_modules.bzl` ke **413** target OOT X6871; sebelumnya 679) |
+| `.ko` di staging (file / nama unik) | **553 / 552** (`mtk-socinfo` dobel; sebelumnya 813 / 812; action Bazel `4.867 → 919`) |
 | Modul di firmware X6871 | 237 |
 | Nama stock tidak ada di build | **20** (6 tidak direncanakan, 14 kandidat) |
 | Modul recovery vendor_boot | **222**, 100% source (KMI 6) |
 | DLKM (`vendor_dlkm` + `odm_dlkm`) | **266** (`209` + `57`), 100% source (KMI 6, bebas `CONFIG_MODULE_SIG_PROTECT`), image siap |
 | Build target | `//kernel_device_modules-6.12:mgk_64_k612_customer_modules_install.user` |
-| Build terakhir | sukses (clean KMI 6), 2026-11-22 |
-| Kernel HEAD | `20a8f5d` (`alps-kernel_device_modules-6.12`, `x6871-android16-6.12`, 105 commit di atas `06079c2`) |
+| Build terakhir | sukses (clean KMI 6 + trimmed X6871 allowlist), 2026-11-22 |
+| Kernel HEAD | `fa18f7f` (`alps-kernel_device_modules-6.12`, `x6871-android16-6.12`, 106 commit di atas `06079c2`) |
 | Vendor MTK modules HEAD | `83b4fa6` (`alps-vendor_mediatek_kernel_modules`, `x6871-android16-6.12`) |
 | Active clean workspace | `/serverhive1/ramabondanp/x6871-clean/ws` (keep old `/serverhive1/ramabondanp/w1vo` untouched) |
 | Runtime | **Lulus boot di GKI KMI 6 (`android16-6.12-2026-09_r16`, `v19-kmi6`)** dengan `boot.img` + `system_dlkm.img` resmi Google (0 mismatch CRC vs `abi.stg` `10.630` simbol, 0 kolisi `CONFIG_MODULE_SIG_PROTECT`, 0 unresolved symbol); seluruh subsistem modul sebelumnya lulus di KMI 5 (`v18`) |

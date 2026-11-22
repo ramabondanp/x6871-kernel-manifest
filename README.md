@@ -3,15 +3,15 @@
 Workspace Bazel+Kleaf untuk membangun modul kernel **Android 16 / kernel 6.12 / MediaTek MT6895** untuk **Infinix GT 20 Pro (X6871)** (berbasis donor MTK 6.12 Motorola `w1vo36.88-36-7` + OPPO `mt6896`).
 
 - **GKI base (`kernel-6.12`)**: AOSP murni `android16-6.12-2026-09_r16` (`6.12.92-android16-6-g7cc745542612-4k`, **KMI 6**, tanpa patch)
-- **Device modules (`kernel_device_modules-6.12`)**: [`alps-kernel_device_modules-6.12`](https://github.com/ramabondanp/alps-kernel_device_modules-6.12/tree/x6871-android16-6.12) (`x6871-android16-6.12`, **105 commit** di atas baseline `06079c2`, HEAD `20a8f5d`)
+- **Device modules (`kernel_device_modules-6.12`)**: [`alps-kernel_device_modules-6.12`](https://github.com/ramabondanp/alps-kernel_device_modules-6.12/tree/x6871-android16-6.12) (`x6871-android16-6.12`, **106 commit** di atas baseline `06079c2`, HEAD `fa18f7f`)
 - **Vendor MTK modules (`vendor/mediatek/kernel_modules`)**: [`alps-vendor_mediatek_kernel_modules`](https://github.com/ramabondanp/alps-vendor_mediatek_kernel_modules/tree/x6871-android16-6.12) (`x6871-android16-6.12`, **4 commit** X6871 di atas base Motorola + 13 donor OPPO `86edba6`, HEAD `83b4fa6`)
-- **Output build X6871**: staging **813 file** (**812** nama unik), flat customer install **679** `.ko`
+- **Output build X6871** (di-trim ke allowlist runtime `kernel/kleaf/x6871_modules.bzl`, **413** target OOT): staging **553 file** (**552** nama unik), flat customer install **419** `.ko` (429/429 nama unik runtime X6871 tercakup penuh; action Bazel turun `4.867 → 919`)
 - **Output baseline MTK murni** (`mtk-base-latest`): **1.401** `.ko`
 - **Panduan cepat dokumen**:
   - [`docs/HANDOFF.md`](docs/HANDOFF.md) — ringkasan status terkini, aturan kerja, perintah build/repack, dan pengetahuan kritis
   - [`docs/BOOTTEST.md`](docs/BOOTTEST.md) — prosedur flash, rollback, dan checklist uji boot per subsistem
-  - [`docs/PRETEST.md`](docs/PRETEST.md) — log teknis kronologis (§1–§67) hasil audit statis, RE biner, dan uji device
-  - [`docs/PLAN.md`](docs/PLAN.md) — rencana porting awal dan bukti investigasi per modul (§6.x)
+  - [`docs/PRETEST.md`](docs/PRETEST.md) — log teknis kronologis (§1–§68) hasil audit statis, RE biner, dan uji device
+  - [`docs/PLAN.md`](docs/PLAN.md) / [`docs/PLAN-6.18.md`](docs/PLAN-6.18.md) — rencana porting awal (§6.x) & rencana upstreaming `android17-6.18-2026-09_r13`
   - [`docs/DEVICES.md`](docs/DEVICES.md) / [`docs/DEVICES-OVERLAY.md`](docs/DEVICES-OVERLAY.md) — tabel pemetaan node Device Tree X6871 ke driver
 
 ---

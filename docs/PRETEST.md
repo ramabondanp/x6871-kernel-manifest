@@ -4008,6 +4008,7 @@ Target: memindahkan seluruh modul X6871 ke GKI upstream AOSP murni **`android16-
 5. **Hasil uji boot (`gki-kmi6-20261122`)**:
    - Pengguna mengonfirmasi **sukses boot** di X6871 dengan `x6871-twrp-vendor_boot-v19-kmi6.img`, `vendor_dlkm.img`, `odm_dlkm.img`, bersama `boot.img` + `system_dlkm.img` GKI resmi Google `android16-6.12-2026-09_r16` (KMI 6).
    - Seluruh safeguard verifikasi & repack dikemas ulang ke manifest sebagai [`tools/verify-kmi-abi.py`](../tools/verify-kmi-abi.py) dan [`tools/repack-dlkm-latest.sh`](../tools/repack-dlkm-latest.sh) + aturan keras #15–#18 di `docs/HANDOFF.md`.
+   - **Trimming target modul khusus X6871 (`fa18f7f`)**: ditambahkan `kernel/kleaf/x6871_modules.bzl` (allowlist **413** target OOT X6871) + filter `_filter_x6871_modules()` di akhir `kernel/kleaf/mgk_64.bzl`, memangkas **260** target multi-varian/SoC lain yang tidak dipakai (termasuk seluruh 3 modul prebuilt `.o` `sched_cus`). Output staging turun dari **813 → 553** berkas `.ko` (`552` unik), flat install **679 → 419** `.ko`, dan jumlah action Bazel turun **4.867 → 919 (-81,1%)** dengan **429/429** modul unik runtime X6871 tetap lengkap dan lulus penuh 8 gerbang `verify-kmi-abi.py`.
 
 ### Artefak uji (`gki-kmi6-20261122`)
 
