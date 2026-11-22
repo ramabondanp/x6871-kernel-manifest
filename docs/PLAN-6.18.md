@@ -1,7 +1,7 @@
 # PLAN 6.18 — Rencana Upstreaming X6871 (MT6895) ke `android17-6.18-2026-09_r13`
 
 > **Status (2026-11-22): PLAN ONLY — belum dieksekusi.**
-> Baseline produksi tetap di `android16-6.12-2026-09_r16` (KMI 6, rilis `gki-kmi6-20261122`, workspace `~/x6871-kernel`).
+> Baseline produksi tetap di `android16-6.12-2026-09_r16` (KMI 6, rilis `gki-kmi6-20261122`, workspace `<workspace-6.12>`).
 > Skrip di repo ini masih untuk 6.12; `--kver 6.18` adalah opsi yang direncanakan, belum tersedia.
 
 ---
@@ -19,7 +19,7 @@ Memigrasikan seluruh **487 modul runtime** Infinix GT 20 Pro (X6871 / MT6895) �
 | Clang / Rust | `r536225` / `1.82.0.p2` | `r584948c` / `1.91.1.p3` |
 | Manifest AOSP | `common-android16-6.12-2026-09` | `common-android17-6.18-2026-09` |
 | OS Runtime Target | Android 16 / 17 `system` + Android 16 `vendor` | **Android 17 `system` + Android 16 `vendor` (4KB)** |
-| Workspace | `~/x6871-kernel` (tetap utuh) | `~/x6871-6.18` (terpisah) |
+| Workspace | `<workspace-6.12>` (tetap utuh) | `<workspace-6.18>` (terpisah) |
 
 ---
 
@@ -38,7 +38,7 @@ Audit langsung dilakukan dengan mencocokkan seluruh **488 `.ko` runtime** (`v19-
    - **4** hook yang dihapus (`android_rvh_{commit,exit,override,revert}_creds`) **hanya dipakai `mkp.ko`** (0 ekspor, 0 modul lain yang mengimpornya).
 6. **`CONFIG_MODULE_SIG_PROTECT` Aman**: kolisi dengan modul GKI 6.18 hanya `zram.ko` dan `zsmalloc.ko` (`odm_dlkm`), dan keduanya tetap masuk `_COMMON_UNPROTECTED_MODULES_LIST`.
 7. **Kleaf `main-kernel-2026` Kompatibel Secara Primitif**: `ddk_module`, `ddk_headers`, `kernel_build`, `kernel_module`, `kernel_modules_install`, `build.config.{common,aarch64,gki,constants}`, dan `--user_ddk_unsafe_headers` masih tersedia.
-8. **cgroup v2 Sudah Aktif di Stock ROM X6871**: `dmesg10.txt` mengonfirmasi `libprocessgroup` memakai `/sys/fs/cgroup/...` (cgroup v2) walau `CONFIG_MEMCG_V1=y` dihapus di `gki_defconfig` 6.18.
+8. **cgroup v2 Sudah Aktif di Stock ROM X6871**: `log kernel uji` mengonfirmasi `libprocessgroup` memakai `/sys/fs/cgroup/...` (cgroup v2) walau `CONFIG_MEMCG_V1=y` dihapus di `gki_defconfig` 6.18.
 
 ### 2.2 Hambatan Utama (Kenapa Ini Proyek Major)
 
