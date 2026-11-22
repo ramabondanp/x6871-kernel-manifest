@@ -1985,3 +1985,105 @@ image dari pre-release KMI 7.
 pada X6871 yang memakai set KMI 7 `16987858` dan melaporkan operasi kamera
 normal. Penggunaan data OTP oleh HAL belum terverifikasi;
 lihat [PRETEST §69](PRETEST.md#69-uji-kamera-dengan-port-otp--kmi-7).
+
+## 12. Profil baterai MT6375 X6871 — KMI 7
+
+Log port `dmesg10.txt` melaporkan `charge_full = 2946000 µAh`. Angka ini
+sesuai entri fallback `g_Q_MAX[0][0] = 2946` di modul MediaTek, bukan hasil
+pengukuran kapasitas baterai. Isi tabel fallback `g_Q_MAX` dan `g_Q_MAX_H_CURRENT`
+sama dengan `mt6375-battery.ko` stock. `tc_gauge.ko` hanya meneruskan
+`POWER_SUPPLY_PROP_CHARGE_FULL`, jadi bukan sumber selisih.
+
+Port memulihkan dua bagian konfigurasi stock di `drivers/power/supply/mtk_battery.c`:
+
+1. Baca `batteryID-channel` dari AUXADC sebelum menginisialisasi kurva.
+   Pembacaan stock pada perangkat ini adalah 1820 mV, yang memilih profil 3.
+   Kurva profil 3 dari DT stock mencapai 5060,1 mAh. Pemilihan profil
+   eksplisit melalui DT tetap berlaku jika diaktifkan.
+2. Gunakan `tran_Q_diff` sesuai ID baterai untuk Qmax. Nilainya 5000 mAh
+   pada DT stock X6871. Konversi yang sudah benar di port dipertahankan:
+   target laporan `charge_full` adalah `5000000 µAh`, bukan `500000 µAh`
+   seperti pada log pembanding dengan modul stock. Ini nilai desain,
+   bukan hasil pengukuran kapasitas baterai yang sudah menua.
+
+Uji lokal memeriksa batas pemilihan ID, override ambang dari DT, dan
+penanganan error baca. DTB dasar dari `vendor_boot` juga sudah diuji
+bersama overlay stock: hasil gabungan memuat kelima kurva profil 3 dan
+nilai `tran_Q_diff` yang diharapkan. Build `user` KMI 7 lulus delapan
+pemeriksaan KMI/ABI untuk 488 modul; 2.658 CRC impor GKI unik cocok
+dengan Google CI `16987858`. Perubahan ini tidak mengubah ABI antara
+fuel gauge dan daemon userspace atau batas pengisian.
+
+`mt6375-battery.ko` ada di `vendor_boot` dan `odm_dlkm`; gunakan kedua
+image tersebut dari build yang sama. Pertahankan `vendor_dlkm` dari
+build OTP jika sudah terpasang. GKI dan DTBO tidak diubah.
+
+Untuk uji perangkat, cek ID profil dan Qmax di log. Dari terminal perangkat,
+jalankan:
+
+```sh
+cd /sys/class/power_supply/battery
+cat charge_full charge_full_design capacity
+```
+
+Dua baris pertama dalam µAh, baris terakhir dalam persen. Uji perangkat
+di `dmesg11.txt` mengonfirmasi profil 3 pada 1820 mV dan `charge_full`
+sebesar `5000000 µAh`. Perubahan profil tersedia di commit modul perangkat
+[`94fc581`](https://github.com/ramabondanp/alps-kernel_device_modules-6.12/commit/94fc58164d984734e5666a70a821ce5cb324ace7).
+
+### 12.1. Antarmuka `tran_batt` dan ABI `fgauged`
+
+Donor Transsion MT6897 6.1 mendaftarkan `tran_batt` dari `mtk_battery.c`.
+Modul stock X6871 6.12 mendaftarkannya dari `mtk_battery_manager.ko`,
+sedangkan port belum mendaftarkannya. Akibatnya, `dmesg11.txt` mencatat
+`Couldn't get dev(tran_batt)` saat `tc_gauge` membaca data fuel gauge.
+
+Port menambahkan bagian baca-saja di battery manager untuk MT6375
+single-gauge: ID baterai, siklus mentah, SOC, coulomb counter, dan estimasi
+sisa kapasitas. Sisa kapasitas diambil dari mode gauge yang aktif, bukan
+dari angka kapasitas desain. Ini tidak memulihkan riwayat siklus yang
+belum disuplai ke kernel dan tidak mengubah algoritme charging.
+
+ABI `fuel_gauge_custom_data` donor 6.1 berukuran 784 byte, port 6.12
+900 byte, dan biner X6871 stock 952 byte. Donor membantu mencocokkan
+properti `tran_batt`, tetapi layout-nya bukan pengganti ABI daemon stock.
+Build uji `tran_batt` KMI 7 dari Google CI `16987858` lulus delapan
+pemeriksaan KMI/ABI untuk 488 modul. Uji lokal mencakup perhitungan sisa
+kapasitas untuk mode kernel dan daemon serta penanganan data yang belum
+tersedia. Dibanding build profil baterai, hanya `mtk_battery_manager.ko`
+di `vendor_boot` dan `odm_dlkm` yang berubah. `vendor_dlkm` OTP tetap
+identik. `dmesg12.txt`
+mengonfirmasi pembacaan `tran_batt` untuk SOC (`7700` = 77,00%); siklus
+mentah masih `0`.
+
+### 12.2. Akhir pengisian dan ABI daemon stock
+
+`dmesg13.txt` mencatat MT6375 `DONE` (`CHG_STAT = 0x07`), event EOC sudah
+diterima, dan arus baterai turun ke hampir nol saat UI masih menunjukkan
+78%. Disassembly `mtk_battery_manager.ko` stock menunjukkan perilaku
+laporan `Charging` yang sama; fallback kernel stock juga tidak menangani
+`FG_INTR_CHR_FULL`. Library stock `libfgauge_gm30.so` menangani event itu
+melalui `fg_charging_full_int_handler`.
+
+Port mengadaptasi ABI stock untuk gauge MT6375 dengan `tran_Q_diff`:
+13 field `DYNAMIC_VC_*` dan `DIFFERENCE_*` mulai offset `0x384`, lengkap
+dengan default dan override DT dari modul stock. Paket pengaturan 952 byte,
+tabel 55.124 byte, dan paket gabungan 56.076 byte diperiksa saat kompilasi.
+Gauge lain tetap memakai ABI lama. Pemeriksaan versi dan fallback tetap
+berlaku bila daemon tidak cocok. Notifikasi penuh juga mengikuti stock:
+tetap jalankan kalibrasi EOC, tetapi jangan beri event penuh ke daemon
+jika pengisian sedang memakai mode tegangan rendah (`low CV`). Tidak ada
+perubahan batas listrik atau pemaksaan persentase 100%.
+
+Build `user` KMI 7 dari Google CI `16987858` lulus delapan pemeriksaan
+KMI/ABI untuk 488 modul. Uji lokal memeriksa pembacaan potongan paket
+900 dan 952 byte, termasuk potongan yang melewati batas offset `0x384`
+serta permintaan di luar batas. Dibanding build uji `tran_batt`, hanya
+`mt6375-battery.ko` dan `mtk_battery_manager.ko` di `vendor_boot` dan
+`odm_dlkm` yang berubah. `vendor_dlkm` OTP tetap identik. Adaptasi ABI,
+jalur EOC, dan antarmuka `tran_batt` tersedia di commit modul perangkat
+[`8164631`](https://github.com/ramabondanp/alps-kernel_device_modules-6.12/commit/8164631010c02019a5b9c9ab9d23bbadfc4b70af).
+
+Uji perangkat (`dmesg14.txt`) menunjukkan `fuelgauged` aktif dan UI naik
+dari 78% ke 81%. Perilaku pada `DONE` belum terverifikasi. Lihat
+[PRETEST §70](PRETEST.md#70-uji-fuel-gauge-mt6375--kmi-7) untuk bukti log.

@@ -456,7 +456,14 @@ Semua CRC untuk 2.657 simbol impor unik dari GKI cocok dengan ekspor
 juga lulus verifikasi. Ketiga image tersedia di
 [GitHub Pre-release `gki-kmi7-16987858`](https://github.com/ramabondanp/x6871-kernel-manifest/releases/tag/gki-kmi7-16987858).
 Maintainer melaporkan bahwa pre-release KMI 7 ini sudah diuji langsung
-di X6871. Rincian hasil uji per fitur belum dicatat.
+di X6871. Hasil uji berikut berasal dari build lanjutan, bukan dari
+artefak pre-release di atas:
+
+- [OTP kamera](PRETEST.md#69-uji-kamera-dengan-port-otp--kmi-7): kamera
+  dilaporkan normal, tetapi penggunaan data OTP oleh HAL belum terverifikasi.
+- [Fuel gauge MT6375](PRETEST.md#70-uji-fuel-gauge-mt6375--kmi-7): profil 3
+  dan `charge_full` 5.000.000 µAh terbaca; `fuelgauged` stock aktif dan UI
+  naik dari 78% ke 81%. Uji sampai `DONE` masih pending.
 
 Saat repack, ambil `--staging` secara eksplisit dari `out_bazel_kmi7/`,
 bukan dari keluaran default `out_bazel/`. Pakai `--out-dir

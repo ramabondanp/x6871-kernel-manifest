@@ -26,6 +26,7 @@ Indeks bagian penting:
 - §52–§61: audio FS1599, AOD, `mtk-cam-isp`, flashlight, touch/DT2W, FOD (normal/AOD/screen-off), dan akar masalah VENC (`VENC_H264=1`)
 - §62–§68: fast charging HVDCP20 (`alg_name_array`), race `mtk_iommu`, earpiece `Playback_R_DAC`, penyelarasan `mtu3.ko` stock, dan bringup GKI KMI 6 (`android16-6.12-2026-09_r16`) + trim `x6871_modules.bzl`
 - [§69: Uji kamera dengan port OTP](#69-uji-kamera-dengan-port-otp--kmi-7)
+- [§70: Uji fuel gauge MT6375](#70-uji-fuel-gauge-mt6375--kmi-7)
 
 Tujuan awal (§1–§39): memastikan modul tidak menggantung/menimpa simbol stock
 dan tidak melakukan operasi berbahaya terhadap hardware **sebelum** boot. Bagian
@@ -4043,3 +4044,18 @@ normal. Tidak ada hasil uji per fitur atau log HAL yang memastikan data
 OTP dipakai alih-alih fallback. Ini bukan hasil uji Ext-ISP, yang tidak
 diport. Lihat [PLAN §11](PLAN.md#11-kalibrasi-kamera-x6871--kmi-7) untuk
 layout, ABI, dan verifikasi build.
+
+## 70. Uji fuel gauge MT6375 — KMI 7
+
+| Log | Hasil pada X6871 |
+|---|---|
+| `dmesg11.txt` | ID baterai 1820 mV memilih profil 3; `healthd` melaporkan `fc=5000000` µAh (nilai desain, bukan pengukuran kapasitas aktual). |
+| `dmesg12.txt` | Error `Couldn't get dev(tran_batt)` tidak muncul lagi; SOC presisi terbaca `7700` (77,00%). Siklus mentah masih `0` pada build ini. |
+| `dmesg13.txt` | Sebelum adaptasi ABI, `fuelgauged` mencatat `fg_mode:1 sleep`. Charger mencapai `DONE` (`CHG_STAT = 0x07`) saat UI masih 78%. |
+| `dmesg14.txt` | Setelah adaptasi ABI, daemon mengirim `FG_DAEMON_CMD_SET_KERNEL_UISOC`; `healthd` mengonfirmasi kenaikan 78% → 79% (271 s) → 80% (331 s) → 81% (391 s). |
+
+`dmesg14.txt` mulai pada detik 252, jadi baris handshake awal
+`X6871 fuelgauged ABI matched` tidak terekam. Charger masih mengisi
+(`CHG_STAT = 0x04`) pada akhir log. Respons saat `DONE` dan apakah UI
+mencapai 100% belum terverifikasi. Lihat
+[PLAN §12](PLAN.md#12-profil-baterai-mt6375-x6871--kmi-7) untuk perubahan driver.
