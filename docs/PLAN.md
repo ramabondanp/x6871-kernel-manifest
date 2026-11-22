@@ -2087,3 +2087,27 @@ jalur EOC, dan antarmuka `tran_batt` tersedia di commit modul perangkat
 Uji perangkat (`dmesg14.txt`) menunjukkan `fuelgauged` aktif dan UI naik
 dari 78% ke 81%. Perilaku pada `DONE` belum terverifikasi. Lihat
 [PRETEST §70](PRETEST.md#70-uji-fuel-gauge-mt6375--kmi-7) untuk bukti log.
+
+## 13. Perangkat I2C AW22XXX dan ET5904
+
+Image KMI 7 sudah memuat `leds-aw22xxx.ko` dan `tran_ldo.ko`, dan
+keduanya terdaftar di `odm_dlkm` `modules.load`. Nama `aw22xxx_led`
+adalah identitas perangkat I²C, bukan nama modul. ET5904 donor 6.1
+diadaptasi sebagai `tran_ldo.ko` agar cocok dengan dua node stock
+`tran,tran_ldo` pada alamat `0x28`. Log kamera pada `dmesg11.txt`
+menunjukkan rail `TRANLDO*6` dan `TRANLDO*7` telah terdaftar. Tidak
+perlu menambahkan `et5904.ko` atau mengubah konfigurasi rail.
+
+Pada log yang sama, `aw22xxx_led 3-006a` mengenali chip AW22127,
+tetapi gagal probe karena EINT menolak GPIO 16 yang dikonfigurasi
+sebagai output. `leds-aw22xxx.ko` stock memakai flag `1` untuk GPIO
+interrupt, sama dengan arah input di donor 6.1. Port 6.12 kini memakai
+`GPIOF_IN` alih-alih `0` (`GPIOF_OUT_INIT_LOW`). Arah GPIO reset,
+trigger IRQ, dan firmware LED tidak berubah. Perbaikan tersedia di
+commit modul perangkat [`47d7517`](https://github.com/ramabondanp/alps-kernel_device_modules-6.12/commit/47d751747d894a522ba1ee11e876160c16071f00).
+Probe dilaporkan berhasil; lihat [PRETEST §71](PRETEST.md#71-uji-probe-aw22xxx--kmi-7).
+
+Build uji KMI 7 (`16987858`) lulus delapan pemeriksaan KMI/ABI untuk
+488 modul. Dibanding build `fuelgauged` stock, hanya `leds-aw22xxx.ko`
+di `vendor_boot` dan `odm_dlkm` yang berubah. `vendor_dlkm` tetap
+identik; `tran_ldo.ko`, GKI, dan DT tidak berubah.

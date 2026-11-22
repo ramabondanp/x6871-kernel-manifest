@@ -27,6 +27,7 @@ Indeks bagian penting:
 - §62–§68: fast charging HVDCP20 (`alg_name_array`), race `mtk_iommu`, earpiece `Playback_R_DAC`, penyelarasan `mtu3.ko` stock, dan bringup GKI KMI 6 (`android16-6.12-2026-09_r16`) + trim `x6871_modules.bzl`
 - [§69: Uji kamera dengan port OTP](#69-uji-kamera-dengan-port-otp--kmi-7)
 - [§70: Uji fuel gauge MT6375](#70-uji-fuel-gauge-mt6375--kmi-7)
+- [§71: Uji probe AW22XXX](#71-uji-probe-aw22xxx--kmi-7)
 
 Tujuan awal (§1–§39): memastikan modul tidak menggantung/menimpa simbol stock
 dan tidak melakukan operasi berbahaya terhadap hardware **sebelum** boot. Bagian
@@ -4059,3 +4060,12 @@ layout, ABI, dan verifikasi build.
 (`CHG_STAT = 0x04`) pada akhir log. Respons saat `DONE` dan apakah UI
 mencapai 100% belum terverifikasi. Lihat
 [PLAN §12](PLAN.md#12-profil-baterai-mt6375-x6871--kmi-7) untuk perubahan driver.
+
+## 71. Uji probe AW22XXX — KMI 7
+
+Pada `dmesg11.txt`, AW22127 terdeteksi di `3-006a`, tetapi EINT menolak
+GPIO 16 karena disetel sebagai output; probe berakhir dengan `-5`.
+Setelah GPIO interrupt diubah menjadi input (`47d7517`), penguji
+melaporkan probe berhasil pada X6871 dengan build KMI 7 `16987858`.
+Fungsi dan efek LED belum diuji. Lihat [PLAN §13](PLAN.md#13-perangkat-i2c-aw22xxx-dan-et5904)
+untuk perbandingan dengan stock dan alasan `tran_ldo.ko` (ET5904) tidak diubah.

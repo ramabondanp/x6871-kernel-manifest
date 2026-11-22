@@ -151,7 +151,7 @@ Ambil `dmesg` penuh setelah boot, lalu periksa:
 | Fingerprint (FOD) | `ls -l /dev/goodix_fp`; `cat /sys/kernel/tran_fp/vendor_name`; `dmesg \| grep -iE 'tran_fp\|fp key finger\|notify fingerprint'` | `/dev/goodix_fp` ada, `vendor_name=goodix_opt_tee`, sentuh ikon FOD memicu `fp key finger` (key `195`) + HBM uevent `TRAN_FULL_HBM_EVENT=FULL_HBM_SET` |
 | tkv | `/proc/tkv` | ada, atau log `refusing to map` (aman) |
 | tnek | `/dev/tnek` | ada |
-| LED | `/sys/class/leds/aw22xxx*` | node ada |
+| LED AW22XXX | cek `aw22xxx_i2c_probe probe completed successfully!` di `dmesg` dan `/sys/class/leds/aw22xxx*`; coba efek dari UI | catat probe dan efek secara terpisah: node sysfs tidak membuktikan LED menyala. Lihat [PRETEST §71](PRETEST.md#71-uji-probe-aw22xxx--kmi-7). |
 | Reboot/suspend | `reboot`; `echo mem > /sys/power/state` | tidak hang |
 
 ### Uji fokus USB replug

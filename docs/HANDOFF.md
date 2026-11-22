@@ -464,6 +464,8 @@ artefak pre-release di atas:
 - [Fuel gauge MT6375](PRETEST.md#70-uji-fuel-gauge-mt6375--kmi-7): profil 3
   dan `charge_full` 5.000.000 µAh terbaca; `fuelgauged` stock aktif dan UI
   naik dari 78% ke 81%. Uji sampai `DONE` masih pending.
+- [LED AW22XXX](PRETEST.md#71-uji-probe-aw22xxx--kmi-7): probe dilaporkan
+  berhasil setelah koreksi GPIO interrupt. Efek LED belum diuji.
 
 Saat repack, ambil `--staging` secara eksplisit dari `out_bazel_kmi7/`,
 bukan dari keluaran default `out_bazel/`. Pakai `--out-dir
@@ -705,10 +707,12 @@ Layout sudah diverifikasi dua arah dan di-assert saat compile:
 Ekspor `tran-led-core` **20 == 20 identik** dengan firmware. Nama DT
 `tran,led_core`, modinfo `tran_led_core`.
 
-### `leds-aw22xxx` sudah selesai — jangan kembali ke donor 6.1
+### `leds-aw22xxx` — port 6.12 dan status probe
 
 Alamat: `drivers/leds/tran_led/leds-aw22xxx.c` (+ `.h`, `-reg.h`, `-cfg.h`).
 Commit `54c604b9378e`. Implementasi penuh ada di PLAN.md §6.2r.
+Pada build uji KMI 7, `47d7517` memperbaiki arah GPIO interrupt.
+Probe dilaporkan berhasil; [uji efek LED masih pending](PRETEST.md#71-uji-probe-aw22xxx--kmi-7).
 
 - Ekspor/impor/alias **identik**, 7 entri tabel ops mendarat di offset yang
   sama (`0x158…0x1a0`), `aw22xxx_cfg_name` 13.184 byte byte-identik.
