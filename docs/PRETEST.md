@@ -3981,3 +3981,36 @@ Repack terverifikasi (`222` modul cocok staging, `dtb`/`bootconfig`/`vendor_ramd
 3. **Squash 2 commit terakhir `mtu3` (`alps-kernel_device_modules-6.12`)**:
    - Commit `6230061` + `f661c15` di-squash menjadi satu commit bersih **`32a8db7`** (`usb: mtu3: match stock X6871 mtu3 pullup, stop, and cdp-block behavior`, force-pushed ke `alps/x6871-android16-6.12`).
    - Sisa `#include <linux/of_device.h>` yang tidak terpakai di `mtu3_dr.c` ikut dibersihkan sehingga hanya `mtu3_core.c` dan `mtu3_gadget.c` yang berubah di atas `68db913` (**103 commit** total di atas baseline `06079c2`). Isi kode `.ko` pada `x6871-twrp-vendor_boot-v18.img` (`md5 73b94a9f88ed39a852e8a1343978d37e`) identik secara fungsional.
+
+## 68. Bringup GKI AOSP murni `android16-6.12-2026-09_r16` (6.12.92, KMI 5 → KMI 6)
+
+Target: memindahkan seluruh modul X6871 ke GKI upstream AOSP murni **`android16-6.12-2026-09_r16`** (`7cc745542`, Linux `6.12.92`, `KMI_GENERATION=6`, `CLANG_VERSION=r536225`, `RUSTC_VERSION=1.82.0.p2`) **tanpa mengedit satu berkas pun di `kernel-6.12`**, untuk dipasangkan dengan `boot.img` + `system_dlkm.img` rilis resmi Google.
+
+1. **Audit perubahan GKI (`android16-6.12-2025-09_r32` → `2026-09_r16`)**:
+   - Diff `gki/aarch64/abi.stg`: 9.615 → 10.630 simbol (+1.017, -2 `f2fs_submit_folio_write`, **6.418 simbol berubah CRC** akibat perubahan struct/ABI KMI 5→6 termasuk `fscrypt_master_key`, `task_struct`, `cfs_rq`, `files_struct`, `mm_struct`, dll.). Seluruh 491 modul X6871 mengimpor simbol yang CRC-nya berubah sehingga build ulang penuh dari source wajib dilakukan.
+   - Seluruh 13 simbol yang keluar dari `gki/aarch64/symbols/mtk` tetap tersedia di daftar simbol GKI lain (`base`, dll.); 0 header baru hilang di `ack_headers.bzl`.
+   - Audit objek prebuilt (`.o`/`.a`): hanya 3 modul di `sched_cus` (`eas_ext.ko`, `cpuqos_ext.ko`, `mtk_em.ko`) yang memakai `.o` prebuilt, dan ketiganya **tidak termasuk** dalam set modul X6871 (seluruh 488 modul X6871 dibangun 100% dari C source).
+2. **Dua perbaikan pada `alps-kernel_device_modules-6.12` (0 perubahan di `kernel-6.12` & `alps-vendor_mediatek_kernel_modules`)**:
+   - **`96b299e`** (`kernel/kleaf/mgk_modules.bzl`): `fs/pstore/pstore_blk.ko` dan `fs/pstore/pstore_zone.ko` dipromosikan ke `COMMON_GKI_MODULES_LIST` di `kernel-6.12/modules.bzl` sehingga memicu duplikasi rule filegroup pada varian `eng`/`userdebug`. Difilter dinamis terhadap `COMMON_GKI_MODULES_LIST`.
+   - **`20a8f5d`** (`drivers/misc/mediatek/sched/eas/balance.c`): hapus klon lokal `attach_task()` dan `attach_one_task()` yang kini didefinisikan `static inline` di upstream `kernel/sched/sched.h` (`6.12.92`).
+3. **Pembersihan `CONFIG_MODULE_SIG_PROTECT` pada `vendor_dlkm`**:
+   - Pada GKI resmi Google (`CONFIG_MODULE_SIG_PROTECT=y`), modul GKI selain `_COMMON_UNPROTECTED_MODULES_LIST` (`zram.ko`, `zsmalloc.ko`) ditolak (`-EACCES`) jika tidak ditandatangani kunci GKI Google.
+   - Audit seluruh modul menunjukkan tepat 3 modul di `vendor_dlkm` (`rfkill.ko`, `bluetooth.ko`, `libarc4.ko`, 109 simbol) bentrok dengan simbol terproteksi `system_dlkm`, sedangkan `vendor_boot` dan `odm_dlkm` bernilai **0 kolisi**.
+   - Ketiganya dikeluarkan dari `vendor_dlkm` (menjadi **209** `.ko`, **191** `modules.load`, sejajar stock X6871) sehingga dimuat penuh dari `system_dlkm.img` rilis Google. `zsmalloc.ko` + `zram.ko` di `odm_dlkm` tetap dipertahankan karena termasuk unprotected GKI modules.
+4. **Verifikasi akhir 488 modul (`222` `vendor_boot` + `209` `vendor_dlkm` + `57` `odm_dlkm`)**:
+   - Vermagic 488/488: `6.12.92-android16-6-g7cc745542612-4k SMP preempt mod_unload modversions aarch64`.
+   - CRC terhadap `gki/aarch64/abi.stg` resmi (10.630 simbol): **0 mismatch**.
+   - Impor simbol `vmlinux` di luar daftar KMI 6: **0**.
+   - Kolisi `CONFIG_MODULE_SIG_PROTECT`: **0**.
+   - Unresolved symbol (`vendor_boot` standalone & closure penuh bersama `vmlinux` + `system_dlkm`): **0**.
+   - AVB hashtree footer `vendor_dlkm.img` & `odm_dlkm.img` lulus `avbtool verify_image`.
+
+### Artefak uji (`gki-kmi6-20261122`)
+
+```text
+x6871-twrp-vendor_boot-v19-kmi6.img  md5 91eb249ff001d250fad855c40476f1b5  67.108.864 B
+vendor_dlkm.img                      md5 5f7b6cecb1c44a1ffc3280dd481fbfcf  24.551.424 B
+odm_dlkm.img                         md5 6ee3cadceb5c4750dbbfe3d0056b6ea8   4.206.592 B
+/srv path                            /serverhive1/ramabondanp/x6871-clean/out/
+rollback KMI 5                       x6871-twrp-vendor_boot-v18.img, vendor_dlkm-v16-kmi5.img, odm_dlkm-v16-kmi5.img
+```

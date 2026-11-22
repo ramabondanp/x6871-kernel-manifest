@@ -2,9 +2,10 @@
 
 Workspace Bazel+Kleaf untuk membangun modul kernel **Android 16 / kernel 6.12 / MediaTek MT6895** untuk **Infinix GT 20 Pro (X6871)** (berbasis donor MTK 6.12 Motorola `w1vo36.88-36-7` + OPPO `mt6896`).
 
-- **Device modules (`kernel_device_modules-6.12`)**: [`alps-kernel_device_modules-6.12`](https://github.com/ramabondanp/alps-kernel_device_modules-6.12/tree/x6871-android16-6.12) (`x6871-android16-6.12`, **103 commit** di atas baseline `06079c2`, HEAD `32a8db7`)
+- **GKI base (`kernel-6.12`)**: AOSP murni `android16-6.12-2026-09_r16` (`6.12.92-android16-6-g7cc745542612-4k`, **KMI 6**, tanpa patch)
+- **Device modules (`kernel_device_modules-6.12`)**: [`alps-kernel_device_modules-6.12`](https://github.com/ramabondanp/alps-kernel_device_modules-6.12/tree/x6871-android16-6.12) (`x6871-android16-6.12`, **105 commit** di atas baseline `06079c2`, HEAD `20a8f5d`)
 - **Vendor MTK modules (`vendor/mediatek/kernel_modules`)**: [`alps-vendor_mediatek_kernel_modules`](https://github.com/ramabondanp/alps-vendor_mediatek_kernel_modules/tree/x6871-android16-6.12) (`x6871-android16-6.12`, **4 commit** X6871 di atas base Motorola + 13 donor OPPO `86edba6`, HEAD `83b4fa6`)
-- **Output build X6871**: staging **806 file** (**805** nama unik), flat customer install **702** `.ko`
+- **Output build X6871**: staging **813 file** (**812** nama unik), flat customer install **679** `.ko`
 - **Output baseline MTK murni** (`mtk-base-latest`): **1.401** `.ko`
 - **Panduan cepat dokumen**:
   - [`docs/HANDOFF.md`](docs/HANDOFF.md) — ringkasan status terkini, aturan kerja, perintah build/repack, dan pengetahuan kritis
@@ -27,7 +28,7 @@ git clone https://github.com/ramabondanp/x6871-kernel-manifest ~/x6871-kernel-ma
 # 1. Sync workspace AOSP + overlay manifest X6871
 mkdir -p ~/x6871-kernel && cd ~/x6871-kernel
 repo init -u https://android.googlesource.com/kernel/manifest \
-          -b common-android16-6.12-2025-09
+          -b common-android16-6.12-2026-09
 cp ~/x6871-kernel-manifest/local_manifest.xml .repo/local_manifests/x6871.xml
 repo sync -j16
 
@@ -65,7 +66,7 @@ Untuk SoC lain: `PLATFORM=mt6991 ~/x6871-kernel-manifest/build.sh user` (default
 
 ## Status Runtime & Rilis Terbaru (2026-11-22)
 
-Seluruh partisi modul (**222** modul `vendor_boot` + **212** `vendor_dlkm` + **57** `odm_dlkm`) dibangun **100% dari source**.
+Seluruh partisi modul (**222** modul `vendor_boot` + **209** `vendor_dlkm` + **57** `odm_dlkm`) dibangun **100% dari source** terhadap GKI AOSP murni **`android16-6.12-2026-09_r16`** (`6.12.92-android16-6`, **KMI 6**), siap dipasangkan langsung dengan `boot.img` & `system_dlkm.img` rilis resmi Google.
 
 ### Status per subsistem
 
@@ -83,20 +84,21 @@ Seluruh partisi modul (**222** modul `vendor_boot` + **212** `vendor_dlkm` + **5
 | **Earpiece speaker (`RCV Mux`)** | ✅ Lulus (`v16`) | Restore `RCV Select=Playback_R_DAC` (`aca5276`); terkonfirmasi di `dmesg9.txt` (`mt_rcv_event`, mux 1) |
 | **USB replug berulang** | ✅ Modul clear (bug GKI custom) | `mtu3.ko` sejajar stock (`32a8db7`); uji balik seluruh DLKM & modul stock tetap memicu bug yang sama → sumber masalah ada di kernel GKI custom (`boot.img`), bukan modul kita (`PRETEST.md` §67) |
 
-### Rilis terbaru: `mtu3-stock-20261122` (kernel `32a8db7`, squash dari `f661c15`)
+### Rilis terbaru: `gki-kmi6-20261122` (GKI `android16-6.12-2026-09_r16` / `6.12.92-android16-6`, kernel `20a8f5d`)
 
 ```text
-x6871-twrp-vendor_boot-v18.img  md5 73b94a9f88ed39a852e8a1343978d37e  67.108.864 B
-vendor_dlkm.img                 md5 72daa1f10eba75d9cd0e3359a27ff76f  24.551.424 B
-odm_dlkm.img                    md5 99b2194fa63cab8c751f71b8fbd4eb5e   4.206.592 B
+x6871-twrp-vendor_boot-v19-kmi6.img  md5 91eb249ff001d250fad855c40476f1b5  67.108.864 B
+vendor_dlkm.img                      md5 5f7b6cecb1c44a1ffc3280dd481fbfcf  24.551.424 B
+odm_dlkm.img                         md5 6ee3cadceb5c4750dbbfe3d0056b6ea8   4.206.592 B
 ```
 
-Jika sudah memakai v16, cukup flash `vendor_boot` v18; kedua DLKM identik.
+Wajib di-flash bersamaan dengan `boot.img` + `system_dlkm.img` GKI **`android16-6.12-2026-09_r16`** (KMI 6) rilis Google. Tiga modul GKI terproteksi (`rfkill.ko`, `bluetooth.ko`, `libarc4.ko`) dikeluarkan dari `vendor_dlkm` agar tidak bentrok dengan `CONFIG_MODULE_SIG_PROTECT` pada GKI resmi Google (kini dimuat penuh dari `system_dlkm` seperti stock).
 
 ### Ringkasan perjalanan rilis
 
 | Rilis | `vendor_boot` | Sorotan utama |
 |---|---|---|
+| `gki-kmi6-20261122` | v19-kmi6 | Migrasi GKI ke AOSP murni `android16-6.12-2026-09_r16` (`6.12.92-android16-6`, KMI 5→6, tanpa edit GKI): dedup `pstore_{blk,zone}` (`96b299e`), hapus klon `attach_task`/`attach_one_task` di `eas/balance.c` (`20a8f5d`), keluarkan 3 modul GKI terproteksi (`rfkill`/`bluetooth`/`libarc4`) dari `vendor_dlkm`; 0 mismatch CRC vs `abi.stg` (10.630 simbol) & 0 simbol tak terselesaikan |
 | `mtu3-stock-20261122` | v18 | Samakan `mtu3.ko` dengan stock (`mdelay(4)`, `ssusb_phy_dp_pullup`, hapus `cdp-block` di `ssusb_gadget_init`, squash `32a8db7`); uji modul stock membuktikan bug USB berasal dari GKI custom |
 | `mtu3-replug-20261122` | v17 | (Direvert & di-squash di `32a8db7`) `usb_gadget_connect()` pada NONE → DEVICE |
 | `rcv-usb-20261122` | v16 | Fix earpiece `Playback_R_DAC` (enum/route/event stock) + pullup UDC saat replug (workqueue/urutan role switch stock) |

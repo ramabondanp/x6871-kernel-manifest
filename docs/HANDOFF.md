@@ -8,22 +8,39 @@ Ditulis 2026-11-19, diperbarui 2026-11-22 untuk sesi AI berikutnya. Baca ini dul
 
 | Item | Nilai |
 |---|---|
-| `.ko` flat customer install | **702** |
-| `.ko` di staging (file / nama unik) | **806 / 805** (`mtk-socinfo` dobel) |
+| GKI base (`kernel-6.12`) | AOSP murni `android16-6.12-2026-09_r16` (`6.12.92-android16-6-g7cc745542612-4k`, **KMI 6**, tanpa patch) |
+| `.ko` flat customer install | **679** |
+| `.ko` di staging (file / nama unik) | **813 / 812** (`mtk-socinfo` dobel) |
 | Modul di firmware X6871 | 237 |
 | Nama stock tidak ada di build | **20** (6 tidak direncanakan, 14 kandidat) |
-| Modul recovery vendor_boot | **222**, 100% source |
-| DLKM (`vendor_dlkm` + `odm_dlkm`) | **269**, 100% source, image siap |
+| Modul recovery vendor_boot | **222**, 100% source (KMI 6) |
+| DLKM (`vendor_dlkm` + `odm_dlkm`) | **266** (`209` + `57`), 100% source (KMI 6, bebas `CONFIG_MODULE_SIG_PROTECT`), image siap |
 | Build target | `//kernel_device_modules-6.12:mgk_64_k612_customer_modules_install.user` |
-| Build terakhir | sukses (inkremental), 2026-11-22 |
-| Kernel HEAD | `32a8db7` (`alps-kernel_device_modules-6.12`, `x6871-android16-6.12`, 103 commit di atas `06079c2`) |
+| Build terakhir | sukses (clean KMI 6), 2026-11-22 |
+| Kernel HEAD | `20a8f5d` (`alps-kernel_device_modules-6.12`, `x6871-android16-6.12`, 105 commit di atas `06079c2`) |
 | Vendor MTK modules HEAD | `83b4fa6` (`alps-vendor_mediatek_kernel_modules`, `x6871-android16-6.12`) |
 | Active clean workspace | `/serverhive1/ramabondanp/x6871-clean/ws` (keep old `/serverhive1/ramabondanp/w1vo` untouched) |
-| Runtime | **Seluruh subsistem modul lulus**: boot + layar + AOD + kamera foto + rekam video + FOD normal/AOD/screen-off + DT2W + flashlight + Wi-Fi + GPU + charging HVDCP20/PD + earpiece (`v16`); bug USB replug terkonfirmasi berasal dari kernel GKI custom (`boot.img`), bukan modul kita (`PRETEST.md` §67) |
+| Runtime | Seluruh subsistem modul lulus di KMI 5 (`v18`); bringup KMI 6 (`v19-kmi6`) terverifikasi statis 0 mismatch CRC vs `abi.stg` resmi Google (`10.630` simbol), 0 simbol tak terselesaikan, 0 kolisi `CONFIG_MODULE_SIG_PROTECT` — siap uji boot dengan `boot.img` + `system_dlkm.img` GKI `android16-6.12-2026-09_r16` |
 
 ## Status Rilis Terbaru & Ringkasan Riwayat (2026-11-22)
 
-### Rilis terbaru: `mtu3-stock-20261122` (kernel `32a8db7`, `vendor_boot` v18)
+### Rilis terbaru: `gki-kmi6-20261122` (GKI `android16-6.12-2026-09_r16`, kernel `20a8f5d`, `vendor_boot` v19-kmi6)
+
+```text
+x6871-twrp-vendor_boot-v19-kmi6.img  md5 91eb249ff001d250fad855c40476f1b5  67.108.864 B
+vendor_dlkm.img                      md5 5f7b6cecb1c44a1ffc3280dd481fbfcf  24.551.424 B
+odm_dlkm.img                         md5 6ee3cadceb5c4750dbbfe3d0056b6ea8   4.206.592 B
+/srv path                            /serverhive1/ramabondanp/x6871-clean/out/
+rollback KMI 5                       x6871-twrp-vendor_boot-v18.img, vendor_dlkm-v16-kmi5.img, odm_dlkm-v16-kmi5.img
+```
+
+Migrasi GKI ke tag AOSP murni **`android16-6.12-2026-09_r16`** (`6.12.92-android16-6`, `KMI_GENERATION=6`, `CLANG_VERSION=r536225`, `RUSTC_VERSION=1.82.0.p2`) **tanpa mengubah satu baris pun di `kernel-6.12`** (`PRETEST.md` §68):
+1. **`kernel/kleaf/mgk_modules.bzl` (`96b299e`)**: filter `fs/pstore/pstore_blk.ko` & `fs/pstore/pstore_zone.ko` dari `mgk_module_{eng,userdebug}_outs` bila sudah masuk `COMMON_GKI_MODULES_LIST` di `kernel-6.12/modules.bzl`.
+2. **`drivers/misc/mediatek/sched/eas/balance.c` (`20a8f5d`)**: hapus klon lokal `attach_task()` / `attach_one_task()` yang kini disediakan `static inline` di `kernel/sched/sched.h` pada `6.12.92`.
+3. **`vendor_dlkm` & `CONFIG_MODULE_SIG_PROTECT`**: keluarkan 3 modul GKI terproteksi (`rfkill.ko`, `bluetooth.ko`, `libarc4.ko`) dari `vendor_dlkm` (kini `209` modul, `191` `modules.load`) karena ketiganya sudah dimiliki & ditandatangani oleh `system_dlkm.img` GKI resmi Google (`zsmalloc.ko` & `zram.ko` di `odm_dlkm` termasuk `_COMMON_UNPROTECTED_MODULES_LIST`, aman).
+4. **Verifikasi KMI 6**: 6.418 simbol `abi.stg` berubah CRC dari KMI 5→6 (berdampak ke 491/491 modul); setelah build ulang seluruh 488 `.ko` (`222`+`209`+`57`) mencocokkan **0 mismatch CRC** terhadap `gki/aarch64/abi.stg` resmi (`10.630` simbol), **0 simbol `vmlinux` non-KMI-6**, **0 kolisi `CONFIG_MODULE_SIG_PROTECT`**, dan **0 unresolved symbol**.
+
+### Rilis sebelumnya (KMI 5): `mtu3-stock-20261122` (kernel `32a8db7`, `vendor_boot` v18)
 
 ```text
 x6871-twrp-vendor_boot-v18.img  md5 73b94a9f88ed39a852e8a1343978d37e  67.108.864 B

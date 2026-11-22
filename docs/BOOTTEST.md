@@ -37,16 +37,16 @@ Tujuan: memvalidasi **seluruh boot** (recovery + Android system), bukan hanya sa
    `dtbo.img` tetap milik stock. Ini risiko yang harus diamati di dmesg
    (lihat §5).
 
-## 1. Artefak Uji Terbaru (`mtu3-stock-20261122`)
+## 1. Artefak Uji Terbaru (`gki-kmi6-20261122`)
 
 | Artefak | Sumber | Catatan |
 |---|---|---|
-| `x6871-twrp-vendor_boot-v18.img` | `tools/repack-vendor-boot-latest.sh` | **222** modul source (`md5 73b94a9f88ed39a852e8a1343978d37e`), `mtu3.ko` sejajar stock (`32a8db7`); dtb/bootconfig/recovery TWRP tetap |
-| `vendor_dlkm.img` | EROFS + AVB (`fastbootd`) | **212** modul source (`md5 72daa1f10eba75d9cd0e3359a27ff76f`), identik dengan v16 |
-| `odm_dlkm.img` | EROFS + AVB (`fastbootd`) | **57** modul source (`md5 99b2194fa63cab8c751f71b8fbd4eb5e`), identik dengan v16 |
-| kernel `Image` | `out_bazel/.../mgk_64_k612_kernel_aarch64.user/Image` | opsional, hanya jika `boot.img` ikut diganti |
+| `boot.img` & `system_dlkm.img` | rilis resmi Google GKI `android16-6.12-2026-09_r16` | **Wajib** KMI 6 (`6.12.92-android16-6`); `system_dlkm` menyediakan modul GKI terproteksi (`rfkill`, `bluetooth`, `libarc4`, dll.) |
+| `x6871-twrp-vendor_boot-v19-kmi6.img` | `tools/repack-vendor-boot-latest.sh` | **222** modul source KMI 6 (`md5 91eb249ff001d250fad855c40476f1b5`, kernel `20a8f5d`); dtb/bootconfig/recovery TWRP tetap |
+| `vendor_dlkm.img` | EROFS + AVB (`fastbootd`) | **209** modul source KMI 6 (`md5 5f7b6cecb1c44a1ffc3280dd481fbfcf`, `191` `modules.load`); 3 modul GKI terproteksi dikeluarkan |
+| `odm_dlkm.img` | EROFS + AVB (`fastbootd`) | **57** modul source KMI 6 (`md5 6ee3cadceb5c4750dbbfe3d0056b6ea8`, `57` `modules.load`) |
 | `dtbo.img` | stock, tidak diubah | build tidak menghasilkan dtbo |
-| staging modul | `.../mgk_64_k612_customer_modules_install.user/staging/lib/modules/6.12.38-android16-5-g2c4fd33ae6d8-4k` | 806 file / 805 nama unik |
+| staging modul | `.../mgk_64_k612_customer_modules_install.user/staging/lib/modules/6.12.92-android16-6-g7cc745542612-4k` | 813 file / 812 nama unik |
 
 ## 2. Membuat image vendor_boot
 
