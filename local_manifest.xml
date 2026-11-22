@@ -8,14 +8,17 @@
     repo sync -j16
 
   Mengganti kernel/common dan kernel/build AOSP dengan versi MTK w1vo,
-  total 12 project (11 repo Motorola w1vo/w2we + 1 repo donor OPPO mt6896).
+  total 6 project (5 repo Motorola w1vo/w2we + 1 repo terpadu
+  alps-vendor_mediatek_kernel_modules yang sudah menggabungkan 6 repo
+  vendor MTK Motorola, 13 modul donor OPPO mt6896, serta port GPU Mali
+  r54p1 dan kamera X6871).
 
   Tidak ada tag <default> di sini karena manifest AOSP sudah punya;
   revision/remote ditulis per project.
 -->
 <manifest>
   <remote name="moto" fetch="https://github.com/MotorolaMobilityLLC" />
-  <remote name="oppo" fetch="https://github.com/oppo-source" />
+  <remote name="alps" fetch="https://github.com/ramabondanp" />
 
   <remove-project name="kernel/common" />
   <remove-project name="kernel/build" />
@@ -44,31 +47,15 @@
   <project path="kernel_device_modules-6.12" name="kernel-kernel_device_modules-6.12"
            remote="moto" revision="android-16-release-w1vo36.88-36-7" />
 
-  <!-- Vendor modules MTK -->
-  <project path="vendor/mediatek/kernel_modules/gpu"
-           name="vendor-mediatek-kernel_modules-gpu"
-           remote="moto" revision="android-16-release-w1vo36.88-36-7" />
-  <project path="vendor/mediatek/kernel_modules/mtkcam"
-           name="vendor-mediatek-kernel_modules-mtkcam"
-           remote="moto" revision="android-16-release-w1vo36.88-36-7" />
-  <project path="vendor/mediatek/kernel_modules/connectivity/conninfra"
-           name="vendor-mediatek-kernel_modules-connectivity-conninfra"
-           remote="moto" revision="android-16-release-w1vo36.88-36-7" />
-  <project path="vendor/mediatek/kernel_modules/connectivity/bt/linux_v2"
-           name="vendor-mediatek-kernel_modules-connectivity-bt-linux_v2"
-           remote="moto" revision="android-16-release-w1vo36.88-36-7" />
-  <project path="vendor/mediatek/kernel_modules/connectivity/bt/mt66xx"
-           name="vendor-mediatek-kernel_modules-connectivity-bt-mt66xx"
-           remote="moto" revision="android-16-release-w1vo36.88-36-7" />
-  <project path="vendor/mediatek/kernel_modules/connectivity/wlan/core/gen4m"
-           name="vendor-mediatek-kernel_modules-connectivity-wlan-core-gen4m"
-           remote="moto" revision="android-16-release-w1vo36.88-36-7" />
-
-  <!-- Donor OPPO mt6896 (Android 16 / 6.12) untuk module yang tidak
-       dipublikasikan Motorola: afs_common_utils, hbt_driver, hbt_driver_cus,
-       met_drv_v3, sched_cus, connectivity/{common,connfem,fmradio,gps,
-       wlan/adaptor,wlan/core/gen4-mt79xx,bt/linux_v2_ce,bt/mt76xx}. -->
-  <project path="donor/oppo-mt6896"
-           name="android_kernel_modules_oppo_mt6896"
-           remote="oppo" revision="oppo/mt6896_b_16.0_reno12" />
+  <!-- Vendor modules MTK terpadu:
+       Berisi 6 repo Motorola w1vo36.88-36-7 (gpu, mtkcam, connectivity/
+       conninfra, bt/linux_v2, bt/mt66xx, wlan/core/gen4m), 13 modul donor
+       OPPO mt6896 (afs_common_utils, hbt_driver, hbt_driver_cus, met_drv_v3,
+       sched_cus, connectivity/{common,connfem,fmradio,gps,wlan/adaptor,
+       wlan/core/gen4-mt79xx,bt/linux_v2_ce,bt/mt76xx}), serta commit port
+       Infinix X6871 (Mali r54p1-11eac0, camsys sink_fmt ABI, 4 sensor kamera
+       + EEPROM). -->
+  <project path="vendor/mediatek/kernel_modules"
+           name="alps-vendor_mediatek_kernel_modules"
+           remote="alps" revision="w1vo36-6.12-port" />
 </manifest>

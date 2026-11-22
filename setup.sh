@@ -6,7 +6,7 @@
 # Melakukan (idempotent, aman dijalankan berulang):
 #   1. MODULE.bazel  <- mgk.MODULE.bazel (root AOSP tidak memuat MGK)
 #   2. symlink common-6.12 -> kernel-6.12
-#   3. symlink 13 module donor OPPO mt6896
+#   3. symlink 13 module donor OPPO mt6896 (hanya bila workspace split legacy)
 #   4. symlink ../vendor/mediatek (mgk_repo pakai path="../vendor/mediatek")
 #   5. hapus label //vendor/... yang tidak tersedia dari mgk_64.bzl
 set -e
@@ -33,11 +33,13 @@ fi
 # --- 2. common-6.12 --------------------------------------------------------
 [ -e common-6.12 ] || { ln -s kernel-6.12 common-6.12; echo "symlink common-6.12"; }
 
-# --- 3. donor OPPO ---------------------------------------------------------
+# --- 3. donor OPPO (fallback untuk workspace split legacy) -----------------
 DONOR=donor/oppo-mt6896/vendor/mediatek/kernel_modules
 VM=vendor/mediatek/kernel_modules
 
-if [ -d "$DONOR" ]; then
+if [ -d "$VM/afs_common_utils" ] && [ ! -L "$VM/afs_common_utils" ]; then
+  echo "vendor/mediatek/kernel_modules sudah terpadu (vendored), skip symlink donor OPPO"
+elif [ -d "$DONOR" ]; then
   link_donor() {
     rel="$1"
     [ -e "$DONOR/$rel" ] || { echo "  skip (tidak ada di donor): $rel"; return; }
@@ -66,7 +68,7 @@ if [ -d "$DONOR" ]; then
     link_donor "$m"
   done
 else
-  echo "WARNING: donor/oppo-mt6896 tidak ada, skip symlink"
+  echo "WARNING: donor/oppo-mt6896 tidak ada dan $VM belum lengkap, skip symlink"
 fi
 
 # --- 4. parent vendor/mediatek --------------------------------------------
