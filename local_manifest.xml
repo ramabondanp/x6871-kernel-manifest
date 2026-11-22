@@ -2,10 +2,14 @@
 <!--
   Overlay untuk manifest AOSP kernel (Infinix GT 20 Pro / X6871, MT6895):
 
+  Jalankan dari root workspace kernel dengan repo manifest ini di
+  ~/x6871-kernel-manifest (lihat README.md):
+
     repo init -u https://android.googlesource.com/kernel/manifest \
               -b common-android16-6.12-2026-09
-    cp local_manifest.xml .repo/local_manifests/x6871.xml
-    repo sync -j16
+    mkdir -p .repo/local_manifests
+    cp ~/x6871-kernel-manifest/local_manifest.xml .repo/local_manifests/x6871.xml
+    repo sync
 
   Mengganti kernel/build AOSP dengan Kleaf/MGK rules, mem-pin GKI murni ke
   tag android16-6.12-2026-09_r16 (6.12.92, KMI 6) di path kernel-6.12, dan
@@ -17,7 +21,8 @@
       x6871-android16-6.12)
 
   Tidak ada tag <default> di sini karena manifest AOSP sudah punya;
-  revision/remote ditulis per project.
+  revision/remote ditulis per project. GKI dikunci ke tag, sedangkan
+  proyek Motorola dan port X6871 mengikuti branch yang tertera.
 -->
 <manifest>
   <remote name="moto" fetch="https://github.com/MotorolaMobilityLLC" />
