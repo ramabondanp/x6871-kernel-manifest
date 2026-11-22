@@ -1,6 +1,6 @@
-# Kernel 6.12 untuk Infinix GT 20 Pro (X6871)
+# Manifest Kernel X6871 — Port Linux 6.12 Tidak Resmi
 
-Repo ini membantu Anda membangun modul kernel **Android 16** untuk **Infinix GT 20 Pro (X6871 / MediaTek MT6895)**. Modul perangkat dibangun dari kode sumber dan dipasangkan dengan kernel resmi Google (GKI) tanpa modifikasi. Ini bukan ROM lengkap.
+Repo ini menyediakan manifest dan skrip untuk mengambil kode sumber dan membangun modul kernel **Android 16** untuk **Infinix GT 20 Pro (X6871 / MT6895)**. Port tidak resmi ini mengadaptasi driver dari kode sumber donor dan merekonstruksi bagian yang tidak dipublikasikan melalui reverse engineering modul kernel (`.ko`) dari firmware bawaan X6871. Modul hasil port berjalan di atas **AOSP GKI 6.12 tanpa modifikasi**.
 
 ## Apa yang sudah diuji?
 
