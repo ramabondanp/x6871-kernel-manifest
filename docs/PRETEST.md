@@ -4005,6 +4005,10 @@ Target: memindahkan seluruh modul X6871 ke GKI upstream AOSP murni **`android16-
    - Unresolved symbol (`vendor_boot` standalone & closure penuh bersama `vmlinux` + `system_dlkm`): **0**.
    - AVB hashtree footer `vendor_dlkm.img` & `odm_dlkm.img` lulus `avbtool verify_image`.
 
+5. **Hasil uji boot (`gki-kmi6-20261122`)**:
+   - Pengguna mengonfirmasi **sukses boot** di X6871 dengan `x6871-twrp-vendor_boot-v19-kmi6.img`, `vendor_dlkm.img`, `odm_dlkm.img`, bersama `boot.img` + `system_dlkm.img` GKI resmi Google `android16-6.12-2026-09_r16` (KMI 6).
+   - Seluruh safeguard verifikasi & repack dikemas ulang ke manifest sebagai [`tools/verify-kmi-abi.py`](../tools/verify-kmi-abi.py) dan [`tools/repack-dlkm-latest.sh`](../tools/repack-dlkm-latest.sh) + aturan keras #15–#18 di `docs/HANDOFF.md`.
+
 ### Artefak uji (`gki-kmi6-20261122`)
 
 ```text

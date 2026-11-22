@@ -20,7 +20,7 @@ Ditulis 2026-11-19, diperbarui 2026-11-22 untuk sesi AI berikutnya. Baca ini dul
 | Kernel HEAD | `20a8f5d` (`alps-kernel_device_modules-6.12`, `x6871-android16-6.12`, 105 commit di atas `06079c2`) |
 | Vendor MTK modules HEAD | `83b4fa6` (`alps-vendor_mediatek_kernel_modules`, `x6871-android16-6.12`) |
 | Active clean workspace | `/serverhive1/ramabondanp/x6871-clean/ws` (keep old `/serverhive1/ramabondanp/w1vo` untouched) |
-| Runtime | Seluruh subsistem modul lulus di KMI 5 (`v18`); bringup KMI 6 (`v19-kmi6`) terverifikasi statis 0 mismatch CRC vs `abi.stg` resmi Google (`10.630` simbol), 0 simbol tak terselesaikan, 0 kolisi `CONFIG_MODULE_SIG_PROTECT` — siap uji boot dengan `boot.img` + `system_dlkm.img` GKI `android16-6.12-2026-09_r16` |
+| Runtime | **Lulus boot di GKI KMI 6 (`android16-6.12-2026-09_r16`, `v19-kmi6`)** dengan `boot.img` + `system_dlkm.img` resmi Google (0 mismatch CRC vs `abi.stg` `10.630` simbol, 0 kolisi `CONFIG_MODULE_SIG_PROTECT`, 0 unresolved symbol); seluruh subsistem modul sebelumnya lulus di KMI 5 (`v18`) |
 
 ## Status Rilis Terbaru & Ringkasan Riwayat (2026-11-22)
 
@@ -264,6 +264,26 @@ kalau memang tidak ada source.
 14. 7 modul GKI (`arm_dsu_pmu`, `drm_display_helper`, `drm_dma_helper`,
     `industrialio-triggered-buffer`, `kfifo_buf`, `reboot-mode`,
     `syscon-reboot-mode`) **bukan gap** — ada di `mgk_module_ext_outs`.
+15. **GKI (`kernel-6.12`) JANGAN PERNAH diedit untuk menyesuaikan modul.**
+    Semua adaptasi KMI/API wajib dilakukan di `kernel_device_modules-6.12`,
+    `vendor/mediatek/kernel_modules`, atau `local_manifest.xml` agar modul
+    selalu kompatibel 100% dengan `boot.img` + `system_dlkm.img` rilis resmi Google.
+16. **Jangan masukkan modul GKI terproteksi ke `vendor_dlkm`/`vendor_boot`/`odm_dlkm`.**
+    Pada GKI resmi Google (`CONFIG_MODULE_SIG_PROTECT=y`), setiap modul di
+    `kernel-6.12/modules.bzl` selain `_COMMON_UNPROTECTED_MODULES_LIST`
+    (`zram.ko`, `zsmalloc.ko`) akan ditolak (`-EACCES`) bila tidak bertanda
+    tangan kunci GKI Google (mis. `rfkill.ko`, `bluetooth.ko`, `libarc4.ko`).
+    Modul-modul itu disediakan langsung oleh `system_dlkm.img` Google.
+17. **Wajib jalankan `./tools/verify-kmi-abi.py` sebelum setiap rilis atau upgrade tag GKI.**
+    Skrip ini memvalidasi 8 gerbang sekaligus (GKI murni bersih, vermagic,
+    0 kolisi `CONFIG_MODULE_SIG_PROTECT`, closure `vendor_boot` standalone & penuh,
+    0 mismatch CRC vs `gki/aarch64/abi.stg`, 0 impor `vmlinux` non-KMI, dan
+    integritas `modules.dep`/`modules.load`).
+18. **Saat KMI generation naik (mis. 5 → 6), audit semua objek prebuilt (`.o`/`.a`).**
+    Perubahan layout struct di `gki/aarch64/abi.stg.allowed_breaks` tidak memicu
+    error compile pada `ddk_prebuilt_object`; pastikan tidak ada modul di set
+    runtime X6871 yang menautkan `.o` prebuilt (saat ini hanya `sched_cus` yang
+    punya `.o` prebuilt dan ketiganya tidak dipakai X6871).
 
 ## Lingkungan
 
@@ -311,6 +331,30 @@ Info commit/md5 ditulis ke `<out>.buildinfo`.
 
 Menambah/mengurangi modul recovery: edit `tools/recovery-modules.txt`,
 `tools/modules.load`, dan `tools/modules.load.recovery` sekaligus.
+
+### Repack DLKM & Safeguard Verifikasi KMI/ABI (WAJIB untuk setiap rilis & upgrade GKI)
+
+```bash
+cd /serverhive1/ramabondanp/w1vo36-kernel-manifest
+
+# 1. Repack vendor_dlkm.img + odm_dlkm.img (otomatis buang modul GKI terproteksi,
+#    pakai AOSP mkfs.erofs/avbtool/fec, dan verifikasi AVB hashtree)
+./tools/repack-dlkm-latest.sh \
+  --out-dir /serverhive1/ramabondanp/x6871-clean/out \
+  --work-dir /serverhive1/ramabondanp/x6871-clean/out/dlkm-latest-work
+
+# 2. Jalankan 8 gerbang safeguard KMI/ABI terhadap GKI murni & abi.stg resmi
+./tools/verify-kmi-abi.py
+```
+
+#### Checklist cepat upgrade tag GKI (mis. `android16-6.12-YYYY-MM_rXX`)
+
+1. Cek `build.config.constants` tag target (`CLANG_VERSION`, `RUSTC_VERSION`, `KMI_GENERATION`) dan pastikan prebuilt tersedia di `ws/prebuilts/`.
+2. Checkout tag GKI murni di `ws/kernel-6.12` (jangan edit satu berkas pun di `kernel-6.12`); cek diff `modules.bzl`, `ack_headers.bzl`, dan `gki/aarch64/abi.stg.allowed_breaks`.
+3. Build penuh `--keep_going` pada `mgk_64_k612_kernel_aarch64.user` + `mgk_64_k612_customer_modules_install.user`; perbaiki error hanya di `kernel_device_modules-6.12` / `vendor/mediatek/kernel_modules`.
+4. Repack dengan `./tools/repack-vendor-boot-latest.sh --skip-build` dan `./tools/repack-dlkm-latest.sh`.
+5. Jalankan `./tools/verify-kmi-abi.py` — wajib lulus seluruh 8 gerbang (0 error) sebelum commit/push/rilis.
+6. Update `local_manifest.xml` (`refs/tags/<tag>`), commit + push semua repo, lalu flash bersama `boot.img` + `system_dlkm.img` rilis resmi Google untuk tag yang sama.
 
 ### Jebakan build
 

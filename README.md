@@ -168,6 +168,8 @@ Detail tiap rilis ada di [`docs/HANDOFF.md`](docs/HANDOFF.md) dan [`docs/PRETEST
 | `scripts/add-*.sh`, `scripts/patch-tc-misc-6.12.sh`, `scripts/port-tc-module.sh` | Skrip porting historis untuk driver Transsion, Iris, panel RM69220, `tran_ldo`, charger, dan kamera X6871 |
 | `patches/` | Patch pendukung (`abie-zstd-ramdisk.patch`, `mtkcam-x6871-camera.patch`, `tc_misc_intf_6_12_extra.c`) |
 | `tools/repack-vendor-boot-latest.sh` | **Repack utama `vendor_boot`**: build terbaru, stage 222 modul, pack TWRP zstd, dan verifikasi md5 per `.ko` |
+| `tools/repack-dlkm-latest.sh` | **Repack utama DLKM (`vendor_dlkm` + `odm_dlkm`)**: stage + strip modul terbaru, otomatis buang modul GKI terproteksi (`CONFIG_MODULE_SIG_PROTECT`), EROFS + AVB hashtree + `avbtool verify_image` |
+| `tools/verify-kmi-abi.py` | **Safeguard KMI/ABI GKI**: verifikasi 8 gerbang (GKI murni bersih, vermagic, `CONFIG_MODULE_SIG_PROTECT`, closure `vendor_boot` & penuh, 0 mismatch CRC vs `gki/aarch64/abi.stg`, 0 simbol non-KMI, dan `modules.dep`/`modules.load`) |
 | `tools/stage-recovery-modules.py` | Stage + strip modul dari staging Bazel dan regenerasi `modules.dep`/`alias`/`softdep` |
 | `tools/recovery-modules.txt` | Daftar otoritatif 222 modul `vendor_boot` |
 | `tools/modules.load`, `tools/modules.load.recovery` | Daftar muat init (`165` / `216` entri) |
