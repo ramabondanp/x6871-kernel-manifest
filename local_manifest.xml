@@ -1,17 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Overlay untuk manifest AOSP kernel:
+  Overlay untuk manifest AOSP kernel (Infinix GT 20 Pro / X6871, MT6895):
 
     repo init -u https://android.googlesource.com/kernel/manifest \
               -b common-android16-6.12-2025-09
-    cp local_manifest.xml .repo/local_manifests/w1vo.xml
+    cp local_manifest.xml .repo/local_manifests/x6871.xml
     repo sync -j16
 
-  Mengganti kernel/common dan kernel/build AOSP dengan versi MTK w1vo,
-  total 6 project (5 repo Motorola w1vo/w2we + 1 repo terpadu
-  alps-vendor_mediatek_kernel_modules yang sudah menggabungkan 6 repo
-  vendor MTK Motorola, 13 modul donor OPPO mt6896, serta port GPU Mali
-  r54p1 dan kamera X6871).
+  Mengganti kernel/common dan kernel/build AOSP dengan tree MTK 6.12 +
+  port Infinix X6871, total 6 project:
+    - 4 repo Motorola w1vo/w2we (Kleaf/MGK build rules + kernel-6.12)
+    - 2 repo port X6871 (alps-kernel_device_modules-6.12 dan
+      alps-vendor_mediatek_kernel_modules, keduanya di branch
+      x6871-android16-6.12)
 
   Tidak ada tag <default> di sini karena manifest AOSP sudah punya;
   revision/remote ditulis per project.
@@ -38,14 +39,12 @@
   <project path="build/bazel_mgk_rules" name="kernel-build-bazel_mgk_rules"
            remote="moto" revision="android-16-release-w1vo36.88-36-7" />
 
-  <!-- Kernel + device modules.
-       Untuk baseline MTK murni, jalankan reproduce-cleanup.sh (branch
-       mtk-base-latest). Untuk port Infinix X6871, checkout branch
-       w1vo36-6.12-port dari remote alps (lihat README.md). -->
+  <!-- Kernel + device modules (langsung ke branch port Infinix X6871).
+       Untuk baseline MTK murni tanpa driver X6871, lihat README.md bagian B. -->
   <project path="kernel-6.12" name="kernel-mtk"
            remote="moto" revision="android-16-release-w1vo36.88-36-7" />
-  <project path="kernel_device_modules-6.12" name="kernel-kernel_device_modules-6.12"
-           remote="moto" revision="android-16-release-w1vo36.88-36-7" />
+  <project path="kernel_device_modules-6.12" name="alps-kernel_device_modules-6.12"
+           remote="alps" revision="x6871-android16-6.12" />
 
   <!-- Vendor modules MTK terpadu:
        Berisi 6 repo Motorola w1vo36.88-36-7 (gpu, mtkcam, connectivity/
@@ -57,5 +56,5 @@
        + EEPROM). -->
   <project path="vendor/mediatek/kernel_modules"
            name="alps-vendor_mediatek_kernel_modules"
-           remote="alps" revision="w1vo36-6.12-port" />
+           remote="alps" revision="x6871-android16-6.12" />
 </manifest>

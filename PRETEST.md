@@ -1,7 +1,7 @@
 # PRETEST — Log Analisis Statis, RE Biner & Investigasi Boot X6871
 
 Dibuat 2026-11-19 sebagai catatan kronologis (§1–§59). Kernel
-`w1vo36-6.12-port` saat ini berada di **`17a6b66d7927`** (diperbarui 2026-11-22).
+`x6871-android16-6.12` saat ini berada di **`17a6b66d7927`** (diperbarui 2026-11-22).
 
 > **Status 2026-11-22:** Rilis terbaru adalah **`venc-fod-dt2w-20261122`**
 > (`twrp-vendor_boot-allsrc-display-usb-v10.img` + `twrp-dlkm-venc-fod-dt2w-20261122.zip`,

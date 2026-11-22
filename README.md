@@ -1,9 +1,9 @@
-# Manifest W1VO36.88-36-7 — Port Kernel Infinix GT 20 Pro (X6871)
+# Manifest Kernel 6.12 — Infinix GT 20 Pro (X6871 / MT6895)
 
-Workspace Bazel+Kleaf untuk membangun modul kernel **Android 16 / kernel 6.12 / MediaTek MT6895**, berbasis tree Motorola W1VO36.88-36-7 dan diport penuh untuk **Infinix GT 20 Pro (X6871)**.
+Workspace Bazel+Kleaf untuk membangun modul kernel **Android 16 / kernel 6.12 / MediaTek MT6895** untuk **Infinix GT 20 Pro (X6871)** (berbasis donor MTK 6.12 Motorola `w1vo36.88-36-7` + OPPO `mt6896`).
 
-- **Branch port X6871 (`kernel_device_modules-6.12`)**: [`w1vo36-6.12-port`](https://github.com/ramabondanp/alps-kernel_device_modules-6.12/tree/w1vo36-6.12-port) (`alps`, **90 commit** di atas baseline `06079c2`, HEAD `17a6b66d7927`)
-- **Vendor MTK kernel modules (`vendor/mediatek/kernel_modules`)**: [`alps-vendor_mediatek_kernel_modules`](https://github.com/ramabondanp/alps-vendor_mediatek_kernel_modules/tree/w1vo36-6.12-port) (`w1vo36-6.12-port`, **4 commit** X6871 di atas base Motorola + 13 donor OPPO `86edba6`, HEAD `83b4fa6`)
+- **Device modules (`kernel_device_modules-6.12`)**: [`alps-kernel_device_modules-6.12`](https://github.com/ramabondanp/alps-kernel_device_modules-6.12/tree/x6871-android16-6.12) (`x6871-android16-6.12`, **90 commit** di atas baseline `06079c2`, HEAD `17a6b66d7927`)
+- **Vendor MTK modules (`vendor/mediatek/kernel_modules`)**: [`alps-vendor_mediatek_kernel_modules`](https://github.com/ramabondanp/alps-vendor_mediatek_kernel_modules/tree/x6871-android16-6.12) (`x6871-android16-6.12`, **4 commit** X6871 di atas base Motorola + 13 donor OPPO `86edba6`, HEAD `83b4fa6`)
 - **Output build X6871**: staging **806 file** (**805** nama unik), flat customer install **702** `.ko`
 - **Output baseline MTK murni** (`mtk-base-latest`): **1.401** `.ko`
 - **Panduan cepat dokumen**:
@@ -19,29 +19,21 @@ Workspace Bazel+Kleaf untuk membangun modul kernel **Android 16 / kernel 6.12 / 
 
 ### A. Build port Infinix X6871 (disarankan)
 
-Branch `w1vo36-6.12-port` sudah memuat seluruh driver X6871 (panel RM69220, Pixelworks Iris, `tran_ldo`, stack charger Transsion, audio FS1599, 4 sensor kamera + EEPROM, flashlight, haptic, touch Goodix GT9916, optical fingerprint `tran_fp`, dan fix VENC/GPU/SCP).
+`local_manifest.xml` langsung mengarah ke branch `x6871-android16-6.12` pada `alps-kernel_device_modules-6.12` dan `alps-vendor_mediatek_kernel_modules`, yang sudah memuat seluruh driver X6871 (panel RM69220, Pixelworks Iris, `tran_ldo`, stack charger Transsion, audio FS1599, 4 sensor kamera + EEPROM, flashlight, haptic, touch Goodix GT9916, optical fingerprint `tran_fp`, Mali r54p1-11eac0, dan fix VENC/GPU/SCP).
 
 ```bash
-git clone https://github.com/ramabondanp/w1vo36-kernel-manifest
-cd w1vo36-kernel-manifest
+git clone https://github.com/ramabondanp/x6871-kernel-manifest ~/x6871-kernel-manifest
 
-# 1. Sync workspace AOSP + overlay manifest
-mkdir -p ~/w1vo && cd ~/w1vo
+# 1. Sync workspace AOSP + overlay manifest X6871
+mkdir -p ~/x6871-kernel && cd ~/x6871-kernel
 repo init -u https://android.googlesource.com/kernel/manifest \
           -b common-android16-6.12-2025-09
-cp ~/w1vo36-kernel-manifest/local_manifest.xml .repo/local_manifests/w1vo.xml
+cp ~/x6871-kernel-manifest/local_manifest.xml .repo/local_manifests/x6871.xml
 repo sync -j16
 
-# 2. Checkout branch port X6871
-cd kernel_device_modules-6.12
-git remote add alps https://github.com/ramabondanp/alps-kernel_device_modules-6.12
-git fetch alps w1vo36-6.12-port
-git checkout -B w1vo36-6.12-port FETCH_HEAD
-cd ..
-
-# 3. Siapkan workspace, lalu build (overlay entry_level_legacy.config wajib untuk X6871)
-~/w1vo36-kernel-manifest/setup.sh
-OVERLAYS=entry_level_legacy.config ~/w1vo36-kernel-manifest/build.sh user
+# 2. Siapkan workspace, lalu build (overlay entry_level_legacy.config wajib untuk X6871)
+~/x6871-kernel-manifest/setup.sh
+OVERLAYS=entry_level_legacy.config ~/x6871-kernel-manifest/build.sh user
 ```
 
 Hasil build berada di:
@@ -52,22 +44,22 @@ Hasil build berada di:
 Gunakan langkah ini bila hanya ingin memverifikasi tree MTK bersih tanpa kode Motorola maupun Transsion:
 
 ```bash
-cd ~/w1vo36-kernel-manifest
+cd ~/x6871-kernel-manifest
 ./reproduce-cleanup.sh ~/kernel-kernel_device_modules-6.12
 
-cd ~/w1vo/kernel_device_modules-6.12
+cd ~/x6871-kernel/kernel_device_modules-6.12
 git remote add local ~/kernel-kernel_device_modules-6.12
 git fetch local mtk-base-latest
 git checkout -B mtk-base-latest FETCH_HEAD
 cd ..
 
-~/w1vo36-kernel-manifest/setup.sh
-~/w1vo36-kernel-manifest/build.sh user
+~/x6871-kernel-manifest/setup.sh
+~/x6871-kernel-manifest/build.sh user
 ```
 
-Untuk SoC lain: `PLATFORM=mt6991 ~/w1vo36-kernel-manifest/build.sh user` (default: `mt6895`).
+Untuk SoC lain: `PLATFORM=mt6991 ~/x6871-kernel-manifest/build.sh user` (default: `mt6895`).
 
-> **Catatan branch**: `w1vo36-6.12-port` dibangun di atas baseline `06079c2` (yang merupakan keturunan langsung `android16` `30a0466a`) agar riwayat `android16` tidak berubah. Daftar lengkap commit: `git log --oneline 06079c2..HEAD`.
+> **Catatan branch**: `x6871-android16-6.12` di `alps-kernel_device_modules-6.12` dibangun di atas baseline `06079c2` (keturunan langsung `android16` `30a0466a`) agar riwayat `android16` tetap bersih. Daftar lengkap commit: `git log --oneline 06079c2..HEAD`.
 
 ---
 
@@ -98,7 +90,7 @@ twrp-dlkm-venc-fod-dt2w-20261122.zip         md5 92ab587de697a955fceba15ecf335d5
   └─ odm_dlkm.img                            md5 af60243be2a87943f78fc7d254bb690a   4.206.592 B
 ```
 
-Release GitHub: <https://github.com/ramabondanp/w1vo36-kernel-manifest/releases/tag/venc-fod-dt2w-20261122>
+Release GitHub: <https://github.com/ramabondanp/x6871-kernel-manifest/releases/tag/venc-fod-dt2w-20261122>
 
 ### Ringkasan perjalanan rilis
 
@@ -121,7 +113,7 @@ Detail tiap rilis ada di `HANDOFF.md` dan `PRETEST.md` §40–§59.
 
 ---
 
-## Ringkasan Commit Penting (`w1vo36-6.12-port`)
+## Ringkasan Commit Penting (`x6871-android16-6.12`)
 
 | Commit | Ringkasan |
 |---|---|
@@ -142,7 +134,7 @@ Detail tiap rilis ada di `HANDOFF.md` dan `PRETEST.md` §40–§59.
 
 | Berkas | Fungsi |
 |---|---|
-| `local_manifest.xml` | Overlay manifest AOSP: 6 project (5 repo Motorola w1vo/w2we + 1 repo terpadu `alps-vendor_mediatek_kernel_modules`) |
+| `local_manifest.xml` | Overlay manifest AOSP: 6 project (4 repo Motorola w1vo/w2we + `alps-kernel_device_modules-6.12` + `alps-vendor_mediatek_kernel_modules`) |
 | `reproduce-cleanup.sh` | Membuat branch `mtk-base-latest` (base MTK murni + 12 patch MTK) |
 | `setup.sh` | Menyiapkan `MODULE.bazel`, symlink `common-6.12` & `../vendor/mediatek` (+ fallback symlink donor OPPO legacy), dan trim label `mgk_64.bzl` |
 | `build.sh` | Wrapper build Bazel+Kleaf (`OVERLAYS=entry_level_legacy.config ./build.sh user`) |
@@ -174,7 +166,7 @@ tree mtk-base-latest : fab94f37a9ee8a1d43828bdda55bc669e3138de6
 
 ### Kenapa `vendor/mediatek/kernel_modules` divendorkan terpadu
 
-20 grup modul tidak dipublikasikan Motorola. 13 grup di antaranya berasal dari donor OPPO `mt6896` (Android 16 / kernel 6.12: `afs_common_utils`, `hbt_*`, `met_drv_v3`, `sched_cus`, `connectivity/*`), ditambah perubahan port X6871 di luar `kernel_device_modules-6.12` (GPU Mali r54p1-11eac0, `mtkcam` `camsys` inline `sink_fmt`, 4 sensor kamera X6871 + EEPROM). Seluruh 6 repo vendor Motorola + 13 modul donor OPPO + 4 commit port X6871 kini disatukan ke [`alps-vendor_mediatek_kernel_modules`](https://github.com/ramabondanp/alps-vendor_mediatek_kernel_modules/tree/w1vo36-6.12-port) (branch `w1vo36-6.12-port`), sehingga `repo sync` tidak lagi memerlukan `donor/oppo-mt6896` terpisah maupun symlink manual (`setup.sh` tetap mempertahankan fallback symlink untuk workspace split lama). Sisa 49 label di 20 grup internal/customer yang tidak tersedia tetap dihapus dari `mgk_64.bzl` oleh `setup.sh`:
+20 grup modul tidak dipublikasikan Motorola. 13 grup di antaranya berasal dari donor OPPO `mt6896` (Android 16 / kernel 6.12: `afs_common_utils`, `hbt_*`, `met_drv_v3`, `sched_cus`, `connectivity/*`), ditambah perubahan port X6871 di luar `kernel_device_modules-6.12` (GPU Mali r54p1-11eac0, `mtkcam` `camsys` inline `sink_fmt`, 4 sensor kamera X6871 + EEPROM). Seluruh 6 repo vendor Motorola + 13 modul donor OPPO + 4 commit port X6871 kini disatukan ke [`alps-vendor_mediatek_kernel_modules`](https://github.com/ramabondanp/alps-vendor_mediatek_kernel_modules/tree/x6871-android16-6.12) (branch `x6871-android16-6.12`), sehingga `repo sync` tidak lagi memerlukan `donor/oppo-mt6896` terpisah maupun symlink manual (`setup.sh` tetap mempertahankan fallback symlink untuk workspace split lama). Sisa 49 label di 20 grup internal/customer yang tidak tersedia tetap dihapus dari `mgk_64.bzl` oleh `setup.sh`:
 
 ```text
 afs_core_cus/int  cpufreq_cus/int  fpsgo_cus/int  game_cus/int

@@ -16,8 +16,8 @@ Ditulis 2026-11-19, diperbarui 2026-11-22 untuk sesi AI berikutnya. Baca ini dul
 | DLKM (`vendor_dlkm` + `odm_dlkm`) | **269**, 100% source, image siap |
 | Build target | `//kernel_device_modules-6.12:mgk_64_k612_customer_modules_install.user` |
 | Build terakhir | sukses (inkremental), 2026-11-22 |
-| Kernel HEAD | `17a6b66d7927` (`alps-kernel_device_modules-6.12`, `w1vo36-6.12-port`) |
-| Vendor MTK modules HEAD | `83b4fa6` (`alps-vendor_mediatek_kernel_modules`, `w1vo36-6.12-port`) |
+| Kernel HEAD | `17a6b66d7927` (`alps-kernel_device_modules-6.12`, `x6871-android16-6.12`) |
+| Vendor MTK modules HEAD | `83b4fa6` (`alps-vendor_mediatek_kernel_modules`, `x6871-android16-6.12`) |
 | Runtime | **Android boot + layar + audio + AOD + kamera foto + video preview + Wi-Fi + GPU OK**; rilis `venc-fod-dt2w-20261122` memperbaiki akar masalah VENC (`VENC_H264=1`), ABI notifier AOD/HBM DRM (`mediatek_drm_v1`), DT2W saat AOD (`adaptive-ts`), FOD key/proc (`gt9916_common`), dan `/dev/goodix_fp` + HBM uevent (`tran_fp`); siap uji device |
 
 ## Status Rilis Terbaru & Ringkasan Riwayat (2026-11-22)
@@ -84,9 +84,9 @@ Flash `twrp-vendor_boot-allsrc-display-usb-v10.img` + `twrp-dlkm-venc-fod-dt2w-2
 - **Kamera (`PRETEST.md` §26, §51, §53)**: 4 sensor kamera X6871 (`s5khm6sx`, `gc32e1`, `gc02m3`, `gc02m3macro`) + `camera_eeprom_v4l2` sudah diport (`75ca1ac4a1ae`, `add-camera-x6871.sh`) dan kamera foto sudah berjalan. Yang tidak dipublikasikan vendor hanya 46 fungsi kalibrasi OTP per sensor di `camera_eeprom_v4l2` dan patch Ext-ISP (tidak ada node DT/konsumennya di X6871).
 - **Device table (`DEVICES.md` / `DEVICES-OVERLAY.md`)**: 978 node `okay` (470 modul source, 130 built-in, 371 node platform, 7 tanpa driver; bug `of_match` flash LED `_v4l2` sudah diperbaiki).
 - **Repo**:
-  - `alps-kernel_device_modules-6.12` bersih dan ter-push ke `alps`, branch `w1vo36-6.12-port`, HEAD **`17a6b66d7927`** (**90 commit** di atas `06079c2`).
-  - `alps-vendor_mediatek_kernel_modules` (vendoring terpadu 6 repo vendor Motorola `w1vo36` + 13 modul donor OPPO `mt6896` + 4 commit GPU Mali r54p1 & kamera X6871) ter-push ke `origin`, branch `w1vo36-6.12-port`, HEAD **`83b4fa6`** (di atas base `86edba6`), dan sudah dipasang di `local_manifest.xml`.
-  - Manifest `main` mengikuti commit dokumentasi terakhir.
+  - `alps-kernel_device_modules-6.12` bersih dan ter-push ke `alps`, default branch `x6871-android16-6.12`, HEAD **`17a6b66d7927`** (**90 commit** di atas `06079c2`).
+  - `alps-vendor_mediatek_kernel_modules` (vendoring terpadu 6 repo vendor Motorola `w1vo36` + 13 modul donor OPPO `mt6896` + 4 commit GPU Mali r54p1 & kamera X6871) ter-push ke `origin`, default branch `x6871-android16-6.12`, HEAD **`83b4fa6`** (di atas base `86edba6`).
+  - Manifest `ramabondanp/x6871-kernel-manifest` (`main`, direktori lokal server `/serverhive1/ramabondanp/w1vo36-kernel-manifest`) mengarah langsung ke kedua repo `alps-*` di branch `x6871-android16-6.12`.
 
 ## Objective
 
@@ -99,12 +99,12 @@ kalau memang tidak ada source.
 
 1. **Jangan pakai `/tmp`** — pakai `/serverhive1/ramabondanp/tmp`.
 2. **Selalu commit + push setelah setiap perubahan, tanpa bertanya.**
-   Push ke remote `alps` (branch `w1vo36-6.12-port`); remote `local` hanya
+   Push ke remote `alps` (branch `x6871-android16-6.12`); remote `local` hanya
    kalau tersedia di workspace.
 3. Commit di **semua tree kernel/modul** (`w1vo/kernel_device_modules-6.12`,
    `alps-vendor_mediatek_kernel_modules`, donor 6.1/6.12, repo `alps`) wajib
    **bahasa Inggris** — subjek dan body. Hanya repo manifest
-   (`w1vo36-kernel-manifest`) yang boleh bahasa Indonesia.
+   (`x6871-kernel-manifest`) yang boleh bahasa Indonesia.
 4. Jangan satu commit untuk semua perubahan; satu commit per fitur.
 5. Repo manifest harus tetap ramping.
 6. **Cocokkan modul lewat fingerprint isi `.ko`, jangan lewat nama.**
@@ -207,7 +207,7 @@ seluruh fondasi charger `tc_*`, `tc_charger_framework`, 5 algoritma charging,
 `tc_tfcp_ta`, `pca_tfcp_ta`, `nfc_i2c`, `tran-led-core`, `leds-aw22xxx`,
 serta empat modul fitur: `tran_extcon_usb`, `tran_fp`, `tnek`, `tkv`.
 
-Daftar commit per fitur ada di `git log` branch `w1vo36-6.12-port`.
+Daftar commit per fitur ada di `git log` branch `x6871-android16-6.12`.
 
 ## Yang tersisa: 20 modul di tree staging
 
