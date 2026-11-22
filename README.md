@@ -2,14 +2,14 @@
 
 Workspace Bazel+Kleaf untuk membangun modul kernel **Android 16 / kernel 6.12 / MediaTek MT6895** untuk **Infinix GT 20 Pro (X6871)** (berbasis donor MTK 6.12 Motorola `w1vo36.88-36-7` + OPPO `mt6896`).
 
-- **Device modules (`kernel_device_modules-6.12`)**: [`alps-kernel_device_modules-6.12`](https://github.com/ramabondanp/alps-kernel_device_modules-6.12/tree/x6871-android16-6.12) (`x6871-android16-6.12`, **96 commit** di atas baseline `06079c2`, HEAD `ebca3e1`)
+- **Device modules (`kernel_device_modules-6.12`)**: [`alps-kernel_device_modules-6.12`](https://github.com/ramabondanp/alps-kernel_device_modules-6.12/tree/x6871-android16-6.12) (`x6871-android16-6.12`, **99 commit** di atas baseline `06079c2`, HEAD `8944601`)
 - **Vendor MTK modules (`vendor/mediatek/kernel_modules`)**: [`alps-vendor_mediatek_kernel_modules`](https://github.com/ramabondanp/alps-vendor_mediatek_kernel_modules/tree/x6871-android16-6.12) (`x6871-android16-6.12`, **4 commit** X6871 di atas base Motorola + 13 donor OPPO `86edba6`, HEAD `83b4fa6`)
 - **Output build X6871**: staging **806 file** (**805** nama unik), flat customer install **702** `.ko`
 - **Output baseline MTK murni** (`mtk-base-latest`): **1.401** `.ko`
 - **Panduan cepat dokumen**:
   - [`docs/HANDOFF.md`](docs/HANDOFF.md) — ringkasan status terkini, aturan kerja, perintah build/repack, dan pengetahuan kritis
   - [`docs/BOOTTEST.md`](docs/BOOTTEST.md) — prosedur flash, rollback, dan checklist uji boot per subsistem
-  - [`docs/PRETEST.md`](docs/PRETEST.md) — log teknis kronologis (§1–§61) hasil audit statis, RE biner, dan uji device
+  - [`docs/PRETEST.md`](docs/PRETEST.md) — log teknis kronologis (§1–§62) hasil audit statis, RE biner, dan uji device
   - [`docs/PLAN.md`](docs/PLAN.md) — rencana porting awal dan bukti investigasi per modul (§6.x)
   - [`docs/DEVICES.md`](docs/DEVICES.md) / [`docs/DEVICES-OVERLAY.md`](docs/DEVICES-OVERLAY.md) — tabel pemetaan node Device Tree X6871 ke driver
 
@@ -74,28 +74,30 @@ Seluruh partisi modul (**222** modul `vendor_boot` + **212** `vendor_dlkm` + **5
 | Boot Android 16 & TWRP | ✅ Terbukti | Boot sampai launcher, 0 unresolved symbol |
 | Layar RM69220 (144/120/60/40 Hz) & AOD | ✅ Terbukti | C3D dual-pipe + PQ ABI fixed, 0 underrun |
 | GPU Mali r54p1-11eac0 & gpufreq | ✅ Terbukti | Donor OPPO + fix layout `gpufreq_shared_status` |
-| Audio (MT6368 + FS1599 PA) | ✅ Terbukti | Kontrol `tran_audio_control` + PA switch aktif |
-| Wi-Fi, USB replug, Charger, Haptic, Touch normal | ✅ Terbukti | Tidak ada spam IRQ battery OC |
+| Audio bottom speaker (MT6368 + FS1599 PA) | ✅ Terbukti | Kontrol `tran_audio_control` + PA switch aktif |
+| Wi-Fi, Haptic, Touch normal | ✅ Terbukti | Tidak ada spam IRQ battery OC |
 | Kamera foto & rekam video (save) | ✅ Terbukti | 4 sensor + EEPROM + VENC H264/ADAB/SLBC (`17a6b66d7927`) |
-| Optical FOD (layar menyala & saat AOD) | ✅ Terbukti | `/dev/goodix_fp` + HBM uevent + fix RM69220 HBM/AOD (`59ed7e7`) |
-| **Screen-off FOD (AOD padam)** | 🔄 Menunggu uji (`v12`) | Pertahankan `vddi-gpios` HIGH saat panel power-off agar GT9916 tetap berdaya (`0d456ba`) |
-| **DT2W (saat AOD / layar mati)** | 🔄 Menunggu uji (`v12`) | Jangan biarkan `"al2"` (`0xff`) mematikan double-tap `0xcc` (`e4ed999`) |
-| **Flashlight / Torch** | 🔄 Menunggu uji (`v12`) | Nonaktifkan PT throttling (`CONFIG_MTK_FLASHLIGHT_PT`/`PT_STRICT`) sesuai stock (`ebca3e1`) |
+| Optical FOD (layar menyala, AOD, screen-off) | ✅ Terbukti | `/dev/goodix_fp` + HBM uevent + `vddi-gpios` HIGH (`59ed7e7`, `0d456ba`) |
+| DT2W & Flashlight / Torch | ✅ Terbukti | Fix `al2` (`e4ed999`) + `#undef` PT throttling (`ebca3e1`) |
+| **Fast Charging (HVDCP20/TC30 adapter)** | 🔄 Menunggu uji (`v13`) | Tambah `tc30`/`hvdcp20` ke `alg_name_array` + guard bounds check (`0af45b1`) |
+| **Earpiece speaker (`RCV Mux`)** | 🔄 Menunggu uji (`v13`) | Tambah rute DAPM `{EXT_SPK_AMP_W_NAME, NULL, "RCV Mux"}` (`22efa7e`) |
+| **USB replug berulang** | 🔄 Menunggu uji (`v13`) | Implementasi `mt6375_get_vbus_gd_stat` (`F_ST_PWR_RDY`) + serialisasi `extcon_wq` (`8944601`) |
 
-### Rilis terbaru: `sofod-dt2w-flash-20261122` (kernel `ebca3e1`)
+### Rilis terbaru: `chg-earpiece-usb-20261122` (kernel `8944601`)
 
 ```text
-x6871-twrp-vendor_boot-v12.img  md5 f345308a330b4ceb5daf586bcd059607  67.108.864 B
-vendor_dlkm.img                 md5 4cb91f7c318d0960289e86fe764448e5  24.551.424 B
-odm_dlkm.img                    md5 411cc6106caedd526767e9f5cfc5a70d   4.206.592 B
+x6871-twrp-vendor_boot-v13.img  md5 242333a0cc953a3804c593e388984d24  67.108.864 B
+vendor_dlkm.img                 md5 378d9adf1de9c5a2d3fa8d8466aefd29  24.551.424 B
+odm_dlkm.img                    md5 d6bb4ed087c9f9f69a96c8687c816b2c   4.206.592 B
 ```
 
-Release GitHub: <https://github.com/ramabondanp/x6871-kernel-manifest/releases/tag/sofod-dt2w-flash-20261122>
+Release GitHub: <https://github.com/ramabondanp/x6871-kernel-manifest/releases/tag/chg-earpiece-usb-20261122>
 
 ### Ringkasan perjalanan rilis
 
 | Rilis | `vendor_boot` | Sorotan utama |
 |---|---|---|
+| `chg-earpiece-usb-20261122` | v13 | Fix panic charging HVDCP20 (`tc30`/`hvdcp20` `alg_name_array`), earpiece speaker (`RCV Mux`), USB replug (`mt6375_get_vbus_gd_stat` + `extcon_wq`) |
 | `sofod-dt2w-flash-20261122` | v12 | Fix screen-off FOD (`vddi-gpios` tetap HIGH), DT2W (`al2` tidak mematikan `0xcc`), dan flashlight PT throttling sesuai stock |
 | `aod-dt2w-flash-20261122` | v11 | Fix FOD di AOD (hapus `0x39` idle mode + alpha stock), DT2W 1-byte read + `gesture_maps`, V4L2 flashlight (`flash_sgm37864` + `ocp81375`) |
 | `venc-fod-dt2w-20261122` | v10 | Fix akar masalah VENC (`VENC_H264=1`), ABI notifier AOD/HBM, DT2W AOD, `/dev/goodix_fp` + FOD key `195` |

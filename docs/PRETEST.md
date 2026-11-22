@@ -3795,3 +3795,40 @@ release                                sofod-dt2w-flash-20261122 (raw .img untuk
 ```
 
 Kernel `ebca3e1` (3 commit: `0d456ba`, `e4ed999`, `ebca3e1`).
+
+## 62. `dmesg7`/`logcat5`/`pstore1`: screen-off FOD, DT2W & flashlight lulus; fix panic charging HVDCP20, earpiece speaker (`RCV Mux`), dan USB replug (`get_vbus_gd`)
+
+Status uji user pada `sofod-dt2w-flash-20261122` (v12):
+- **Screen-off FOD (saat AOD padam)**: **LULUS**.
+- **DT2W**: **LULUS**.
+- **Flashlight / Torch**: **LULUS** (`dmesg7.txt` `t=45.534..46.279`: `ocp81375_open` → `mode:2` → `enable:1`).
+- **3 bug baru** yang dianalisis tuntas dari `pstore1.txt` + `dmesg7.txt` + `logcat5.txt` + disassembly `.ko` stock:
+
+1. **Kernel panic saat charging dengan adapter (`tc_charger_framework.ko`, `0af45b1`)**:
+   - Di `pstore1.txt` baris 2148–2341: tepat setelah `[ALG_HVDCP20]__hvdcp20_check_charger: OK, state = 4`, kernel mengalami `Internal error: UBSAN: array index out of bounds` di `Pump_Express_show+0x26c/0x274 [tc_charger_framework]`.
+   - Di `drivers/power/supply/transsion/tc_charger.h`, `enum alg_id_enum` dan `alg_name_array[]` hanya memuat 4 entri (`none`, `pe5`, `pd`, `pe20`) tanpa `tc30` maupun `hvdcp20`. Saat init, `tchg_alg_id("hvdcp20")` mengembalikan `-EINVAL` (`-22`), lalu `Pump_Express_show()` mengindeks `alg_name_array[-22]` dan memicu trap UBSAN (`brk #0x5512`).
+   - Disassembly `.rodata` & `do_algorithm`/`Pump_Express_show`/`Charger_Type_show` stock `tc_charger_framework.ko` memastikan urutan 6 entri stock: `0=none`, `1=pe5`, `2=tc30`, `3=pd`, `4=hvdcp20`, `5=pe20`.
+   - Fix: samakan `alg_id_enum` dan `alg_name_array[]` dengan layout 6 entri stock, tambahkan penanganan `TC30_ID` & `HVDCP20_ID` di `Pump_Express_show()`, `Charger_Type_show()`, dan `tc_get_chg_type()`, serta lindungi semua pembacaan `alg_name_array[alg_id]` dengan helper `tchg_alg_id_to_name()`.
+2. **Earpiece speaker tidak berbunyi (`mt6895-mt6368.ko`, `22efa7e`)**:
+   - Di `dmesg7.txt`, kedua PA FS1599 (`0x35` bawah `pos:01` dan `0x34` atas/earpiece `pos:08`) ter-probe dan diaktifkan oleh `tran_audio_pa_switch(1)`, namun saat pemutaran audio hanya `mt_lo_event()` yang jalan — `mt_rcv_event()` tidak pernah terpicu (di stock `normal2.txt` baris 12439–12440, **keduanya** `mt_rcv_event(RCV Mux)` dan `mt_lo_event(LINEOUT L)` menyala).
+   - Disassembly `mt6895_mt6368_routes` di stock `mt6895-mt6368.ko` memiliki 4 entri rute DAPM, termasuk `{EXT_SPK_AMP_W_NAME, NULL, "RCV Mux"}` yang hilang di source kita.
+   - Fix: tambahkan `{EXT_SPK_AMP_W_NAME, NULL, "RCV Mux"},` ke `mt6895_mt6368_routes[]` di `sound/soc/mediatek/mt6895/mt6895-mt6368.c`.
+3. **USB replug gagal terdeteksi kembali (`mt6375-charger.ko` + `tran_extcon_usb.ko`, `8944601`)**:
+   - Di `dmesg7.txt` baris 5777 dan `pstore1.txt` baris 296 & 1102, `tc_detect_bc12_run` selalu mencetak `do without check vbus_gd or err:-95` (stock `normal2.txt` baris 11324: `switch ic vbus_gd is ready`) karena `.get_vbus_gd` (`mt6375_get_vbus_gd_stat`) tidak terpasang di `mt6375_chg_ops`.
+   - Tanpa `get_vbus_gd`, `tc_detect_bc12_run` langsung keluar dari loop tunggu VBUS good dan melewatkan `msleep(100)` sebelum menyalakan BC1.2 pada saat hot-replug (saat `cdp-block` sudah bebas), sehingga BC1.2 berjalan terlalu dini saat VBUS/D+/D- belum stabil. Selain itu, `tc_bc12_dn` belum di-clear sebelum re-enable BC1.2, dan `wq_psy` di `tran_extcon_usb` berjalan di `system_power_efficient_wq` yang bisa race dengan `tran_usb_extcon_update_role(USB_ROLE_NONE)` di `extcon_wq`.
+   - Fix: implementasikan `mt6375_get_vbus_gd_stat()` (membaca `F_ST_PWR_RDY` persis disassembly stock `mt6375-charger.ko`) dan pasang `.get_vbus_gd` di `mt6375_chg_ops`, clear `tc_bc12_dn` sebelum mengaktifkan `F_BC12_EN`, dan antrekan `wq_psy` pada `extcon->extcon_wq` agar serial terhadap transisi `USB_ROLE_NONE`.
+4. **Verifikasi biner (build inkremental di `/serverhive1/ramabondanp/x6871-clean/ws`)**:
+   - `tc_charger_framework.ko`: seluruh 6 nama algoritma (`none`, `pe5`, `tc30`, `pd`, `hvdcp20`, `pe20`) + fallback `unknown` + bounds check `cmp #0x5` hadir, cocok byte-per-byte di `odm_dlkm.img` dan `x6871-twrp-vendor_boot-v13.img`.
+   - `mt6895-mt6368.ko`: 4 rute DAPM termasuk `"RCV Mux"` hadir di `.rodata`, cocok byte-per-byte di `vendor_dlkm.img`.
+   - `mt6375-charger.ko` & `tran_extcon_usb.ko`: `mt6375_get_vbus_gd_stat` dan `queue_delayed_work_on` pada `extcon_wq` hadir, cocok byte-per-byte di `odm_dlkm.img` dan `x6871-twrp-vendor_boot-v13.img`.
+
+### Artefak (`chg-earpiece-usb-20261122`)
+
+```text
+x6871-twrp-vendor_boot-v13.img         md5 242333a0cc953a3804c593e388984d24  67.108.864 B
+vendor_dlkm.img                        md5 378d9adf1de9c5a2d3fa8d8466aefd29  24.551.424 B
+odm_dlkm.img                           md5 d6bb4ed087c9f9f69a96c8687c816b2c   4.206.592 B
+release                                chg-earpiece-usb-20261122 (raw .img untuk fastbootd)
+```
+
+Kernel `8944601` (3 commit: `0af45b1`, `22efa7e`, `8944601`).
