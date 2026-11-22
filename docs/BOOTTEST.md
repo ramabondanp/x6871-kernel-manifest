@@ -83,10 +83,12 @@ cfig/Android_boot_image_editor, lalu membongkar hasilnya dan **gagal**
 kalau ada `.ko` yang beda dari staging. Modul tidak pernah disalin dari
 image lama.
 
-Direktori `--work-dir` dibuat ulang oleh skrip DLKM; jangan simpan file lain
-di sana. Hanya lanjut ke flash jika semua langkah lulus. Untuk hasil build
-sendiri, gunakan `vendor_boot-test.img` sebagai pengganti image `vendor_boot`
-rilis pada contoh flash di bawah.
+Gunakan `--work-dir` kosong atau direktori kerja yang sudah ditandai oleh
+skrip DLKM. Jika direktori lama belum bertanda, gunakan path baru; direktori
+kerja yang ditandai akan dibuat ulang saat repack berikutnya. Hanya lanjut
+ke flash jika semua langkah lulus. Untuk hasil build sendiri, gunakan
+`vendor_boot-test.img` sebagai pengganti image `vendor_boot` rilis pada
+contoh flash di bawah.
 
 `tools/pack-vendor-boot.sh` adalah tool legacy dan **jangan dipakai untuk
 X6871**: ia memfilter berdasarkan nama stock sehingga modul build-only

@@ -3,6 +3,7 @@
 #
 #   ./tools/repack-vendor-boot-latest.sh
 #   ./tools/repack-vendor-boot-latest.sh --out "$HOME/tmp/x6871/twrp-vendor_boot-test.img"
+#   ./tools/repack-vendor-boot-latest.sh --skip-build --staging /path/to/lib/modules/6.12.x
 #
 # The script:
 #   1. runs the documented Bazel build (unless --skip-build is given),
@@ -10,7 +11,7 @@
 #   3. stages the committed recovery module list from that tree, stripping debug
 #      info and regenerating modules.dep/alias/softdep with depmod,
 #   4. packs with the existing bbootimg/gradle packer,
-#   5. unpacks the result and fails if any .ko differs from the staged file.
+#   5. verifies the packed image before copying it to the output path.
 #
 # It never copies .ko files out of an old vendor_boot image.  That is the
 # failure mode that put the pre-display panel driver back into an image.
@@ -30,8 +31,6 @@ RECOVERY_LOAD_LIST="$ROOT/tools/modules.load.recovery"
 STRIP=${STRIP:-llvm-strip}
 DEPMOD=${DEPMOD:-depmod}
 
-mkdir -p "$TMPDIR"
-
 OUT=""
 STAGING=""
 SKIP_BUILD=0
@@ -40,6 +39,9 @@ die() { echo "ERROR: $*" >&2; exit 1; }
 info() { echo "[repack] $*"; }
 
 while [ $# -gt 0 ]; do
+    case "$1" in
+        --out|--staging) [[ -n ${2:-} && $2 != --* ]] || die "$1 membutuhkan path" ;;
+    esac
     case "$1" in
         --out) OUT="$2"; shift 2 ;;
         --staging) STAGING="$2"; shift 2 ;;
@@ -54,10 +56,15 @@ done
 [ -f "$RECOVERY_LOAD_LIST" ] || die "modules.load.recovery tidak ada: $RECOVERY_LOAD_LIST"
 [ -d "$PACKER/build/unzip_boot/root.1" ] || \
     die "packer belum di-unpack: $PACKER/build/unzip_boot/root.1"
+UNPACK="$KERNEL_ROOT/tools/mkbootimg/unpack_bootimg.py"
+[ -f "$UNPACK" ] || die "unpack_bootimg tidak ada: $UNPACK"
+mkdir -p "$TMPDIR"
 
 if [ -z "$OUT" ]; then
     OUT="$BASE_OUT/twrp-vendor_boot-$(date -u +%Y%m%d-%H%M%S).img"
 fi
+[ ! -d "$OUT" ] || die "--out harus berupa path file: $OUT"
+[ ! "$OUT" -ef "$PACKER/vendor_boot.img" ] || die "--out tidak boleh menunjuk ke image kerja packer"
 mkdir -p "$(dirname "$OUT")"
 
 if [ "$SKIP_BUILD" = "0" ]; then
@@ -97,14 +104,11 @@ python3 "$ROOT/tools/stage-recovery-modules.py" \
 info "pack bbootimg"
 ( cd "$PACKER" && ./gradlew pack --offline -q )
 [ -f "$PACKER/vendor_boot.img" ] || die "packer tidak menghasilkan vendor_boot.img"
-cp -f "$PACKER/vendor_boot.img" "$OUT"
 
 info "verifikasi isi image"
 WORK=$(mktemp -d "$TMPDIR/repack-verify.XXXXXX")
 trap 'rm -rf "$WORK"' EXIT
-UNPACK="$KERNEL_ROOT/tools/mkbootimg/unpack_bootimg.py"
-[ -f "$UNPACK" ] || die "unpack_bootimg tidak ada: $UNPACK"
-python3 "$UNPACK" --boot_img "$OUT" --out "$WORK/vb" >/dev/null 2>&1
+python3 "$UNPACK" --boot_img "$PACKER/vendor_boot.img" --out "$WORK/vb" >/dev/null
 [ -f "$WORK/vb/vendor_ramdisk00" ] || die "vendor_ramdisk00 tidak ada di image"
 zstd -d -c "$WORK/vb/vendor_ramdisk00" > "$WORK/rd.cpio"
 mkdir -p "$WORK/root"
@@ -153,6 +157,7 @@ b=$(md5sum "$WORK/vb/vendor_ramdisk01" | cut -d' ' -f1)
 [ "$a" = "$b" ] || die "vendor_ramdisk01 (recovery) berubah!"
 info "vendor_ramdisk01 (recovery) identik"
 
+cp -fT "$PACKER/vendor_boot.img" "$OUT"
 MD5=$(md5sum "$OUT" | cut -d' ' -f1)
 SIZE=$(stat -c%s "$OUT")
 COMMIT=$(git -C "$TREE" rev-parse --short HEAD 2>/dev/null || echo unknown)

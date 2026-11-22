@@ -9,7 +9,7 @@ regenerates modules.dep/alias/softdep with depmod.
 
 Usage:
     tools/stage-recovery-modules.py \
-        --staging <staging>/lib/modules/6.12.38-... \
+        --staging <staging>/lib/modules/6.12.x-... \
         --list tools/recovery-modules.txt \
         --load-list tools/modules.load \
         --recovery-load-list tools/modules.load.recovery \
@@ -71,9 +71,6 @@ def index_modules(staging):
 
 
 def stage_modules(index, names, dest, strip):
-    missing = [n for n in names if n not in index]
-    if missing:
-        die("modul tidak ada di staging: " + ", ".join(missing))
     for name in names:
         src = index[name]
         dst = os.path.join(dest, name)
@@ -177,6 +174,13 @@ def main():
     names = read_names(args.list)
     if not names:
         die("daftar modul kosong: " + args.list)
+    staging, dest = map(os.path.realpath, (args.staging, args.dest))
+    if os.path.commonpath((staging, dest)) in (staging, dest):
+        die("--dest tidak boleh tumpang tindih dengan --staging")
+    index = index_modules(args.staging)
+    missing = [n for n in names if n not in index]
+    if missing:
+        die("modul tidak ada di staging: " + ", ".join(missing))
     os.makedirs(args.dest, exist_ok=True)
     for entry in os.listdir(args.dest):
         path = os.path.join(args.dest, entry)
@@ -185,7 +189,6 @@ def main():
         else:
             shutil.rmtree(path)
 
-    index = index_modules(args.staging)
     count = stage_modules(index, names, args.dest, args.strip)
     dep_count = run_depmod(args.dest, version, args.depmod)
 

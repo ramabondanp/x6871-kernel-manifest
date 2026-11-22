@@ -24,6 +24,7 @@ import argparse
 import glob
 import os
 import re
+import shutil
 import struct
 import subprocess
 import sys
@@ -123,9 +124,15 @@ def load_unprotected_gki_mods(modules_bzl_path: str):
 
 def check_load_and_dep(part: str, mod_dir: str, errors: list):
     kos = {f for f in os.listdir(mod_dir) if f.endswith(".ko")}
-    for load_name in ("modules.load", "modules.load.recovery"):
+    if not kos:
+        errors.append(f"{part}: no .ko files in {mod_dir}")
+    load_names = ["modules.load"]
+    if part == "vendor_boot":
+        load_names.append("modules.load.recovery")
+    for load_name in load_names:
         lp = os.path.join(mod_dir, load_name)
-        if not os.path.exists(lp):
+        if not os.path.isfile(lp):
+            errors.append(f"{part}: missing {load_name}")
             continue
         for line in open(lp):
             entry = line.strip()
@@ -136,8 +143,14 @@ def check_load_and_dep(part: str, mod_dir: str, errors: list):
                 errors.append(f"{part}/{load_name}: dangling entry {entry}")
 
     dep_path = os.path.join(mod_dir, "modules.dep")
-    if os.path.exists(dep_path):
+    if not os.path.isfile(dep_path):
+        errors.append(f"{part}: missing modules.dep")
+    else:
         dep_lines = open(dep_path).read().splitlines()
+        dep_modules = {os.path.basename(l.split(":", 1)[0].strip()) for l in dep_lines if ":" in l}
+        missing = sorted(kos - dep_modules)
+        if missing:
+            errors.append(f"{part}/modules.dep: missing entries for {len(missing)} modules: {', '.join(missing[:5])}")
         if part == "vendor_boot":
             usb_dp = [l for l in dep_lines if l.startswith("/lib/modules/usb_dp_selector.ko:")]
             if usb_dp and "/lib/modules/mediatek_drm_v1.ko" not in usb_dp[0]:
@@ -167,6 +180,10 @@ def main():
     ap.add_argument("--od-dir", default=None, help="odm_dlkm/lib/modules directory")
     ap.add_argument("--allow-dirty-gki", action="store_true")
     args = ap.parse_args()
+
+    for tool in ("git", "llvm-objcopy", "readelf", "modinfo"):
+        if shutil.which(tool) is None:
+            sys.exit(f"ERROR: required tool not found: {tool}")
 
     k_src = os.path.join(args.ws, "kernel-6.12")
     bases = sorted(

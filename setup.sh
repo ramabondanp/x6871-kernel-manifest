@@ -12,32 +12,40 @@
 #   5. hapus label //vendor/... yang tidak tersedia dari mgk_64.bzl (bila masih ada)
 set -e
 
-[ -d build/bazel_mgk_rules ] || { echo "ERROR: bukan root workspace kernel (build/bazel_mgk_rules tidak ada)"; exit 1; }
-[ -d kernel-6.12 ]           || { echo "ERROR: kernel-6.12 tidak ada"; exit 1; }
-[ -d kernel_device_modules-6.12 ] || { echo "ERROR: kernel_device_modules-6.12 tidak ada"; exit 1; }
+die() { echo "ERROR: $*" >&2; exit 1; }
+
+MGK_MODULE=build/bazel_mgk_rules/bzlmod/mgk.MODULE.bazel
+F=kernel_device_modules-6.12/kernel/kleaf/mgk_64.bzl
+VM=vendor/mediatek/kernel_modules
+DONOR=donor/oppo-mt6896/vendor/mediatek/kernel_modules
+[ -f "$MGK_MODULE" ] || die "$MGK_MODULE tidak ada; jalankan dari root workspace setelah repo sync"
+[ -d kernel-6.12 ] || die "kernel-6.12 tidak ada"
+[ -f "$F" ] || die "$F tidak ada"
+[ -d "$VM" ] || [ -d "$DONOR" ] || die "$VM tidak ada"
+
+# MGK resolves these from the workspace. Never silently use another checkout.
+if [ -e ../vendor/mediatek ] || [ -L ../vendor/mediatek ]; then
+  [ ../vendor/mediatek -ef vendor/mediatek ] || \
+    die "../vendor/mediatek bukan milik workspace ini; gunakan workspace di bawah direktori induk terpisah"
+fi
+if [ -e common-6.12 ]; then
+  [ common-6.12 -ef kernel-6.12 ] || die "common-6.12 tidak menunjuk ke kernel-6.12 workspace ini"
+fi
 
 # --- 1. MODULE.bazel -------------------------------------------------------
 # Root MODULE.bazel harus versi MGK, bukan bazel.MODULE.bazel AOSP:
 # mgk.MODULE.bazel sudah include mgk_repo + mgk_kernel_toolchain_ext,
 # jadi tidak bentrok dengan use_repo("kernel_toolchain_info") milik Kleaf.
-MGK_MODULE=build/bazel_mgk_rules/bzlmod/mgk.MODULE.bazel
-if [ -f "$MGK_MODULE" ]; then
-  if [ -L MODULE.bazel ] || ! cmp -s MODULE.bazel "$MGK_MODULE"; then
-    rm -f MODULE.bazel
-    cp "$MGK_MODULE" MODULE.bazel
-    echo "MODULE.bazel <- $MGK_MODULE"
-  fi
-else
-  echo "WARNING: $MGK_MODULE tidak ada, MODULE.bazel dibiarkan"
+if [ -L MODULE.bazel ] || ! cmp -s MODULE.bazel "$MGK_MODULE"; then
+  rm -f MODULE.bazel
+  cp "$MGK_MODULE" MODULE.bazel
+  echo "MODULE.bazel <- $MGK_MODULE"
 fi
 
 # --- 2. common-6.12 --------------------------------------------------------
-[ -e common-6.12 ] || { ln -s kernel-6.12 common-6.12; echo "symlink common-6.12"; }
+[ -e common-6.12 ] || { ln -sfn kernel-6.12 common-6.12; echo "symlink common-6.12"; }
 
 # --- 3. donor OPPO (fallback untuk workspace split legacy) -----------------
-DONOR=donor/oppo-mt6896/vendor/mediatek/kernel_modules
-VM=vendor/mediatek/kernel_modules
-
 if [ -d "$VM/afs_common_utils" ] && [ ! -L "$VM/afs_common_utils" ]; then
   echo "vendor/mediatek/kernel_modules sudah terpadu (vendored), skip symlink donor OPPO"
 elif [ -d "$DONOR" ]; then
@@ -84,7 +92,6 @@ fi
 # Kalau labelnya dibiarkan, Bazel gagal "no such package".
 # Branch port x6871-android16-6.12 sudah bersih; langkah ini hanya mengubah
 # mgk_64.bzl bila masih ada label tak tersedia (mis. baseline mtk-base-latest).
-F=kernel_device_modules-6.12/kernel/kleaf/mgk_64.bzl
 MODS='afs_core_cus|afs_core_int|cpufreq_cus|cpufreq_int|fpsgo_cus|fpsgo_int|game_cus|game_int|gpio_sap_ctrl|met_drv_secure_v3|msync2_frd_cus|msync2_frd_int|mtk_input|perf_common_cus|perf_common_int|sched_int|task_turbo_cus|task_turbo_int|thinmd_exception|wwan'
 
 if grep -qE "//vendor/mediatek/kernel_modules/($MODS)([/:])" "$F"; then

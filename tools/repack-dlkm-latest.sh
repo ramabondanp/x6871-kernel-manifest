@@ -24,14 +24,20 @@ DLKM_CFG=${DLKM_CFG:-$ROOT/tools/dlkm/config}
 WORK_DIR=""
 STAGING=""
 
+die() { echo "ERROR: $*" >&2; exit 1; }
+
 while [ $# -gt 0 ]; do
+    case "$1" in
+        --out-dir|--work-dir|--staging|--base)
+            [[ -n ${2:-} && $2 != --* ]] || die "$1 requires a path" ;;
+    esac
     case "$1" in
         --out-dir) OUT_DIR="$2"; shift 2 ;;
         --work-dir) WORK_DIR="$2"; shift 2 ;;
         --staging) STAGING="$2"; shift 2 ;;
         --base) BASE_TEMPLATE="$2"; shift 2 ;;
         -h|--help) sed -n '2,14p' "$0"; exit 0 ;;
-        *) echo "ERROR: unknown argument: $1" >&2; exit 1 ;;
+        *) die "unknown argument: $1" ;;
     esac
 done
 
@@ -50,8 +56,22 @@ export PATH="$TOOLS_BIN:$PATH"
 
 python3 - "$KERNEL_ROOT" "$STAGING" "$BASE_TEMPLATE" "$DLKM_CFG" "$WORK_DIR" "$OUT_DIR" <<'PY'
 import hashlib, os, re, shutil, subprocess, sys
+from pathlib import Path
 
-ws, stg, base_tpl, dlkm_cfg, work_dir, out_dir = sys.argv[1:7]
+ws, stg, base_tpl, dlkm_cfg, work_dir, out_dir = map(os.path.realpath, sys.argv[1:7])
+work = Path(work_dir)
+for path in map(Path, (ws, stg, base_tpl, dlkm_cfg)):
+    if work == path or work in path.parents or path in work.parents:
+        sys.exit(f"ERROR: --work-dir overlaps an input: {work} and {path}")
+out = Path(out_dir)
+if work == out or work in out.parents:
+    sys.exit(f"ERROR: --work-dir must not contain --out-dir: {work}")
+marker = work / ".x6871-dlkm-work"
+if work.exists() and not work.is_dir():
+    sys.exit(f"ERROR: --work-dir is not a directory: {work}")
+if work.is_dir() and any(work.iterdir()) and not marker.is_file():
+    sys.exit(f"ERROR: existing --work-dir is non-empty and not managed by this script: {work}. Choose a new directory.")
+
 kver = os.path.basename(stg)
 print(f"[repack-dlkm] staging: {stg}")
 
@@ -75,6 +95,7 @@ for dp, _, fns in os.walk(stg):
 if os.path.exists(work_dir):
     shutil.rmtree(work_dir)
 os.makedirs(work_dir)
+marker.touch()
 os.makedirs(out_dir, exist_ok=True)
 
 
@@ -110,6 +131,7 @@ specs = [
     ("odm_dlkm",     4206592, "ad366d04-4b0d-59e3-a713-8ef40abb27c3"),
 ]
 
+verified = []
 for part, part_size, uuid in specs:
     print(f"\n[repack-dlkm] === {part} ===")
     tpl_part = os.path.join(base_tpl, part)
@@ -146,7 +168,8 @@ for part, part_size, uuid in specs:
     load_path = os.path.join(mod_dir, "modules.load")
     load_lines = [l.strip() for l in open(tpl_load) if l.strip() and os.path.basename(l.strip()) not in protected_gki_ko]
     for l in load_lines:
-        assert os.path.exists(os.path.join(mod_dir, os.path.basename(l))), f"Dangling modules.load entry: {l}"
+        if not os.path.isfile(os.path.join(mod_dir, os.path.basename(l))):
+            sys.exit(f"ERROR: {part}: dangling modules.load entry: {l}")
     open(load_path, "w").write("\n".join(load_lines) + "\n")
 
     dep_root = os.path.join(work_dir, f"dep-{part}")
@@ -178,7 +201,9 @@ for part, part_size, uuid in specs:
         fs_out, fc_out,
     )
 
-    raw_img = os.path.join(work_dir, f"{part}_repack.img")
+    # avbtool resolves the hashtree descriptor's partition name to a sibling
+    # image, so the staged file must already use the final basename.
+    raw_img = os.path.join(work_dir, f"{part}.img")
     subprocess.run([
         "mkfs.erofs", "-zlz4hc", "-T", "1230768000", "-U", uuid,
         f"--mount-point=/{part}",
@@ -199,9 +224,12 @@ for part, part_size, uuid in specs:
         "--prop", f"com.android.build.{part}.fingerprint:transsion/tssi/tssi:16/BP2A.250605.031.A3/301550100:user/release-keys",
     ], check=True)
 
-    final_img = os.path.join(out_dir, f"{part}.img")
+    subprocess.run(["avbtool", "verify_image", "--image", raw_img], check=True)
+    verified.append((raw_img, os.path.join(out_dir, f"{part}.img"), len(keep_kos), len(load_lines)))
+
+# Publish only after both images pass AVB verification.
+for raw_img, final_img, module_count, load_count in verified:
     shutil.copy2(raw_img, final_img)
-    subprocess.run(["avbtool", "verify_image", "--image", final_img], check=True)
     md5 = hashlib.md5(open(final_img, "rb").read()).hexdigest()
-    print(f"[repack-dlkm] OK {final_img}: {len(keep_kos)} .ko, {len(load_lines)} load, {os.path.getsize(final_img)} B, md5={md5}")
+    print(f"[repack-dlkm] OK {final_img}: {module_count} .ko, {load_count} load, {os.path.getsize(final_img)} B, md5={md5}")
 PY

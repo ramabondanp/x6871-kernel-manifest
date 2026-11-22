@@ -285,6 +285,9 @@ kalau memang tidak ada source.
 
 - Workspace: `~/x6871-kernel` (setup mengikuti [README](../README.md#build-dari-source))
 - Manifest: `~/x6871-kernel-manifest`
+- Jika `../vendor/mediatek` sudah dipakai workspace lain, tempatkan checkout
+  baru di direktori induk terpisah (mis. `~/x6871-build/kernel`). `setup.sh`
+  tidak akan menimpa link workspace lain. Set `KERNEL_ROOT` untuk repack.
 - Oracle firmware (237 `.ko`): `~/tmp/x6871/vr/root/lib/modules/`
 - DTBO otoritatif: `~/tmp/x6871/frag0.dts`
 - Konfigurasi kernel device: `~/tmp/bootRE_ikconfig`
