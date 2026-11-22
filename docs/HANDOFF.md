@@ -16,14 +16,30 @@ Ditulis 2026-11-19, diperbarui 2026-11-22 untuk sesi AI berikutnya. Baca ini dul
 | DLKM (`vendor_dlkm` + `odm_dlkm`) | **269**, 100% source, image siap |
 | Build target | `//kernel_device_modules-6.12:mgk_64_k612_customer_modules_install.user` |
 | Build terakhir | sukses (inkremental), 2026-11-22 |
-| Kernel HEAD | `68db913` (`alps-kernel_device_modules-6.12`, `x6871-android16-6.12`, 102 commit di atas `06079c2`) |
+| Kernel HEAD | `6230061` (`alps-kernel_device_modules-6.12`, `x6871-android16-6.12`, 103 commit di atas `06079c2`) |
 | Vendor MTK modules HEAD | `83b4fa6` (`alps-vendor_mediatek_kernel_modules`, `x6871-android16-6.12`) |
 | Active clean workspace | `/serverhive1/ramabondanp/x6871-clean/ws` (keep old `/serverhive1/ramabondanp/w1vo` untouched) |
-| Runtime | **Boot + layar + AOD + kamera foto + rekam video + FOD normal/AOD/screen-off + DT2W + flashlight + Wi-Fi + GPU + charging HVDCP20/PD OK**; rilis `rcv-usb-20261122` (v16, raw `.img` untuk `fastbootd`) memuat fix earpiece `Playback_R_DAC` (`aca5276`) dan pullup UDC saat replug (`68db913`); siap uji device |
+| Runtime | **Boot + layar + AOD + kamera foto + rekam video + FOD normal/AOD/screen-off + DT2W + flashlight + Wi-Fi + GPU + charging HVDCP20/PD OK**; **earpiece lulus di v16**, USB replug belum lulus (`PRETEST.md` §65) |
 
 ## Status Rilis Terbaru & Ringkasan Riwayat (2026-11-22)
 
-### Rilis aktif: `rcv-usb-20261122` (kernel `68db913`, `vendor_boot` v16 + DLKM v15)
+### Rilis uji terbaru: `mtu3-replug-20261122` (kernel `6230061`, `vendor_boot` v17)
+
+```text
+x6871-twrp-vendor_boot-v17.img  md5 68df06607016a34d12bfbe19e2c6df77  67.108.864 B
+vendor_dlkm.img                 md5 72daa1f10eba75d9cd0e3359a27ff76f  24.551.424 B
+odm_dlkm.img                    md5 99b2194fa63cab8c751f71b8fbd4eb5e   4.206.592 B
+/srv path                       /serverhive1/ramabondanp/x6871-clean/out/
+```
+
+Hasil uji v16 (`dmesg9.txt`/`logcat7.txt`): earpiece **lulus**. USB sudah
+kembali ke DEVICE setelah replug, tetapi pullup yang pernah dimatikan tidak
+dipasang lagi. `mtu3.ko` v17 meminta pullup lewat UDC core pada NONE → DEVICE
+bila gadget masih terikat dan softconnect belum aktif. Build/repack lulus;
+di antara 222 modul `vendor_boot`, hanya `mtu3.ko` berbeda dari v16. Kedua
+DLKM identik. Uji perangkat masih diperlukan (`PRETEST.md` §65).
+
+### Rilis sebelumnya: `rcv-usb-20261122` (kernel `68db913`, `vendor_boot` v16 + DLKM v15)
 
 ```text
 x6871-twrp-vendor_boot-v16.img  md5 b6a0fb64f1043314a990b420af0c163b  67.108.864 B
@@ -114,7 +130,7 @@ Boot pembanding `normal2.txt` (GKI `Image` kita + modul stock) berhasil merekam 
 - **Boot & recovery**: TWRP + Android 16 boot sampai launcher dengan **222** modul `vendor_boot` (`modules.load` 165, `modules.load.recovery` 216) + **269** modul DLKM (**212** `vendor_dlkm` + **57** `odm_dlkm`, `modules.load` 194/57), 100% source, closure simbol **0 unresolved** (hanya weak `mtk_drm_gateic_set_backlight`).
 - **Layar & AOD**: `panel-rm69220-vdo-x6871.ko` (4 mode 144/120/60/40 Hz byte-identik stock, 8bpc/1056 Mbps, 0 underrun) + `mediatek_drm_v1.ko` (C3D dual-pipe SRAM + `PQ_VIRTUAL_SET_PROPERTY` 12 B + AOD).
 - **GPU & SCP**: Mali r54p1-11eac0 donor OPPO + fix layout `gpufreq_shared_status` + `SCP_IPI_COUNT=59`.
-- **USB, Charger & Audio**: replug USB berulang normal (`tran_extcon_usb` `af55c9c00426`), spam IRQ battery OC 65 Hz ditutup (`rfg-mtk-tran-conf-diff`), audio FS1599 PA + `tran_audio_control` normal, haptic + Wi-Fi + UFS/MTK storage + touch normal OK.
+- **USB, Charger & Audio**: replug USB lulus di uji historis `dmesg14` (§42.1), tetapi gagal pada Android v16 (§65); spam IRQ battery OC 65 Hz ditutup (`rfg-mtk-tran-conf-diff`), earpiece + audio FS1599 PA + `tran_audio_control` normal, haptic + Wi-Fi + UFS/MTK storage + touch normal OK.
 - **Kamera foto & preview**: 4 sensor X6871 (`s5khm6sx`, `gc32e1`, `gc02m3`, `gc02m3macro`) + `camera_eeprom_v4l2` + `mtk-cam-isp` inline `sink_fmt` + flashlight `ocp81375_v4l2`.
 
 ### Komposisi modul & repack
@@ -123,10 +139,11 @@ Boot pembanding `normal2.txt` (GKI `Image` kita + modul stock) berhasil merekam 
 - **Set DLKM (269 modul)**: EROFS identik opsi stock + AVB hashtree footer; zip TWRP menulis langsung ke logical partition tanpa menghapus partisi. 25 modul stock tanpa source (`transsion_tranlog`, `thd`, varian touch alternatif, dll.) tidak disertakan; `tran_zram` diganti `zsmalloc`+`zram`, ditambah `rfkill`, `bluetooth`, `libarc4`, `task_turbo`.
 - **Repack `vendor_boot`**: selalu pakai `tools/repack-vendor-boot-latest.sh` (lihat §Perintah build / Repack). Jangan menyalin `.ko` dari image lama atau memakai `tools/pack-vendor-boot.sh` legacy (`PRETEST.md` §43/§44).
 
-### Ringkasan riwayat rilis (`v1`–`v16`)
+### Ringkasan riwayat rilis (`v1`–`v17`)
 
 | Rilis | `vendor_boot` | Kernel HEAD | Ringkasan perubahan | Referensi |
 |---|---|---|---|---|
+| `mtu3-replug-20261122` | v17 | `6230061` | MTU3 minta pullup ulang pada NONE → DEVICE bila gadget masih terikat | `PRETEST.md` §65 |
 | `rcv-usb-20261122` | v16 | `68db913` | Fix earpiece `Playback_R_DAC` (enum/route/`mt_rcv_event`) dan pullup UDC saat replug (workqueue/urutan role switch stock) | `PRETEST.md` §64 |
 | `iommu-chg-earpiece-usb-20261122` | v14 | `5f569d0` | Fix boot race panic `mtk_iommu` (`hw_list` sebelum `iommu_device_register` + NULL guard `larbdev`) di atas v13 | `PRETEST.md` §63 |
 | `chg-earpiece-usb-20261122` | v13 | `8944601` | Fix panic charging HVDCP20 (`tc30`/`hvdcp20` `alg_name_array` + guard), earpiece speaker (`RCV Mux`), USB replug (`mt6375_get_vbus_gd_stat` + `extcon_wq`) | `PRETEST.md` §62 |
@@ -147,18 +164,22 @@ Boot pembanding `normal2.txt` (GKI `Image` kita + modul stock) berhasil merekam 
 
 ### Langkah uji berikutnya
 
-Flash via `fastbootd` ketiga file `.img` rilis `rcv-usb-20261122` (`x6871-twrp-vendor_boot-v16.img`, `vendor_dlkm.img`, `odm_dlkm.img`), lalu uji:
-1. **Earpiece speaker (media)**: putar stereo playback — `mt_rcv_event()` harus muncul dengan `mux 1` (`Playback_R_DAC`) bersamaan `mt_lo_event()`; suara keluar dari earpiece atas dan speaker bawah.
-2. **Earpiece speaker (panggilan)**: panggilan suara — `mt_rcv_event()` dengan `mux 2` (`Voice Playback`), suara dari earpiece.
-3. **USB replug berulang (PC ↔ cabut ↔ PC)**: setelah role DEVICE harus ada `mtu3 ... gadget (high-speed) pullup D+`, `mtu3_link_isr: high-speed`, `gadget RESET`, lalu adb/MTP langsung terdeteksi kembali. Sebagai pembanding, `tc_detect_bc12_run` tetap harus mencetak `switch ic vbus_gd is ready`.
-4. **Regresi charging**: adapter HVDCP20/PD tetap charging normal dan tidak panic.
+Ikuti `BOOTTEST.md` §3–§4. Jika sudah memakai v16, cukup flash
+`x6871-twrp-vendor_boot-v17.img`; kedua DLKM tidak berubah.
+
+1. **USB replug**: minimal tiga kali cabut-colok ke PC tanpa restart `adbd`.
+   Role DEVICE harus diikuti `pullup D+`, `gadget RESET`, dan `adb -d shell true`.
+   Uji MTP terpisah. Jika wedge lagi, catat `gadget bound=0/1`, status UDC,
+   dan properti FunctionFS sesuai §4.
+2. **Regresi earpiece**: stereo playback (`mux 1`) dan panggilan (`mux 2`).
+3. **Regresi USB/charging**: OTG, charge-only, dan adapter HVDCP20/PD tanpa panic.
 
 ### Catatan kamera, device table & repo
 
 - **Kamera (`PRETEST.md` §26, §51, §53)**: 4 sensor kamera X6871 (`s5khm6sx`, `gc32e1`, `gc02m3`, `gc02m3macro`) + `camera_eeprom_v4l2` sudah diport (`75ca1ac4a1ae`, `scripts/add-camera-x6871.sh`) dan kamera foto + rekam video sudah berjalan. Yang tidak dipublikasikan vendor hanya 46 fungsi kalibrasi OTP per sensor di `camera_eeprom_v4l2` dan patch Ext-ISP (tidak ada node DT/konsumennya di X6871).
 - **Device table (`DEVICES.md` / `DEVICES-OVERLAY.md`)**: 978 node `okay` (470 modul source, 130 built-in, 371 node platform, 7 tanpa driver; bug `of_match` flash LED `_v4l2` sudah diperbaiki).
 - **Repo**:
-  - `alps-kernel_device_modules-6.12` bersih dan ter-push ke `alps`, default branch `x6871-android16-6.12`, HEAD **`68db913`** (**102 commit** di atas `06079c2`).
+  - `alps-kernel_device_modules-6.12` bersih dan ter-push ke `alps`, default branch `x6871-android16-6.12`, HEAD **`6230061`** (**103 commit** di atas `06079c2`).
   - `alps-vendor_mediatek_kernel_modules` (vendoring terpadu 6 repo vendor Motorola `w1vo36` + 13 modul donor OPPO `mt6896` + 4 commit GPU Mali r54p1 & kamera X6871) ter-push ke `origin`, default branch `x6871-android16-6.12`, HEAD **`83b4fa6`** (di atas base `86edba6`).
   - Manifest `ramabondanp/x6871-kernel-manifest` (`main`, direktori lokal server `/serverhive1/ramabondanp/w1vo36-kernel-manifest`) mengarah langsung ke kedua repo `alps-*` di branch `x6871-android16-6.12`.
 
@@ -389,10 +410,7 @@ impor tak terselesaikan, 0 CRC tak terpenuhi, 0 export ambigu**. Detail di
   balik ke region.
 
 ### Berikutnya paling siap
-- **Uji device `venc-fod-dt2w-20261122` (`v10`)**: flash
-  `twrp-vendor_boot-allsrc-display-usb-v10.img` +
-  `twrp-dlkm-venc-fod-dt2w-20261122.zip`, lalu verifikasi rekam video (save),
-  DT2W (termasuk saat AOD), dan FOD. Detail di `PRETEST.md` §59 & `BOOTTEST.md` §4.
+- **Uji device v17**: fokus USB replug (`PRETEST.md` §65 & `BOOTTEST.md` §4).
 - `tkv_recovery` — sibling `tkv`, 20 KB, 11 ekspor / 24 impor; kandidat
   berikutnya yang paling kecil.
 - `tran_rhi` — health info storage (ECC/erase/suhu), 47 KB, tanpa source.
@@ -681,4 +699,3 @@ bukan salah config:
 
 Data lengkap diff awal: `/serverhive1/ramabondanp/tmp/dlkm-diff.json`.
 (Repack EROFS + AVB hashtree footer dan boot Android 16 telah diselesaikan pada 2026-11-20; lihat `PRETEST.md` §45.)
-

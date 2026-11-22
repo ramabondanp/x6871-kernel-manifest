@@ -3891,4 +3891,52 @@ odm_dlkm.img                    md5 99b2194fa63cab8c751f71b8fbd4eb5e   4.206.592
 /srv path                       /serverhive1/ramabondanp/x6871-clean/out/
 ```
 
-Kernel `68db913` (2 commit: `aca5276` earpiece, `68db913` extcon; di atas `5f569d0`). Foto lama v14 disimpan sebagai `vendor_dlkm-v14.img`/`odm_dlkm-v14.img`.
+Kernel `68db913` (2 commit: `aca5276` earpiece, `68db913` extcon; di atas `5f569d0`). Image lama v14 disimpan sebagai `vendor_dlkm-v14.img`/`odm_dlkm-v14.img`.
+
+## 65. `dmesg9`/`logcat7`: earpiece lulus; USB mencapai DEVICE tanpa pullup
+
+Hasil uji `rcv-usb-20261122` (v16): **earpiece lulus** menurut pengguna;
+`dmesg9.txt` mencatat berulang `mt_rcv_event(), event 0x1, mux 1`
+(contoh `32.051` dan `43.200`). **USB replug masih gagal.**
+
+| Waktu kernel | Bukti |
+|---|---|
+| `28.366`–`29.400` | Configfs meminta pullup sebelum port aktif. Setelah role DEVICE, `pullup D+`, `gadget RESET`, lalu endpoint adb aktif. |
+| `65.742`–`65.847` | Ada perintah `stop adbd` / `start adbd`; `sys.usb.ffs.ready` turun ke `0`, lalu UDC meminta `pullup (off)` saat port masih aktif. Tidak terlihat deskriptor FunctionFS baru atau permintaan pullup `on` sesudahnya dalam dump. |
+| `124.941`–`130.125` | Port berulang kembali ke NONE saat cabut dan DEVICE saat colok, setelah BC1.2 SDP (`vbus_gd` ready, `online=1, type=1`), tetapi tidak ada pullup atau reset bus. `logcat7.txt` (`15:56:16.583`) juga melihat UFP/sink/device dengan data enabled. |
+
+`ssusb_hwrscs_req timeout` juga muncul pada enumerasi pertama yang sukses
+dan pada stock `normal2.txt`, jadi timeout saja tidak menjelaskan perbedaan.
+Tidak ada bukti DR-swap diperlukan untuk colok PC ini; role DEVICE sudah
+benar. Di `dmesg8.txt` v14, gadget juga menerima `pullup (off)` setelah
+cabut (`57.166`), lalu tidak pullup lagi walau kembali ke DEVICE (`58.863`).
+
+**Kandidat perbaikan (`mtu3.ko`, `6230061`):** pada port `mediatek,mt6895-mtu3`,
+setelah transisi NONE → DEVICE, bila `mtu3_start()` belum mengaktifkan pullup
+dan gadget masih terikat, panggil `usb_gadget_connect()` melalui UDC core
+(di luar spinlock). UDC tetap menentukan apakah gadget siap dan boleh
+tersambung. Tidak mengubah BC1.2, charging, atau role extcon; tidak memaksa
+pullup bila gadget telah dilepas. `mtu3.ko` hanya ada di `vendor_boot`.
+Relokasi `usb_gadget_connect` terverifikasi di `ssusb_mode_sw_work_v2`;
+CRC `0xb6c75a4c` sama dengan impor simbol tersebut di `usb_meta.ko` stock.
+
+**Uji pembeda:** cabut-colok tiga kali dengan USB debugging aktif tanpa
+me-restart `adbd` atau mengubah mode USB di tengah pengujian; cek `adb -d`
+agar ADB melalui Wi-Fi tidak dihitung sebagai lulus. Uji juga MTP terpisah.
+Jika muncul `new device session without pullup (gadget bound=0)`, periksa
+`/config/usb_gadget/g1/UDC`, `sys.usb.config`, `sys.usb.state`, dan
+`sys.usb.ffs.ready` melalui terminal lokal atau ADB nirkabel. Port yang sudah
+DEVICE tetapi gadget kosong perlu investigasi rebind FunctionFS/configfs,
+bukan perubahan TCPC/BC1.2 lagi. Build/repack tidak membuktikan uji runtime.
+
+### Artefak uji (`mtu3-replug-20261122`)
+
+```text
+x6871-twrp-vendor_boot-v17.img  md5 68df06607016a34d12bfbe19e2c6df77  67.108.864 B
+vendor_dlkm.img                 md5 72daa1f10eba75d9cd0e3359a27ff76f  24.551.424 B
+odm_dlkm.img                    md5 99b2194fa63cab8c751f71b8fbd4eb5e   4.206.592 B
+```
+
+Build Bazel lulus dari workspace clean. Repack membandingkan semua 222 modul
+dengan staging; diff v16/v17 menunjukkan **hanya `mtu3.ko` berubah**, sementara
+DTB, bootconfig, fragmen recovery, dan kedua image DLKM tetap identik.

@@ -1,13 +1,10 @@
 # BOOTTEST — Prosedur Uji Boot & Checklist X6871
 
-> **Status 2026-11-22:** Rilis terbaru adalah **`iommu-chg-earpiece-usb-20261122`**
-> (kernel `5f569d0`, `vendor_boot` v14 + `vendor_dlkm` + `odm_dlkm`,
-> **100% modul source**, raw `.img` untuk `fastbootd`). Android 16 sudah terbukti
-> boot sampai launcher dengan layar normal (144/120/60/40 Hz + AOD), bottom speaker,
-> GPU Mali, Wi-Fi, touch normal, kamera foto + rekam video, optical FOD
-> (layar menyala, AOD, screen-off), DT2W, dan flashlight/torch.
-> Fokus uji terbaru: **boot bebas race `mtk_iommu`, charging dengan adapter (HVDCP20/TC30), earpiece speaker, dan USB replug**. Prosedur
-> repack yang berlaku ada di §2 dan §11; catatan §9–§10 adalah arsip historis.
+> **Status 2026-11-22:** Earpiece lulus pada v16. USB masih gagal setelah
+> role DEVICE, sehingga kandidat v17 menguji jalur pullup MTU3. Fokus uji:
+> **USB replug (ADB kabel dan MTP)**, lalu pastikan charging HVDCP20/PD
+> dan earpiece tidak regresi. Prosedur repack ada di §2 dan §11;
+> §9–§10 adalah arsip historis.
 
 Tujuan: memvalidasi **seluruh boot** (recovery + Android system), bukan hanya satu modul.
 
@@ -40,13 +37,13 @@ Tujuan: memvalidasi **seluruh boot** (recovery + Android system), bukan hanya sa
    `dtbo.img` tetap milik stock. Ini risiko yang harus diamati di dmesg
    (lihat §5).
 
-## 1. Artefak Terbaru (`iommu-chg-earpiece-usb-20261122`)
+## 1. Artefak Uji Terbaru (`mtu3-replug-20261122`)
 
 | Artefak | Sumber | Catatan |
 |---|---|---|
-| `x6871-twrp-vendor_boot-v14.img` | `tools/repack-vendor-boot-latest.sh` | **222** modul source (`md5 c5236194d20621543af6eb14a20e9e7b`, termasuk fix `mtk_iommu.ko`), dtb/bootconfig/recovery TWRP tetap |
-| `vendor_dlkm.img` | EROFS + AVB (`fastbootd`) | **212** modul source (`md5 378d9adf1de9c5a2d3fa8d8466aefd29`), termasuk fix `mt6895-mt6368.ko` |
-| `odm_dlkm.img` | EROFS + AVB (`fastbootd`) | **57** modul source (`md5 d6bb4ed087c9f9f69a96c8687c816b2c`), termasuk fix `tc_charger_framework.ko`, `mt6375-charger.ko`, `tran_extcon_usb.ko` |
+| `x6871-twrp-vendor_boot-v17.img` | `tools/repack-vendor-boot-latest.sh` | **222** modul source (`md5 68df06607016a34d12bfbe19e2c6df77`), hanya `mtu3.ko` berubah dari v16; dtb/bootconfig/recovery TWRP tetap |
+| `vendor_dlkm.img` | EROFS + AVB (`fastbootd`) | **212** modul source (`md5 72daa1f10eba75d9cd0e3359a27ff76f`), identik dengan v16 |
+| `odm_dlkm.img` | EROFS + AVB (`fastbootd`) | **57** modul source (`md5 99b2194fa63cab8c751f71b8fbd4eb5e`), identik dengan v16 |
 | kernel `Image` | `out_bazel/.../mgk_64_k612_kernel_aarch64.user/Image` | opsional, hanya jika `boot.img` ikut diganti |
 | `dtbo.img` | stock, tidak diubah | build tidak menghasilkan dtbo |
 | staging modul | `.../mgk_64_k612_customer_modules_install.user/staging/lib/modules/6.12.38-android16-5-g2c4fd33ae6d8-4k` | 806 file / 805 nama unik |
@@ -74,18 +71,22 @@ bisa hilang. Detail repack: `HANDOFF.md` §Repack dan `PRETEST.md` §44.
 ## 3. Flash dan rollback
 
 ```bash
-# 1. Flash vendor_boot (bootloader unlocked; image tidak ditandatangani)
-fastboot flash vendor_boot twrp-vendor_boot-allsrc-display-usb-v10.img
+# 1. Dari bootloader fastboot (bootloader unlocked; image tidak ditandatangani)
+fastboot flash vendor_boot x6871-twrp-vendor_boot-v17.img
 
-# 2. Flash vendor_dlkm + odm_dlkm lewat TWRP (Install zip):
-#    twrp-dlkm-venc-fod-dt2w-20261122.zip
-#    atau lewat fastbootd:
+# 2. Lewati blok ini jika DLKM v16 sudah terpasang (isinya identik).
+#    Jika belum, masuk fastbootd untuk partisi logis:
+fastboot reboot fastboot
+fastboot getvar is-userspace  # harus yes
 fastboot flash vendor_dlkm vendor_dlkm.img
 fastboot flash odm_dlkm odm_dlkm.img
+
+# 3. Boot Android
 fastboot reboot
 ```
 
-Rollback (wajib disiapkan sebelum tes):
+Rollback (wajib disiapkan sebelum tes): bila awalnya memakai v16,
+flash kembali `x6871-twrp-vendor_boot-v16.img` saja. Untuk rollback penuh ke stock:
 
 ```bash
 fastboot flash vendor_boot /serverhive1/ramabondanp/tmp/x6871/vendor_boot.img
@@ -105,7 +106,7 @@ Ambil `dmesg` penuh setelah boot, lalu periksa:
 | Storage/UFS | `dmesg \| grep -iE 'ufs\|scsi'`; `ls /dev/block/by-name`; mount `/data` | UFS probe, semua partisi ada, `/data` ter-mount |
 | Display/panel & AOD | matikan lalu nyalakan layar + uji AOD; `dmesg \| grep -iE 'lcm_prepare\|panel_doze\|underrun'` | resume normal, mode 144/120/60/40 Hz & AOD bersih, 0 underrun |
 | Touch & DT2W | `dmesg \| grep -iE 'goodix\|tran_touch'` | touch normal (`goodix_ts_report_finger`); masuk AOD tidak memicu `drm notify tp resume start`; double-tap memicu `got valid gesture type 0xcc` |
-| Charger/USB | cabut-colok kabel; `dmesg \| grep -iE 'tran_extcon\|ssusb_set_mode\|online=.*type='` | cabut -> role NONE, colok -> `online=1, type=1` (SDP), `pullup D+`, `gadget RESET`; tidak ada spam battery OC |
+| Charger/USB | cabut-colok kabel; `dmesg \| grep -iE 'tran_extcon\|ssusb_set_mode\|online=.*type=\|pullup\|gadget RESET'` | cabut → role NONE, colok → `online=1, type=1` (SDP), `pullup D+`, `gadget RESET`; ADB kabel/MTP tersambung kembali |
 | Audio | `dmesg \| grep -iE 'mt6895-afe\|fs15xx\|snd'`; uji speaker | card terdaftar, PA aktif, tidak ada timeout IPI |
 | Kamera & Video | foto + rekam video 1080p lalu simpan; `dmesg \| grep -iE 'check_codec_id\|venc\|LARB7'` | `check_codec_id ipi id 1 is correct`, `slbc_request 1`, `mtk_vcodec_enc_clock_on`, **0** fault `LARB7_PORT24`/`mva=0x0` |
 | Connectivity | `dmesg \| grep -iE 'wlan\|wmt\|bt'`; `ip link` | `wlan0` ada dan tersambung |
@@ -117,6 +118,31 @@ Ambil `dmesg` penuh setelah boot, lalu periksa:
 | tnek | `/dev/tnek` | ada |
 | LED | `/sys/class/leds/aw22xxx*` | node ada |
 | Reboot/suspend | `reboot`; `echo mem > /sys/power/state` | tidak hang |
+
+### Uji fokus USB replug v17
+
+1. Boot dengan USB debugging aktif. Verifikasi `adb -d shell true` dari PC;
+   `-d` memastikan yang diuji adalah transport USB, bukan Wi-Fi.
+2. Cabut hingga port berubah ke NONE, lalu colok kembali. Ulangi minimal
+   tiga kali tanpa `stop/start adbd` atau mengubah mode USB. Tiap siklus harus
+   kembali ke DEVICE, mengeluarkan `pullup D+` dan `gadget RESET`, lalu
+   `adb -d shell true` berhasil. Uji File Transfer (MTP), OTG, dan charger
+   dinding terpisah; mode charge-only jangan ikut mengekspor fungsi data.
+3. Jika port DEVICE tetapi PC tidak bisa enumerasi, ambil `dmesg`/`logcat -b all`
+   dari terminal lokal atau ADB nirkabel. Rekam juga status ini sebelum dan
+   setelah kegagalan (akses root mungkin diperlukan untuk configfs):
+
+   ```sh
+   getprop sys.usb.config
+   getprop sys.usb.state
+   getprop sys.usb.ffs.ready
+   cat /config/usb_gadget/g1/UDC
+   cat /sys/class/udc/11201000.usb0/state
+   ```
+
+   `new device session without pullup (gadget bound=0)` menunjukkan tidak
+   ada gadget aktif saat replug. Lihat `PRETEST.md` §65 untuk pembeda
+   dari kegagalan pullup dengan gadget masih terikat.
 
 ## 5. Delta yang **wajar** terlihat (bukan bug)
 
