@@ -20,7 +20,7 @@ Ditulis 2026-11-19, diperbarui 2026-11-22 sebagai referensi teknis & panduan kel
 | Kernel HEAD | `fa18f7f` (`alps-kernel_device_modules-6.12`, `x6871-android16-6.12`, 106 commit di atas `06079c2`) |
 | Vendor MTK modules HEAD | `83b4fa6` (`alps-vendor_mediatek_kernel_modules`, `x6871-android16-6.12`) |
 | Active clean workspace | `~/x6871-kernel` |
-| Runtime | **Lulus boot di GKI KMI 6 (`android16-6.12-2026-09_r16`, `v19-kmi6`)** dengan `boot.img` + `system_dlkm.img` resmi Google (0 mismatch CRC vs `abi.stg` `10.630` simbol, 0 kolisi `CONFIG_MODULE_SIG_PROTECT`, 0 unresolved symbol); seluruh subsistem modul sebelumnya lulus di KMI 5 (`v18`) |
+| Runtime | **Lulus boot di GKI KMI 6 (`android16-6.12-2026-09_r16`, `v19-kmi6`)** dengan `boot.img` + `system_dlkm.img` resmi Google (0 mismatch CRC vs `abi.stg` `10.630` simbol, 0 kolisi `CONFIG_MODULE_SIG_PROTECT`, 0 unresolved symbol). Hasil uji TWRP dan fitur perangkat di bawah berasal dari beberapa build KMI 5. |
 
 ## Status Rilis Terbaru & Ringkasan Riwayat (2026-11-22)
 
@@ -160,18 +160,19 @@ Boot pembanding `normal2.txt` (GKI `Image` kita + modul stock) berhasil merekam 
    - `mediatek_drm_v1`: kirim `TRAN_DISP_BLANK_NOTIFY_FINGERPRINT (2)` di akhir `mtk_drm_crtc_set_panel_hbm(crtc, true)`.
    - `gt9916_common`: `/proc/fingerprint_status` menulis perintah Goodix `0x30` (`len=5`, `data[0]=0`/`1`), `brl_gesture()` zero-init `cmd`, `brl_event_handler()` mendeteksi FOD down (`0x88`) / up (`(pre_buf[0] & 0xf) == 0`) dengan key `195` (`0xc3`), dan `goodix_ts_resume()` membersihkan `g_fp_flag`.
 
-### Yang sudah terbukti di device (TWRP & Android 16)
+### Hasil uji perangkat sebelum migrasi (KMI 5)
 
 - **Boot & recovery**: TWRP + Android 16 boot sampai launcher dengan **222** modul `vendor_boot` (`modules.load` 165, `modules.load.recovery` 216) + **269** modul DLKM (**212** `vendor_dlkm` + **57** `odm_dlkm`, `modules.load` 194/57), 100% source, closure simbol **0 unresolved** (hanya weak `mtk_drm_gateic_set_backlight`).
 - **Layar & AOD**: `panel-rm69220-vdo-x6871.ko` (4 mode 144/120/60/40 Hz byte-identik stock, 8bpc/1056 Mbps, 0 underrun) + `mediatek_drm_v1.ko` (C3D dual-pipe SRAM + `PQ_VIRTUAL_SET_PROPERTY` 12 B + AOD).
 - **GPU & SCP**: Mali r54p1-11eac0 donor OPPO + fix layout `gpufreq_shared_status` + `SCP_IPI_COUNT=59`.
-- **USB, Charger & Audio**: replug USB lulus di uji historis `dmesg14` (§42.1), tetapi gagal pada Android v16 (§65); spam IRQ battery OC 65 Hz ditutup (`rfg-mtk-tran-conf-diff`), earpiece + audio FS1599 PA + `tran_audio_control` normal, haptic + Wi-Fi + UFS/MTK storage + touch normal OK.
-- **Kamera foto & preview**: 4 sensor X6871 (`s5khm6sx`, `gc32e1`, `gc02m3`, `gc02m3macro`) + `camera_eeprom_v4l2` + `mtk-cam-isp` inline `sink_fmt` + flashlight `ocp81375_v4l2`.
+- **USB**: uji cabut-colok sempat lulus (`PRETEST.md` §42.1), lalu gagal di Android v16. Pada uji balik v18, masalah tetap terjadi dengan modul stock dan GKI kustom yang sama (`PRETEST.md` §67). Belum ada hasil uji cabut-colok pada KMI 6 di log.
+- **Charger & audio**: fast charging HVDCP20/PD lulus, spam IRQ battery OC 65 Hz ditutup, earpiece dan speaker FS1599 berfungsi. Haptic, Wi-Fi, UFS, touch, DT2W, dan sidik jari dalam layar juga lulus pada build KMI 5.
+- **Kamera**: foto, rekam video 1080p, dan senter lulus (`PRETEST.md` §59–§62).
 
 ### Komposisi modul & repack
 
 - **Set `vendor_boot` (222 modul)**: 20 nama stock tidak ada di build (6 tidak direncanakan: panel `cl8`/`ili7838e`, alias panel X6871, 3 MMC/SD; 14 kandidat: 7 storage Transsion, 4 terblokir `transsion_tranlog`, 3 fitur mandiri). Lima modul build-only ditambahkan: `adaptive-ts`, `gt9916_common`, `mtk-mmc`, `panel-rm69220-vdo-x6871`, `tran_richtap_haptic_hv`.
-- **Set DLKM (269 modul)**: EROFS identik opsi stock + AVB hashtree footer; zip TWRP menulis langsung ke logical partition tanpa menghapus partisi. 25 modul stock tanpa source (`transsion_tranlog`, `thd`, varian touch alternatif, dll.) tidak disertakan; `tran_zram` diganti `zsmalloc`+`zram`, ditambah `rfkill`, `bluetooth`, `libarc4`, `task_turbo`.
+- **Set DLKM KMI 6 (266 modul)**: `vendor_dlkm` (209) dan `odm_dlkm` (57) memakai EROFS + AVB hashtree footer dan di-flash via fastbootd. Dibanding set KMI 5 (269 modul), `rfkill`, `bluetooth`, dan `libarc4` kini disediakan oleh `system_dlkm.img` resmi Google, bukan `vendor_dlkm`.
 - **Repack `vendor_boot`**: selalu pakai `tools/repack-vendor-boot-latest.sh` (lihat §Perintah build / Repack). Jangan menyalin `.ko` dari image lama atau memakai `tools/pack-vendor-boot.sh` legacy (`PRETEST.md` §43/§44).
 
 ### Ringkasan riwayat rilis (`v1`–`v19-kmi6`)
@@ -201,11 +202,11 @@ Boot pembanding `normal2.txt` (GKI `Image` kita + modul stock) berhasil merekam 
 
 ### Langkah verifikasi & pemeliharaan berikutnya
 
-Ikuti `BOOTTEST.md` §3–§4 untuk setiap pembaruan GKI atau modul:
+Ikuti `BOOTTEST.md` §2–§4 untuk setiap pembaruan GKI atau modul:
 
-1. **Verifikasi KMI/ABI sebelum flash**: jalankan `./tools/verify-kmi-abi.py` (wajib lulus seluruh 8 gerbang).
+1. **Verifikasi KMI/ABI sebelum flash**: jalankan verifier sesuai [BOOTTEST §2](BOOTTEST.md#2-membuat-image-vendor_boot--dlkm) (wajib lulus seluruh 8 gerbang).
 2. **Flash pasangan GKI KMI 6 yang serasi**: `x6871-twrp-vendor_boot-v19-kmi6.img` + `vendor_dlkm.img` + `odm_dlkm.img` wajib dipasangkan dengan `boot.img` + `system_dlkm.img` GKI resmi Google `android16-6.12-2026-09_r16`.
-3. **Checklist regresi subsistem**: layar 144/120/60/40 Hz & AOD, FOD (layar menyala, AOD, screen-off), DT2W, kamera foto & rekam video 1080p, flashlight, audio speaker & earpiece, Wi-Fi/BT, dan fast charging HVDCP20/PD.
+3. **Checklist regresi subsistem**: TWRP, layar 144/120/60/40 Hz & AOD, FOD (layar menyala, AOD, screen-off), DT2W, kamera foto & rekam video 1080p, flashlight, audio speaker & earpiece, Wi-Fi/BT, USB cabut-colok (ADB dan MTP), dan fast charging HVDCP20/PD.
 
 ### Catatan kamera, device table & repo
 
@@ -282,7 +283,7 @@ kalau memang tidak ada source.
 
 ## Lingkungan
 
-- Workspace: `~/x6871-kernel` (tree lama `~/x6871-kernel` jangan dipakai)
+- Workspace: `~/x6871-kernel` (setup mengikuti [README](../README.md#build-dari-source))
 - Manifest: `~/x6871-kernel-manifest`
 - Firmware dump stock X6871 (`X6871-16.3.0.155SP20`): [`https://gitlab.com/rama-firmware-dumps/infinix/Infinix-X6871`](https://gitlab.com/rama-firmware-dumps/infinix/Infinix-X6871)
 - Oracle firmware (237 `.ko`): `~/tmp/x6871/vr/root/lib/modules/`
@@ -335,10 +336,8 @@ vendor tidak berubah. Untuk mengganti SoC build, set `PLATFORM` (default `mt6895
 
 ### Repack vendor_boot (WAJIB dari build terbaru)
 
-```bash
-cd ~/x6871-kernel-manifest
-./tools/repack-vendor-boot-latest.sh   --out ~/tmp/x6871/twrp-vendor_boot-$(date -u +%Y%m%d-%H%M%S).img
-```
+Ikuti [alur repack dan verifikasi di BOOTTEST](BOOTTEST.md#2-membuat-image-vendor_boot--dlkm),
+termasuk penyiapan base TWRP dan packer.
 
 Skrip ini menjalankan build di `### Perintah build`, mengambil staging
 **hasil build itu**, men-stage 222 modul dari `tools/recovery-modules.txt`,
@@ -352,18 +351,10 @@ Menambah/mengurangi modul recovery: edit `tools/recovery-modules.txt`,
 
 ### Repack DLKM & Safeguard Verifikasi KMI/ABI (WAJIB untuk setiap rilis & upgrade GKI)
 
-```bash
-cd ~/x6871-kernel-manifest
-
-# 1. Repack vendor_dlkm.img + odm_dlkm.img (otomatis buang modul GKI terproteksi,
-#    pakai AOSP mkfs.erofs/avbtool/fec, dan verifikasi AVB hashtree)
-./tools/repack-dlkm-latest.sh \
-  --out-dir ~/x6871-out \
-  --work-dir ~/x6871-out/dlkm-latest-work
-
-# 2. Jalankan 8 gerbang safeguard KMI/ABI terhadap GKI murni & abi.stg resmi
-./tools/verify-kmi-abi.py
-```
+Gunakan [perintah lengkap di BOOTTEST](BOOTTEST.md#2-membuat-image-vendor_boot--dlkm).
+Skrip repack DLKM memverifikasi AVB hashtree. `verify-kmi-abi.py` memeriksa
+kompatibilitas modul; arahkan `--vd-dir` dan `--od-dir` ke hasil repack bila
+direktori kerja tidak berada di `out/` di sebelah workspace (default `~/out`).
 
 #### Checklist cepat upgrade tag GKI (mis. `android16-6.12-YYYY-MM_rXX`)
 
@@ -404,7 +395,7 @@ serta empat modul fitur: `tran_extcon_usb`, `tran_fp`, `tnek`, `tkv`.
 
 Daftar commit per fitur ada di `git log` branch `x6871-android16-6.12`.
 
-## Yang tersisa: 20 modul di tree staging
+## Audit historis: 20 nama modul stock tidak ada di staging KMI 5
 
 Angka 20 adalah nama stock yang tidak ada di **tree staging lengkap**
 (`staging/lib/modules/6.12.38-.../`, 806 file / 805 nama unik). Flat
@@ -510,7 +501,7 @@ impor tak terselesaikan, 0 CRC tak terpenuhi, 0 export ambigu**. Detail di
   balik ke region.
 
 ### Berikutnya paling siap
-- **Uji device v17**: fokus USB replug (`PRETEST.md` §65 & `BOOTTEST.md` §4).
+- **Uji regresi pada GKI resmi KMI 6**: ulangi checklist `BOOTTEST.md` §4, termasuk USB cabut-colok.
 - `tkv_recovery` — sibling `tkv`, 20 KB, 11 ekspor / 24 impor; kandidat
   berikutnya yang paling kecil.
 - `tran_rhi` — health info storage (ECC/erase/suhu), 47 KB, tanpa source.

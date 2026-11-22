@@ -25,11 +25,11 @@ Kolom **Asal**:
 | `**MISMATCH**` | stock punya `of_match`, build kita tidak -> driver tidak akan bind |
 | `tidak ada` | tidak ada driver |
 
-Cara regenerasi:
+Cara regenerasi (gunakan input DT dan indeks modul dari [DEVICES](DEVICES.md#cara-regenerasi)):
 
 ```sh
 cd ~
-M=w1vo36-kernel-manifest/tools
+M=x6871-kernel-manifest/tools
 ./$M/dts-devices.py tmp/x6871/frag0.dts > cmp-out/dev-overlay.tsv
 ./$M/dts-devices.py tmp/x6871/base.dts > cmp-out/dev-base.tsv
 BASE_TSV=cmp-out/dev-base.tsv ./$M/dt-device-table.py \
@@ -47,7 +47,7 @@ module=50, builtin=6, dt=2, tidak ada=4     (tanpa MISMATCH)
   karena `of_match` tidak memakai sufiks `_v4l2`. Sudah diperbaiki di tree
   kernel (commit `7cdb969799b3`).
 - 4 node tanpa driver (`tc_adapter_control`, `tc_trancare`, `tc_pe5`,
-  `md1_sim1_hot_plug_eint-eint`) dibahas di `DEVICES.md` §Temuan 2;
+  `md1_sim1_hot_plug_eint-eint`) dibahas di [DEVICES §Temuan](DEVICES.md#temuan);
   hanya `tc,trancare` yang benar-benar kehilangan fitur.
 - `frag@45/pixelworks@22` dan `@26`: chip Pixelworks Iris (display
   processing) — dikompilasi ke dalam modul `mediatek_drm_v1.ko` (bukan `.ko`

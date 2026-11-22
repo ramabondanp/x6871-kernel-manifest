@@ -1,17 +1,15 @@
 # PLAN — Port driver ke sumber X6871 (Infinix GT 20 Pro)
 
-`HANDOFF.md` = mulai dari sini: status, aturan, lingkungan, yang sudah dan
-belum selesai, pengetahuan kritis. `README.md` = cara build. `PLAN.md` =
-catatan teknis lengkap per temuan (§6.x), termasuk bukti tiap keputusan.
+Dokumen ini mengarsipkan rencana porting awal dan temuan teknis (§6.x).
+Untuk build, mulai dari [README](../README.md#build-dari-source). Untuk status
+rilis dan panduan pemeliharaan, lihat [HANDOFF](HANDOFF.md).
 
 > **Status 2026-11-22:** Seluruh modul `vendor_boot` (222) + `vendor_dlkm`
 > (209) + `odm_dlkm` (57) sudah dibangun **100% dari source** terhadap GKI AOSP murni
 > **`android16-6.12-2026-09_r16`** (`6.12.92-android16-6`, **KMI 6**, kernel HEAD
-> `fa18f7f`, rilis `gki-kmi6-20261122`). Android 16 terbukti boot sampai launcher
-> dengan `boot.img` + `system_dlkm.img` rilis resmi Google, dan seluruh subsistem
-> (layar 144/120/60/40 Hz + AOD, audio speaker & earpiece, GPU Mali r54p1-11eac0,
-> Wi-Fi, fast charging HVDCP20/PD, kamera foto & rekam video 1080p, flashlight,
-> DT2W, serta optical FOD di layar menyala/AOD/screen-off) telah terverifikasi lulus.
+> `fa18f7f` setelah trim, rilis `gki-kmi6-20261122`). Android 16 terbukti boot
+> sampai launcher dengan `boot.img` + `system_dlkm.img` rilis resmi Google.
+> Pengujian TWRP dan fitur perangkat yang dirangkum di §10 berasal dari KMI 5.
 > Angka 688/806 `.ko` di bagian awal dokumen ini adalah snapshot historis; angka build
 > saat ini (setelah trim allowlist `x6871_modules.bzl`) adalah **553** file / **552** nama unik
 > di staging dan **419** flat customer install (919 action Bazel). Untuk status terkini,
@@ -1920,10 +1918,8 @@ bisa dipakai membandingkan `CONFIG_*` kita vs device.
 
 ## 10. Status ringkas (diperbarui 2026-11-22)
 
-Sudah terbukti di device (TWRP & Android 16, rilis `gki-kmi6-20261122` / kernel `fa18f7f`):
-
-- `vendor_boot` (222 modul) + `vendor_dlkm` (209 modul, bebas kolisi `CONFIG_MODULE_SIG_PROTECT`) + `odm_dlkm` (57 modul) 100% source terhadap GKI AOSP murni `android16-6.12-2026-09_r16` (KMI 6), 0 mismatch CRC vs `abi.stg` (10.630 simbol), 0 unresolved symbol.
-- Android 16 boot sampai launcher dengan GPU Mali r54p1-11eac0, Wi-Fi, UFS/MTK storage, haptic/richtap, stack charger `tc_*` + fast charging HVDCP20/PD, audio FS1599 + earpiece (`Playback_R_DAC`), layar RM69220 (144/120/60/40 Hz + C3D dual-pipe + AOD), touch normal GT9916 + DT2W, optical FOD (layar menyala, AOD, screen-off), flashlight V4L2, serta kamera foto & rekam video 1080p (4 sensor X6871 + VENC `VENC_H264=1`).
+- **KMI 6 (`gki-kmi6-20261122`):** Android 16 boot sampai launcher dengan GKI resmi Google `android16-6.12-2026-09_r16`. `vendor_boot` (222 modul), `vendor_dlkm` (209), dan `odm_dlkm` (57) dibangun dari source; audit mencatat 0 mismatch CRC, 0 kolisi `CONFIG_MODULE_SIG_PROTECT`, dan 0 simbol tak terselesaikan.
+- **KMI 5 (build sebelumnya):** TWRP, GPU, Wi-Fi, storage, haptic, fast charging, audio speaker dan earpiece, layar hingga 144 Hz dan AOD, touch dan DT2W, sidik jari dalam layar, senter, serta kamera foto dan video 1080p telah diuji. Lihat [HANDOFF](HANDOFF.md#hasil-uji-perangkat-sebelum-migrasi-kmi-5) untuk rincian dan status USB.
 
 Belum / sengaja dilewati:
 

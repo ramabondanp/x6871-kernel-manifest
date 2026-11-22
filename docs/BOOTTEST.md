@@ -1,10 +1,11 @@
 # BOOTTEST — Prosedur Uji Boot & Checklist X6871
 
-> **Status 2026-11-22:** Seluruh subsistem modul 100% lulus/clear (earpiece
-> lulus v16; `mtu3.ko` sejajar stock di v18 / `32a8db7`). Bug USB replug
-> terkonfirmasi berasal dari kernel GKI custom (`boot.img`) karena tetap
-> terjadi identik saat seluruh DLKM & modul stock di-flash (`PRETEST.md` §67).
-> Prosedur repack ada di §2 dan §11; §9–§10 adalah arsip historis.
+> **Status 2026-11-22:** Android 16 berhasil boot sampai launcher pada
+> `gki-kmi6-20261122` dengan GKI resmi Google. Hasil uji TWRP dan subsistem
+> di [HANDOFF](HANDOFF.md) berasal dari build KMI 5. Bug USB saat cabut-colok
+> tetap terjadi pada GKI kustom meski modul stock dipasang kembali; uji
+> cabut-colok pada KMI 6 belum tercatat (`PRETEST.md` §67–§68).
+> Gunakan prosedur repack di §2; §9–§10 adalah arsip percobaan repack manual.
 
 Tujuan: memvalidasi **seluruh boot** (recovery + Android system), bukan hanya satu modul.
 
@@ -12,7 +13,7 @@ Tujuan: memvalidasi **seluruh boot** (recovery + Android system), bukan hanya sa
 
 1. **Pembagian partisi modul di X6871:**
    - **`vendor_boot`** (`vendor_ramdisk00/lib/modules/`, flat tanpa subdirektori versi): memuat **222 modul** first-stage/recovery bersama `modules.dep`, `modules.alias`, `modules.softdep`, `modules.load` (165 entri), dan `modules.load.recovery` (216 entri).
-   - **`vendor_dlkm` + `odm_dlkm`** (partisi logis di `super`, format EROFS + AVB hashtree footer): memuat **269 modul** Android system (**212** `vendor_dlkm` + **57** `odm_dlkm`, `modules.load` 194/57).
+   - **`vendor_dlkm` + `odm_dlkm`** (partisi logis di `super`, format EROFS + AVB hashtree footer): memuat **266 modul** pada KMI 6 (**209** `vendor_dlkm` + **57** `odm_dlkm`, `modules.load` 191/57).
 2. **Kernel dan modul terikat oleh simbol + CRC, bukan release string.**
    Build ini memakai `CONFIG_MODVERSIONS`, dan `same_magic()` di
    `kernel/module/version.c` melewati token pertama vermagic saat modul punya
@@ -21,7 +22,7 @@ Tujuan: memvalidasi **seluruh boot** (recovery + Android system), bukan hanya sa
    Konsekuensinya: release string boleh berbeda (`gcc51d883045d` vs
    `g2c4fd33ae6d8`) selama simbol dan CRC-nya sama.
 
-   Sudah diverifikasi untuk pasangan ini:
+   Perbandingan historis KMI 5 (bukan acuan kompatibilitas KMI 6):
 
    | Uji | Hasil |
    |---|---|
@@ -29,9 +30,8 @@ Tujuan: memvalidasi **seluruh boot** (recovery + Android system), bukan hanya sa
    | CRC identik | **2174 / 2174** |
    | modul build kita yang cocok CRC-nya dengan kernel stock | **795 / 795** (snapshot 2026-11-19) |
 
-   Artinya modul kita bisa di-load di kernel stock, dan sebaliknya. Tetap
-   disarankan memakai kernel + modul dari satu build supaya perilaku kode
-   (bukan hanya ABI) konsisten.
+   Hasil itu hanya berlaku untuk pasangan yang diuji. Untuk rilis KMI 6,
+   gunakan set image yang cocok di §1; jangan mencampurnya dengan KMI 5.
 3. **Build kita tidak menghasilkan dtb/dtbo.** Target yang dipakai hanya
    membangun `Image` + modul, jadi `dtb` di dalam `vendor_boot` dan
    `dtbo.img` tetap milik stock. Ini risiko yang harus diamati di dmesg
@@ -50,20 +50,43 @@ Tujuan: memvalidasi **seluruh boot** (recovery + Android system), bukan hanya sa
 
 ## 2. Membuat image vendor_boot & DLKM
 
+Siapkan workspace sesuai [README](../README.md#build-dari-source). Repack
+`vendor_boot` juga membutuhkan image TWRP dasar untuk X6871 (tidak disertakan
+di repo) dan checkout `cfig/Android_boot_image_editor` yang mendukung zstd
+(lihat [catatan patch di §10](#10-ramdisk-zstd-twrp--catatan-tool-historis)).
+Taruh image dasar sebagai `vendor_boot.img` di direktori packer, lalu
+jalankan `./gradlew unpack` dari sana. Pastikan `build/unzip_boot/root.1`
+ada dan dependensi Gradle tersedia untuk `pack --offline`.
+
+Contoh memakai packer di `~/tmp/vbwork-twrp`. Siapkan `python3`, `llvm-strip`,
+`llvm-objcopy`, `readelf`, `depmod`, `modinfo`, `zstd`, dan `cpio` di `PATH`.
+
 ```bash
 cd ~/x6871-kernel-manifest
-./tools/repack-vendor-boot-latest.sh \
-  --out ~/tmp/x6871/twrp-vendor_boot-$(date -u +%Y%m%d-%H%M%S).img
-./tools/repack-dlkm-latest.sh --out-dir ~/x6871-out
-./tools/verify-kmi-abi.py
+export KERNEL_ROOT="$HOME/x6871-kernel"
+export PACKER="$HOME/tmp/vbwork-twrp"
+out="$HOME/x6871-out"
+work="$out/dlkm-latest-work"
+
+./tools/repack-vendor-boot-latest.sh --out "$out/vendor_boot-test.img" &&
+  ./tools/repack-dlkm-latest.sh --out-dir "$out" --work-dir "$work" &&
+  ./tools/verify-kmi-abi.py \
+    --vb-dir "$PACKER/build/unzip_boot/root.1/lib/modules" \
+    --vd-dir "$work/vendor_dlkm/lib/modules" \
+    --od-dir "$work/odm_dlkm/lib/modules"
 ```
 
-Skrip menjalankan build Bazel resmi, mengambil staging hasil build itu,
-men-stage 222 modul dari `tools/recovery-modules.txt`, menghapus debug
+Skrip repack `vendor_boot` menjalankan build Bazel, mengambil staging hasil
+build itu, men-stage 222 modul dari `tools/recovery-modules.txt`, menghapus debug
 info, meregenerasi `modules.dep`/`alias`/`softdep`, pack dengan
 cfig/Android_boot_image_editor, lalu membongkar hasilnya dan **gagal**
 kalau ada `.ko` yang beda dari staging. Modul tidak pernah disalin dari
 image lama.
+
+Direktori `--work-dir` dibuat ulang oleh skrip DLKM; jangan simpan file lain
+di sana. Hanya lanjut ke flash jika semua langkah lulus. Untuk hasil build
+sendiri, gunakan `vendor_boot-test.img` sebagai pengganti image `vendor_boot`
+rilis pada contoh flash di bawah.
 
 `tools/pack-vendor-boot.sh` adalah tool legacy dan **jangan dipakai untuk
 X6871**: ia memfilter berdasarkan nama stock sehingga modul build-only
@@ -71,6 +94,10 @@ X6871**: ia memfilter berdasarkan nama stock sehingga modul build-only
 bisa hilang. Detail repack: `HANDOFF.md` §Repack dan `PRETEST.md` §44.
 
 ## 3. Flash dan rollback
+
+Khusus X6871 dengan bootloader terbuka. Cadangkan data dan siapkan set image
+rollback lengkap sebelum mulai. Pakai satu set image yang cocok sesuai §1.
+Jalankan satu per satu; jika ada perintah gagal, jangan lanjut ke reboot Android.
 
 ```bash
 # 1. Dari bootloader fastboot (bootloader unlocked; image tidak ditandatangani)
@@ -88,17 +115,13 @@ fastboot flash odm_dlkm odm_dlkm.img
 fastboot reboot
 ```
 
-Rollback (wajib disiapkan sebelum tes): untuk kembali ke KMI 5 (`v18`),
-flash balik `boot.img` + `system_dlkm.img` KMI 5 beserta `x6871-twrp-vendor_boot-v18.img`,
-`vendor_dlkm-v16-kmi5.img`, dan `odm_dlkm-v16-kmi5.img`. Untuk rollback penuh ke stock:
+Untuk rollback, ulangi urutan di atas dengan satu set image lengkap:
 
-```bash
-fastboot flash vendor_boot ~/tmp/x6871/vendor_boot.img
-# dan flash balik stock boot.img / system_dlkm.img / vendor_dlkm.img / odm_dlkm.img bila perlu
-```
-
-Kalau kernel juga diganti, simpan `boot.img` stock dan flash balik dengan
-cara yang sama.
+- **Kembali ke KMI 5 (`v18`):** gunakan `boot.img` + `system_dlkm.img` KMI 5,
+  `x6871-twrp-vendor_boot-v18.img`, `vendor_dlkm-v16-kmi5.img`, dan `odm_dlkm-v16-kmi5.img`.
+- **Kembali ke stock:** pulihkan kelima partisi yang diubah (`boot`,
+  `vendor_boot`, `system_dlkm`, `vendor_dlkm`, `odm_dlkm`) dengan image dari
+  firmware bawaan yang sama. Prosedur ini tidak mengubah `dtbo`.
 
 ## 4. Checklist boot per subsistem
 
@@ -123,7 +146,7 @@ Ambil `dmesg` penuh setelah boot, lalu periksa:
 | LED | `/sys/class/leds/aw22xxx*` | node ada |
 | Reboot/suspend | `reboot`; `echo mem > /sys/power/state` | tidak hang |
 
-### Uji fokus USB replug v17
+### Uji fokus USB replug
 
 1. Boot dengan USB debugging aktif. Verifikasi `adb -d shell true` dari PC;
    `-d` memastikan yang diuji adalah transport USB, bukan Wi-Fi.
@@ -161,10 +184,10 @@ Ambil `dmesg` penuh setelah boot, lalu periksa:
 - **`mtk-socinfo.ko` ter-build dua kali** (`kernel/` dan `extra/`).
   `tools/stage-recovery-modules.py` sengaja memilih salinan `kernel/`,
   sama dengan image yang sudah terbukti boot.
-- **Staging berisi 806 file / 805 nama unik, perangkat hanya butuh 222.**
-  Sisanya modul platform lain (mt6858/mt6991/mt6993, varian panel, dsb).
-  Komposisi vendor_boot dikunci oleh `tools/recovery-modules.txt`, bukan
-  filter nama stock, supaya modul build-only tidak hilang.
+- **Staging build KMI 6 setelah pemangkasan berisi 553 file / 552 nama unik.**
+  Staging mencakup modul di luar `vendor_boot`. Daftar 222 modul untuk
+  `vendor_boot` dikunci oleh `tools/recovery-modules.txt`, bukan filter nama
+  stock, supaya modul build-only tidak hilang.
 - **dtb/dtbo stock** dipakai apa adanya. Kalau ada driver yang mengeluh
   properti DT tidak dikenal, itu konsekuensi langsung dari poin ini.
 - **API hardware baru** di tiga modul: `clk-common`, `tran_ldo`,
@@ -176,9 +199,8 @@ Ambil `dmesg` penuh setelah boot, lalu periksa:
    → simbol hilang atau CRC beda. Ini pemeriksaan yang benar; pesan
    `version magic ... should be` hanya muncul kalau bagian
    ` SMP preempt mod_unload modversions aarch64` yang berbeda, bukan release.
-2. Cek kernel yang jalan: `uname -r`. Release string boleh berbeda dari build
-   modul (lihat §0.2), tapi kalau bukan kernel kita sama sekali, driver
-   vendor belum tentu ada.
+2. Cek kernel yang jalan dengan `uname -r`, lalu pastikan `boot.img` dan
+   `system_dlkm.img` berasal dari rilis GKI yang ditargetkan oleh modul (§1).
 3. Tidak ada `/dev/block/by-name` → UFS tidak probe; cek
    `dmesg | grep -i ufs` dan `phy-mtk-ufs`.
 4. Layar mati tapi sistem hidup → panel/dtb; cek `dmesg | grep -i dsi`.
@@ -243,13 +265,11 @@ grep '^/lib/modules/usb_dp_selector.ko:' lib/modules/modules.dep
 berarti init berhenti di modul pertama yang gagal — bukan berarti ramdisk
 hanya berisi N modul.
 
-Catatan penting dari uji boot pertama: **kernel yang berbeda build bukan
-penghalang.** Kernel uji (`6.12.117-...-Rama982`) berhasil boot dengan
-seluruh set modul stock, jadi pesan `disagrees about version of symbol ...
-(ignoring)` dan `Kernel module BTF mismatch detected` hanya informatif —
-jangan dikejar. Yang menentukan hanya apakah simbolnya ada. Karena itu
-satu-satunya penyebab kegagalan di log pertama adalah `modules.dep` yang
-kehilangan dependensi, bukan beda versi kernel.
+Pada uji historis dengan kernel kustom `6.12.117-...-Rama982`, set modul
+stock berhasil boot. Kegagalan yang dibahas di bagian ini ditelusuri ke
+dependensi yang hilang dari `modules.dep`. Jangan anggap peringatan CRC/BTF
+pada build lain aman; gunakan pasangan GKI yang sesuai dan jalankan
+verifikasi di §2.
 
 ## 9. Repack dengan cfig/Android_boot_image_editor (historis)
 
@@ -298,10 +318,11 @@ Image TWRP untuk X6871 memakai ramdisk **zstd** (`28 b5 2f fd`), bukan lz4.
 `cfig/Android_boot_image_editor` (commit `f692aff`) belum mengenalnya:
 `./gradlew unpack` berhenti dengan `ramdisk is in unknown format`.
 
-Patch: `tools/patches/abie-zstd-ramdisk.patch` (dibuat terhadap `f692aff`)
+Patch: [`patches/abie-zstd-ramdisk.patch`](../patches/abie-zstd-ramdisk.patch)
+(dibuat terhadap `f692aff`).
 
 ```bash
-cd Android_boot_image_editor && git apply /path/tools/patches/abie-zstd-ramdisk.patch
+git apply "$HOME/x6871-kernel-manifest/patches/abie-zstd-ramdisk.patch"
 ```
 
 Isinya:

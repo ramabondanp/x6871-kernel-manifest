@@ -2,6 +2,7 @@
 
 > **Status (2026-11-22): PLAN ONLY — belum dieksekusi.**
 > Baseline produksi tetap di `android16-6.12-2026-09_r16` (KMI 6, rilis `gki-kmi6-20261122`, workspace `~/x6871-kernel`).
+> Skrip di repo ini masih untuk 6.12; `--kver 6.18` adalah opsi yang direncanakan, belum tersedia.
 
 ---
 
@@ -104,7 +105,7 @@ Fase 5: Repack penuh + verify-kmi-abi.py --kver 6.18 (8 gerbang) + uji boot penu
   - **Pin tag GKI eksplisit**: branch `android17-6.18-2026-09` di `default.xml` sudah bergerak melewati `r13` (`r14`+), sehingga wajib `<remove-project name="kernel/common" />` lalu pin `path="kernel-6.18" revision="refs/tags/android17-6.18-2026-09_r13"` (`ecdaacc9...`).
   - **Hemat disk via `groups="ddk,ddk-external"` / `<remove-project>`**: buang ~24 repo berat non-DDK di `default.xml` (stack GBL `bootable/libbootloader`, `prebuilts/fuchsia_sdk`, `prebuilts/vmm`, `external/rust/android-crates-io`, `u-boot` + GCC 4.9, `devices/google/raviole`, `common-modules/*`, `test/ltp`, `prebuilts/jdk/jdk11`) untuk menghemat puluhan GB ruang disk.
   - **Perubahan struktur AOSP 6.18**: `WORKSPACE.bzlmod` linkfile dihapus (murni Bzlmod); `prebuilts/rust` → `prebuilts/rust-toolchain/linux-x86`; `prebuilts/ndk-r26` → `prebuilts/ndk-r27`; tambahan dep DDK `external/{dwarves,kmod,zstd,argp-standalone,obstack,bazel-contrib-rules_devicetree,bazel-contrib-supply-chain}`.
-  - Buat branch `x6871-android17-6.18` dari HEAD stabil `x6871-android16-6.12` pada `alps-kernel_device_modules-6.12` (`20a8f5d`) dan `alps-vendor_mediatek_kernel_modules` (`83b4fa6`).
+   - Buat branch `x6871-android17-6.18` dari baseline stabil `x6871-android16-6.12` pada `alps-kernel_device_modules-6.12` (`fa18f7f`, sudah termasuk trim) dan `alps-vendor_mediatek_kernel_modules` (`83b4fa6`).
 - Parameterisasi `KVER=${KVER:-6.12}` / `--kver 6.18` pada `setup.sh`, `build.sh`, `tools/repack-vendor-boot-latest.sh`, `tools/repack-dlkm-latest.sh`, dan `tools/verify-kmi-abi.py` (default tetap `6.12`):
   - **Path prebuilt tools 6.18 berubah**: di `main-kernel-2026`, `tools/mkbootimg` dihapus sebagai repo terpisah dan dipindahkan sebagai binary prebuilt ke **`prebuilts/kernel-build-tools/linux_musl-x86/bin/`** (menggantikan `linux-x86/bin/`), berisi sekaligus `mkbootimg`, `unpack_bootimg`, `mkfs.erofs`, `fsck.erofs`, `avbtool`, dan `fec`. Kedua skrip repack harus mendukung fallback `linux_musl-x86/bin` → `linux-x86/bin` (dan `unpack_bootimg` binary → `tools/mkbootimg/unpack_bootimg.py`).
 
@@ -154,14 +155,15 @@ Dikerjakan berurutan pasca-Gerbang #1 lulus:
 
 ### Fase 5 — Verifikasi Safeguard & Uji Perangkat Penuh
 
-- Jalankan `./tools/verify-kmi-abi.py --kver 6.18` — **wajib lulus 8 gerbang (0 error)**:
+- Setelah dukungan 6.18 ditambahkan, jalankan `./tools/verify-kmi-abi.py --kver 6.18` — **wajib lulus 8 gerbang (0 error)**:
   1. `kernel-6.18` bersih (0 edit lokal)
   2. Vermagic seragam `6.18.32-android17-5-...-4k`
   3. 0 mismatch CRC vs `kernel-6.18/gki/aarch64/abi.stg`
   4. 0 impor `vmlinux` non-KMI
   5. 0 kolisi `CONFIG_MODULE_SIG_PROTECT`
-  6. 0 unresolved symbol (`vendor_boot` standalone & closure penuh)
-  7. Integritas `modules.dep`/`modules.load`
-  8. AVB hashtree `vendor_dlkm.img` + `odm_dlkm.img` valid
+   6. 0 unresolved symbol/mismatch CRC untuk `vendor_boot` standalone
+   7. 0 unresolved symbol/mismatch CRC untuk set modul lengkap
+   8. Integritas `modules.dep`/`modules.load`
+- Verifikasi AVB hashtree `vendor_dlkm.img` dan `odm_dlkm.img` melalui skrip repack DLKM.
 - Audit regresi tabel DT & struct ABI (`mtk-scpsys-mt6895` 39 domain, `charger_ops` 138 field, `gpufreq_shared_status`, `venc_vcu_config`).
-- Jalankan checklist boot penuh seluruh subsistem di [`docs/BOOTTEST.md`](BOOTTEST.md) dengan rollback KMI 6 siap pakai.
+- Gunakan [checklist subsistem di BOOTTEST](BOOTTEST.md#4-checklist-boot-per-subsistem), bukan perintah flash 6.12 di dokumen itu. Siapkan set rollback KMI 6.

@@ -10,6 +10,9 @@ Dibuat 2026-11-19 sebagai catatan kronologis (§1–§68). Kernel
 > Angka lama seperti 796/806 `.ko` pada bagian awal adalah snapshot historis sebelum
 > pemangkasan allowlist `x6871_modules.bzl` (`fa18f7f`); angka build sekarang: **553** file /
 > **552** nama unik di staging, **419** flat customer install, `modules.load` 165, `modules.load.recovery` 216.
+> Log KMI 6 di §68 mencatat verifikasi modul dan konfirmasi boot, bukan
+> pengulangan seluruh uji fitur dari KMI 5. Untuk alur flash dan repack
+> yang berlaku, gunakan [BOOTTEST](BOOTTEST.md).
 
 Indeks bagian penting:
 - §23–§26: komposisi 222 modul recovery, set DLKM, storage fork, dan audit kamera

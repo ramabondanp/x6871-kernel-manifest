@@ -20,12 +20,18 @@ Kolom **Asal** dihasilkan otomatis:
 
 ## Cara regenerasi
 
+Contoh ini mereproduksi snapshot KMI 5 dengan dump DT dan direktori modul
+lokal; input tersebut tidak disertakan di repo. Untuk memetakan build lain,
+sesuaikan `W`, `KD`, dan direktori modul dengan artefak yang ingin diaudit.
+Tabel ini memetakan driver, bukan hasil uji runtime (lihat [HANDOFF](HANDOFF.md)).
+
 ```sh
 cd ~
-M=w1vo36-kernel-manifest/tools
-W=w1vo
+M=x6871-kernel-manifest/tools
+W=w1vo  # workspace kernel untuk snapshot ini; sesuaikan dengan checkout lokal
 L=tmp
 KD=6.12.38-android16-5-g2c4fd33ae6d8-4k
+mkdir -p cmp-out
 
 # 1. node DT -> compatible
 ./$M/dts-devices.py tmp/x6871/base.dts tmp/x6871/frag0.dts > cmp-out/devices-raw.tsv
@@ -1193,4 +1199,3 @@ module=470, dt=371, builtin=130, ?=7
 | `frag@50/haptic_hv@5A` | `awinic,haptic_hv` | `tran_richtap_haptic_hv` | source |
 | `frag@53/ocp81375_v4l2@63` | `mediatek,ocp81375_v4l2` | `ocp81375_v4l2` | source |
 | `frag@53/sgm37864_v4l2@64` | `mediatek,sgm37864_v4l2` | `sgm37864_v4l2` | source |
-
