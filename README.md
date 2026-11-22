@@ -4,7 +4,7 @@ Repo ini membantu Anda membangun modul kernel **Android 16** untuk **Infinix GT 
 
 ## Apa yang sudah diuji?
 
-**Rilis `gki-kmi6-20261122`** berhasil boot sampai launcher dengan GKI resmi Google `android16-6.12-2026-09_r16` (Linux 6.12.92, KMI 6).
+**[Rilis eksperimental `gki-kmi6-20261122`](https://github.com/ramabondanp/x6871-kernel-manifest/releases/tag/gki-kmi6-20261122)** berhasil boot sampai launcher dengan GKI resmi Google `android16-6.12-2026-09_r16` (Linux 6.12.92, KMI 6). Maintainer telah menguji langsung fungsi perangkat yang tercantum di bawah pada X6871 dan melaporkan semuanya berfungsi.
 
 Pada build sebelumnya (KMI 5), TWRP, layar hingga 144 Hz dan Always-On Display (AOD), GPU, Wi-Fi, audio speaker dan earpiece, kamera foto dan video, senter, getar, ketuk dua kali untuk membangunkan layar, sidik jari dalam layar, dan pengisian daya cepat sudah diuji dan berfungsi. Masalah USB saat kabel dicabut dan dipasang kembali ditemukan pada GKI kustom, bukan pada modul perangkat. Lihat [hasil pengujian](docs/HANDOFF.md) untuk rinciannya.
 
@@ -35,7 +35,7 @@ out_bazel/*/execroot/_main/bazel-out/k8-fastbuild/bin/kernel_device_modules-6.12
 
 ## Sebelum flash
 
-Gunakan `vendor_boot`, `vendor_dlkm`, dan `odm_dlkm` dari rilis yang sama. Untuk rilis di atas, pasangkan ketiganya dengan **`boot.img` dan `system_dlkm.img`** dari [artefak GKI resmi Google `android16-6.12-2026-09_r16` (KMI 6)](https://ci.android.com/builds/submitted/16901051/kernel_aarch64/latest). Jangan campur dengan image KMI 5. `dtbo.img` tetap bawaan perangkat.
+Unduh `vendor_boot`, `vendor_dlkm`, dan `odm_dlkm` dari [GitHub Release](https://github.com/ramabondanp/x6871-kernel-manifest/releases/tag/gki-kmi6-20261122). Pasangkan ketiganya dengan **`boot-lz4.img` dan `system_dlkm.erofs.img`** dari [artefak GKI resmi Google `android16-6.12-2026-09_r16` (KMI 6)](https://ci.android.com/builds/submitted/16901051/kernel_aarch64/latest). Jangan campur dengan image KMI 5. `dtbo.img` tetap bawaan perangkat.
 
 **Khusus X6871 dengan bootloader terbuka.** Cadangkan data dan siapkan image bawaan untuk rollback sebelum flash. Lihat [daftar image dan checksum](docs/BOOTTEST.md#1-artefak-uji-terbaru-gki-kmi6-20261122) serta [panduan flash dan rollback](docs/BOOTTEST.md#3-flash-dan-rollback). Jika build sendiri, ikuti [langkah membuat image](docs/BOOTTEST.md#2-membuat-image-vendor_boot--dlkm) terlebih dahulu.
 

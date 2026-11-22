@@ -20,7 +20,7 @@ Ditulis 2026-11-19, diperbarui 2026-11-22 sebagai referensi teknis & panduan kel
 | Kernel HEAD | `fa18f7f` (`alps-kernel_device_modules-6.12`, `x6871-android16-6.12`, 106 commit di atas `06079c2`) |
 | Vendor MTK modules HEAD | `83b4fa6` (`alps-vendor_mediatek_kernel_modules`, `x6871-android16-6.12`) |
 | Active clean workspace | `~/x6871-kernel` |
-| Runtime | **Lulus boot di GKI KMI 6 (`android16-6.12-2026-09_r16`, `v19-kmi6`)** dengan `boot.img` + `system_dlkm.img` resmi Google (0 mismatch CRC vs `abi.stg` `10.630` simbol, 0 kolisi `CONFIG_MODULE_SIG_PROTECT`, 0 unresolved symbol). Hasil uji TWRP dan fitur perangkat di bawah berasal dari beberapa build KMI 5. |
+| Runtime | **Lulus boot di GKI KMI 6 (`android16-6.12-2026-09_r16`, `v19-kmi6`)** dengan `boot-lz4.img` + `system_dlkm.erofs.img` resmi Google (0 mismatch CRC vs `abi.stg` `10.630` simbol, 0 kolisi `CONFIG_MODULE_SIG_PROTECT`, 0 unresolved symbol). Hasil uji TWRP dan fitur perangkat di bawah berasal dari beberapa build KMI 5. |
 
 ## Status Rilis Terbaru & Ringkasan Riwayat (2026-11-22)
 
@@ -205,7 +205,7 @@ Boot pembanding `normal2.txt` (GKI `Image` kita + modul stock) berhasil merekam 
 Ikuti `BOOTTEST.md` §2–§4 untuk setiap pembaruan GKI atau modul:
 
 1. **Verifikasi KMI/ABI sebelum flash**: jalankan verifier sesuai [BOOTTEST §2](BOOTTEST.md#2-membuat-image-vendor_boot--dlkm) (wajib lulus seluruh 8 gerbang).
-2. **Flash pasangan GKI KMI 6 yang serasi**: `x6871-twrp-vendor_boot-v19-kmi6.img` + `vendor_dlkm.img` + `odm_dlkm.img` wajib dipasangkan dengan `boot.img` + `system_dlkm.img` GKI resmi Google `android16-6.12-2026-09_r16`.
+2. **Flash pasangan GKI KMI 6 yang serasi**: `x6871-twrp-vendor_boot-v19-kmi6.img` + `vendor_dlkm.img` + `odm_dlkm.img` wajib dipasangkan dengan `boot-lz4.img` + `system_dlkm.erofs.img` GKI resmi Google `android16-6.12-2026-09_r16`.
 3. **Checklist regresi subsistem**: TWRP, layar 144/120/60/40 Hz & AOD, FOD (layar menyala, AOD, screen-off), DT2W, kamera foto & rekam video 1080p, flashlight, audio speaker & earpiece, Wi-Fi/BT, USB cabut-colok (ADB dan MTP), dan fast charging HVDCP20/PD.
 
 ### Catatan kamera, device table & repo

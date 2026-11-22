@@ -39,9 +39,11 @@ Tujuan: memvalidasi **seluruh boot** (recovery + Android system), bukan hanya sa
 
 ## 1. Artefak Uji Terbaru (`gki-kmi6-20261122`)
 
+Unduh ketiga image X6871 dari [GitHub Release `gki-kmi6-20261122` (eksperimental)](https://github.com/ramabondanp/x6871-kernel-manifest/releases/tag/gki-kmi6-20261122). Ambil dua image GKI dari tautan Google di bawah.
+
 | Artefak | Sumber | Catatan |
 |---|---|---|
-| `boot.img` & `system_dlkm.img` | [artefak Google GKI `android16-6.12-2026-09_r16` (build `16901051`, `kernel_aarch64`)](https://ci.android.com/builds/submitted/16901051/kernel_aarch64/latest) | **Wajib** KMI 6 (`6.12.92-android16-6`); `system_dlkm` menyediakan modul GKI terproteksi (`rfkill`, `bluetooth`, `libarc4`, dll.) |
+| `boot-lz4.img` & `system_dlkm.erofs.img` | [artefak Google GKI `android16-6.12-2026-09_r16` (build `16901051`, `kernel_aarch64`)](https://ci.android.com/builds/submitted/16901051/kernel_aarch64/latest) | **Wajib** KMI 6 (`6.12.92-android16-6`); flash masing-masing ke partisi `boot` dan `system_dlkm`. |
 | `x6871-twrp-vendor_boot-v19-kmi6.img` | `tools/repack-vendor-boot-latest.sh` | **222** modul source KMI 6 (`md5 91eb249ff001d250fad855c40476f1b5`, kernel `20a8f5d`); dtb/bootconfig/recovery TWRP tetap |
 | `vendor_dlkm.img` | EROFS + AVB (`fastbootd`) | **209** modul source KMI 6 (`md5 5f7b6cecb1c44a1ffc3280dd481fbfcf`, `191` `modules.load`); 3 modul GKI terproteksi dikeluarkan |
 | `odm_dlkm.img` | EROFS + AVB (`fastbootd`) | **57** modul source KMI 6 (`md5 6ee3cadceb5c4750dbbfe3d0056b6ea8`, `57` `modules.load`) |
@@ -103,13 +105,13 @@ Jalankan satu per satu; jika ada perintah gagal, jangan lanjut ke reboot Android
 
 ```bash
 # 1. Dari bootloader fastboot (bootloader unlocked; image tidak ditandatangani)
-fastboot flash boot boot.img
+fastboot flash boot boot-lz4.img
 fastboot flash vendor_boot x6871-twrp-vendor_boot-v19-kmi6.img
 
 # 2. Masuk fastbootd untuk partisi logis (system_dlkm resmi Google + vendor_dlkm + odm_dlkm):
 fastboot reboot fastboot
 fastboot getvar is-userspace  # harus yes
-fastboot flash system_dlkm system_dlkm.img
+fastboot flash system_dlkm system_dlkm.erofs.img
 fastboot flash vendor_dlkm vendor_dlkm.img
 fastboot flash odm_dlkm odm_dlkm.img
 

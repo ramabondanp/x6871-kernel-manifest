@@ -8,7 +8,7 @@ rilis dan panduan pemeliharaan, lihat [HANDOFF](HANDOFF.md).
 > (209) + `odm_dlkm` (57) sudah dibangun **100% dari source** terhadap GKI AOSP murni
 > **`android16-6.12-2026-09_r16`** (`6.12.92-android16-6`, **KMI 6**, kernel HEAD
 > `fa18f7f` setelah trim, rilis `gki-kmi6-20261122`). Android 16 terbukti boot
-> sampai launcher dengan `boot.img` + `system_dlkm.img` rilis resmi Google.
+> sampai launcher dengan `boot-lz4.img` + `system_dlkm.erofs.img` rilis resmi Google.
 > Pengujian TWRP dan fitur perangkat yang dirangkum di §10 berasal dari KMI 5.
 > Angka 688/806 `.ko` di bagian awal dokumen ini adalah snapshot historis; angka build
 > saat ini (setelah trim allowlist `x6871_modules.bzl`) adalah **553** file / **552** nama unik
