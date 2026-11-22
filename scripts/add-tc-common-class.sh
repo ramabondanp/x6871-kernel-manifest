@@ -1,8 +1,9 @@
 #!/bin/bash
-# Pasang tc_common_class ke tree w1vo.
-# Jalankan dari root workspace. Lihat PLAN.md §8.
+# [HISTORIS — sudah ter-commit di alps-kernel_device_modules-6.12 branch x6871-android16-6.12]
+# Pasang tc_common_class ke tree kernel.
+# Jalankan dari root workspace. Lihat docs/PLAN.md §8.
 #
-#   ./add-tc-common-class.sh /path/ke/transsion-kernel_device_modules-6.1
+#   ./scripts/add-tc-common-class.sh /path/ke/transsion-kernel_device_modules-6.1
 #
 # Kenapa modul ini
 # ----------------

@@ -1,7 +1,7 @@
 #!/bin/bash
 # Cocokkan modul firmware -> file source, tanpa peduli nama file.
 #
-#   ./audit-sources.sh /path/ke/transsion-6.1 /path/ke/firmware-modules
+#   ./scripts/audit-sources.sh /path/ke/transsion-6.1 /path/ke/firmware-modules
 #
 # Kenapa alat ini ada
 # -------------------
@@ -25,8 +25,8 @@
 # dipakai untuk memutuskan port atau RE.
 set -euo pipefail
 
-SRC=${1:?pakai: ./audit-sources.sh <tree-source> <dir-modul-firmware> [modul...]}
-KO=${2:?pakai: ./audit-sources.sh <tree-source> <dir-modul-firmware> [modul...]}
+SRC=${1:?pakai: ./scripts/audit-sources.sh <tree-source> <dir-modul-firmware> [modul...]}
+KO=${2:?pakai: ./scripts/audit-sources.sh <tree-source> <dir-modul-firmware> [modul...]}
 shift 2 || true
 
 [ -d "$SRC" ] || { echo "ERROR: tree source $SRC tidak ada"; exit 1; }

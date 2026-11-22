@@ -1,8 +1,9 @@
 #!/bin/bash
-# Salin modul Transsion yang mandiri dari donor mt6897 ke tree w1vo.
+# [HISTORIS — sudah ter-commit di alps-kernel_device_modules-6.12 branch x6871-android16-6.12]
+# Salin modul Transsion yang mandiri dari donor mt6897 ke tree kernel.
 # Jalankan dari root workspace, setelah `setup.sh`.
 #
-#   ./add-transsion.sh /path/ke/mt6897-extract
+#   ./scripts/add-transsion.sh /path/ke/mt6897-extract
 #
 # Donor didapat dari:
 #   https://d1wd32b69guoqm.cloudfront.net/opensource/android15_kernel_modules_and_devicetree_mt6897.tar.gz

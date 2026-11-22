@@ -1,7 +1,7 @@
 #!/bin/bash
 # Port satu set modul Transsion dari donor 6.1 + patch 6.12 dasar.
 #
-# Pemakaian: ./port-tc-module.sh <nama-modul> [<nama-modul> ...]
+# Pemakaian: ./scripts/port-tc-module.sh <nama-modul> [<nama-modul> ...]
 #
 # Yang dilakukan, per modul:
 #   1. salin <m>.c dan <m>.h (kalau ada) ke drivers/power/supply/transsion/

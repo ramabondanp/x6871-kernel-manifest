@@ -31,9 +31,9 @@ repo init -u https://android.googlesource.com/kernel/manifest \
 cp ~/x6871-kernel-manifest/local_manifest.xml .repo/local_manifests/x6871.xml
 repo sync -j16
 
-# 2. Siapkan workspace, lalu build (overlay entry_level_legacy.config wajib untuk X6871)
+# 2. Siapkan workspace, lalu build (default OVERLAYS=entry_level_legacy.config untuk X6871)
 ~/x6871-kernel-manifest/setup.sh
-OVERLAYS=entry_level_legacy.config ~/x6871-kernel-manifest/build.sh user
+~/x6871-kernel-manifest/build.sh user
 ```
 
 Hasil build berada di:
@@ -54,7 +54,7 @@ git checkout -B mtk-base-latest FETCH_HEAD
 cd ..
 
 ~/x6871-kernel-manifest/setup.sh
-~/x6871-kernel-manifest/build.sh user
+OVERLAYS="" ~/x6871-kernel-manifest/build.sh user
 ```
 
 Untuk SoC lain: `PLATFORM=mt6991 ~/x6871-kernel-manifest/build.sh user` (default: `mt6895`).

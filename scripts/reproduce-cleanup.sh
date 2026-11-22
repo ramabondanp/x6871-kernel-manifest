@@ -6,7 +6,7 @@
 #   mtk-base-latest = mtk-base + 12 patch MTK (header GKI + platform)
 #
 # Pemakaian:
-#   ./reproduce-cleanup.sh [dir-tujuan]
+#   ./scripts/reproduce-cleanup.sh [dir-tujuan]
 #
 # Butuh: git, python3, ~3 GB disk.
 set -e
@@ -50,7 +50,8 @@ c188c78edaba
 4000205a644b
 "
 
-CONFLICT_LOG=${TMPDIR:-/tmp}/w1vo-cherry-pick.err
+CONFLICT_LOG=.git/w1vo-cherry-pick.err
+trap 'rm -f "$CONFLICT_LOG"' EXIT
 for c in $KEPT; do
   echo "== cherry-pick $c $(git log -1 --format='%s' $c)"
   if git cherry-pick -x "$c" >"$CONFLICT_LOG" 2>&1; then

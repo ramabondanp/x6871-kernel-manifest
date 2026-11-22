@@ -1,5 +1,6 @@
 #!/bin/bash
-# Repack vendor_boot.img dengan modul hasil build kita.
+# [LEGACY — JANGAN DIPAKAI UNTUK X6871; pakai tools/repack-vendor-boot-latest.sh]
+# Repack vendor_boot.img dengan modul hasil build kita (filter nama stock).
 #
 #   ./tools/pack-vendor-boot.sh \
 #       --stock  /serverhive1/ramabondanp/tmp/x6871/vendor_boot.img \
@@ -48,8 +49,10 @@ done
 [ -f "$STOCK" ] || die "image stock tidak ada: $STOCK"
 [ -d "$STAGING" ] || die "staging tidak ada: $STAGING"
 
-MKBOOTIMG=${MKBOOTIMG:-/serverhive1/ramabondanp/w1vo/tools/mkbootimg/mkbootimg.py}
-UNPACK=${UNPACK_BOOTIMG:-$(command -v unpack_bootimg || echo /serverhive1/ramabondanp/w1vo/tools/mkbootimg/unpack_bootimg.py)}
+KERNEL_ROOT=${KERNEL_ROOT:-/serverhive1/ramabondanp/w1vo}
+TMPDIR=${TMPDIR:-/serverhive1/ramabondanp/tmp}
+MKBOOTIMG=${MKBOOTIMG:-$KERNEL_ROOT/tools/mkbootimg/mkbootimg.py}
+UNPACK=${UNPACK_BOOTIMG:-$(command -v unpack_bootimg || echo "$KERNEL_ROOT/tools/mkbootimg/unpack_bootimg.py")}
 STRIP=${STRIP:-$(command -v llvm-strip || command -v aarch64-linux-gnu-strip || true)}
 for t in lz4 cpio find sort; do command -v "$t" >/dev/null || die "$t tidak ada"; done
 [ -n "$STRIP" ] || die "strip tidak ada (llvm-strip/aarch64-linux-gnu-strip)"
@@ -62,7 +65,8 @@ run_unpack() { ( cd "$(dirname "$UNPACK")" && python3 "$UNPACK" "$@" ) 2>/dev/nu
                || python3 "$UNPACK" "$@"; }
 
 if [ -z "$WORK" ]; then
-    WORK=$(mktemp -d /serverhive1/ramabondanp/tmp/pack-vb.XXXXXX)
+    mkdir -p "$TMPDIR"
+    WORK=$(mktemp -d "$TMPDIR/pack-vb.XXXXXX")
 fi
 mkdir -p "$WORK"
 

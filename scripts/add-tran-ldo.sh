@@ -1,8 +1,9 @@
 #!/bin/bash
-# Pasang driver regulator tran_ldo (ET5904) ke tree w1vo.
-# Jalankan dari root workspace. Lihat PLAN.md §6.2.
+# [HISTORIS — sudah ter-commit di alps-kernel_device_modules-6.12 branch x6871-android16-6.12]
+# Pasang driver regulator tran_ldo (ET5904) ke tree kernel.
+# Jalankan dari root workspace. Lihat docs/PLAN.md §6.2.
 #
-#   ./add-tran-ldo.sh /path/ke/et5904.c
+#   ./scripts/add-tran-ldo.sh /path/ke/et5904.c
 #
 # Kenapa perlu:
 #   DT X6871 punya `dvdd-supply = <&TRANLDO26>` di node panel1@0.

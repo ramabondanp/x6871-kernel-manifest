@@ -1,5 +1,6 @@
 #!/bin/bash
-# Siapkan workspace w1vo setelah `repo sync`. Jalankan dari root workspace.
+# Siapkan workspace kernel X6871 (MT6895 / 6.12) setelah `repo sync`.
+# Jalankan dari root workspace.
 #
 #   ./setup.sh
 #
@@ -8,10 +9,10 @@
 #   2. symlink common-6.12 -> kernel-6.12
 #   3. symlink 13 module donor OPPO mt6896 (hanya bila workspace split legacy)
 #   4. symlink ../vendor/mediatek (mgk_repo pakai path="../vendor/mediatek")
-#   5. hapus label //vendor/... yang tidak tersedia dari mgk_64.bzl
+#   5. hapus label //vendor/... yang tidak tersedia dari mgk_64.bzl (bila masih ada)
 set -e
 
-[ -d build/bazel_mgk_rules ] || { echo "ERROR: bukan workspace w1vo (jalankan dari root)"; exit 1; }
+[ -d build/bazel_mgk_rules ] || { echo "ERROR: bukan root workspace kernel (build/bazel_mgk_rules tidak ada)"; exit 1; }
 [ -d kernel-6.12 ]           || { echo "ERROR: kernel-6.12 tidak ada"; exit 1; }
 [ -d kernel_device_modules-6.12 ] || { echo "ERROR: kernel_device_modules-6.12 tidak ada"; exit 1; }
 
@@ -81,15 +82,21 @@ fi
 # --- 5. trim label yang tidak tersedia ------------------------------------
 # 20 grup module tidak dipublikasikan Motorola dan tidak ada di donor OPPO.
 # Kalau labelnya dibiarkan, Bazel gagal "no such package".
+# Branch port x6871-android16-6.12 sudah bersih; langkah ini hanya mengubah
+# mgk_64.bzl bila masih ada label tak tersedia (mis. baseline mtk-base-latest).
 F=kernel_device_modules-6.12/kernel/kleaf/mgk_64.bzl
 MODS='afs_core_cus|afs_core_int|cpufreq_cus|cpufreq_int|fpsgo_cus|fpsgo_int|game_cus|game_int|gpio_sap_ctrl|met_drv_secure_v3|msync2_frd_cus|msync2_frd_int|mtk_input|perf_common_cus|perf_common_int|sched_int|task_turbo_cus|task_turbo_int|thinmd_exception|wwan'
 
-[ -f "$F.orig" ] || cp "$F" "$F.orig"
-before=$(wc -l < "$F")
-grep -vE "//vendor/mediatek/kernel_modules/($MODS)([/:])" "$F" > "$F.new"
-mv "$F.new" "$F"
-after=$(wc -l < "$F")
-echo "mgk_64.bzl: $before -> $after baris (hapus $((before-after)) label)"
+if grep -qE "//vendor/mediatek/kernel_modules/($MODS)([/:])" "$F"; then
+  [ -f "$F.orig" ] || cp "$F" "$F.orig"
+  before=$(wc -l < "$F")
+  grep -vE "//vendor/mediatek/kernel_modules/($MODS)([/:])" "$F" > "$F.new"
+  mv "$F.new" "$F"
+  after=$(wc -l < "$F")
+  echo "mgk_64.bzl: $before -> $after baris (hapus $((before-after)) label)"
+else
+  echo "mgk_64.bzl: sudah bersih (0 label tak tersedia)"
+fi
 
 echo
-echo "Selesai. Lanjut:  ./build.sh user"
+echo "Selesai. Lanjut:  ./build.sh user  (default OVERLAYS=entry_level_legacy.config)"

@@ -1,19 +1,19 @@
 #!/bin/bash
-# Build kernel_device_modules-6.12 (w1vo). Jalankan dari root workspace.
+# Build kernel_device_modules-6.12 (Infinix GT 20 Pro / X6871, MT6895).
+# Jalankan dari root workspace kernel.
 #
-#   ./build.sh              # user, mt6895, tanpa overlay (baseline)
-#   ./build.sh user userdebug
-#   PLATFORM=mt6991 ./build.sh user
-#   OVERLAYS=entry_level_legacy.config ./build.sh user
+#   ./build.sh                              # user, mt6895, entry_level_legacy.config (X6871)
+#   ./build.sh userdebug                    # userdebug, mt6895, entry_level_legacy.config
+#   OVERLAYS="" ./build.sh user             # tanpa overlay (untuk baseline MTK murni)
+#   PLATFORM=mt6991 ./build.sh user         # override SoC target
 #
 # OVERLAYS: nama file di kernel_device_modules-6.12/kernel/configs/,
-# dipisah spasi. Contoh yang sudah diverifikasi:
-#   entry_level_legacy.config  -> +13 modul (angka absolut berubah setelah
-#                                 port X6871; lihat PLAN.md/HANDOFF.md)
+# dipisah spasi. Default untuk port X6871: entry_level_legacy.config
+# (set OVERLAYS="" untuk menonaktifkan). Lihat docs/PLAN.md & docs/HANDOFF.md.
 #
-# Perintah ini sudah diverifikasi: 1.401 .ko baseline MTK murni, 0 error.
-# Branch port X6871 + OVERLAYS=entry_level_legacy.config: 806 file staging
-# (805 nama unik), flat customer install 702 .ko. Lihat HANDOFF.md.
+# Output terverifikasi:
+#   - Port X6871 (x6871-android16-6.12): 806 file staging (805 unik), 702 .ko flat
+#   - Baseline MTK murni (mtk-base-latest, OVERLAYS=""): 1.401 .ko, 0 error
 #
 # Tiga hal yang wajib, semuanya dari build.sh MTK/Samsung asli:
 #   --allow_ddk_unsafe_headers=1
@@ -25,9 +25,11 @@
 #     ^ tanpa ini semua 14 platform ikut dibangun.
 set -e
 
+[ -x tools/bazel ] || { echo "ERROR: jalankan dari root workspace kernel (tools/bazel tidak ada)"; exit 1; }
+
 VARIANT=${1:-user}
 PLATFORM=${PLATFORM:-mt6895}
-OVERLAYS=${OVERLAYS:-}
+OVERLAYS=${OVERLAYS-entry_level_legacy.config}
 
 # Jangan pakai /tmp. Override dengan TMPDIR=... kalau perlu.
 export TMPDIR=${TMPDIR:-$PWD/../tmp}

@@ -1,8 +1,9 @@
 #!/bin/bash
-# Pasang Pixelworks Iris ke tree w1vo, lalu patch supaya compile di 6.12.
-# Jalankan dari root workspace. Lihat PLAN.md §7.5.
+# [HISTORIS — sudah ter-commit di alps-kernel_device_modules-6.12 branch x6871-android16-6.12]
+# Pasang Pixelworks Iris ke tree kernel, lalu patch supaya compile di 6.12.
+# Jalankan dari root workspace. Lihat docs/PLAN.md §7.5.
 #
-#   ./add-iris.sh /path/ke/iris-src
+#   ./scripts/add-iris.sh /path/ke/iris-src
 #
 # Sumber iris (GPL-2.0):
 #   https://github.com/OnePlusOSS/android_kernel_5.10_oneplus_mt6895

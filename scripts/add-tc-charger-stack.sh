@@ -1,9 +1,10 @@
 #!/bin/bash
+# [HISTORIS — sudah ter-commit di alps-kernel_device_modules-6.12 branch x6871-android16-6.12]
 # Pasang fondasi charger Transsion: tc_charger_class, tc_adapter_class,
 # tc_algorithm_class, tc_misc_intf (+ tc_common_class dari script lain).
-# Jalankan dari root workspace. Lihat PLAN.md §6.2d.
+# Jalankan dari root workspace. Lihat docs/PLAN.md §6.2d.
 #
-#   ./add-tc-charger-stack.sh /path/ke/transsion-kernel_device_modules-6.1
+#   ./scripts/add-tc-charger-stack.sh /path/ke/transsion-kernel_device_modules-6.1
 #
 # Kenapa 4 modul ini satu paket
 # -----------------------------

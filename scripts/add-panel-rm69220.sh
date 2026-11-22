@@ -1,8 +1,9 @@
 #!/bin/bash
-# Pasang driver panel RM69220 (X6871) ke tree w1vo.
-# Jalankan dari root workspace. Lihat PLAN.md §7.5.
+# [HISTORIS — sudah ter-commit di alps-kernel_device_modules-6.12 branch x6871-android16-6.12]
+# Pasang driver panel RM69220 (X6871) ke tree kernel.
+# Jalankan dari root workspace. Lihat docs/PLAN.md §7.5.
 #
-#   ./add-panel-rm69220.sh /path/ke/mt6897-extract
+#   ./scripts/add-panel-rm69220.sh /path/ke/mt6897-extract
 #
 # Basis: rm692j0_..._lj9.c dari donor mt6897 (kernel 6.1), Transsion,
 # GPL-2.0. Keluarga RM692xx sama, template fungsi identik

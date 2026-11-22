@@ -1,7 +1,9 @@
 #!/bin/bash
+# [HISTORIS — sudah ter-commit di alps-vendor_mediatek_kernel_modules
+#  branch x6871-android16-6.12]
 # Port driver kamera Infinix X6871 (4 sensor + camera_eeprom_v4l2) ke
 # vendor/mediatek/kernel_modules/mtkcam dari donor mt6897 6.1.
-# Jalankan dari root workspace w1vo, setelah `setup.sh`.
+# Jalankan dari root workspace kernel, setelah `setup.sh`.
 #
 #   ./scripts/add-camera-x6871.sh /path/ke/mt6897-extract
 #

@@ -19,13 +19,16 @@ set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 KERNEL_ROOT=${KERNEL_ROOT:-/serverhive1/ramabondanp/w1vo}
 TREE="$KERNEL_ROOT/kernel_device_modules-6.12"
-PACKER=${PACKER:-/serverhive1/ramabondanp/tmp/vbwork-twrp}
-BASE_OUT=${BASE_OUT:-/serverhive1/ramabondanp/tmp/x6871}
+TMPDIR=${TMPDIR:-/serverhive1/ramabondanp/tmp}
+PACKER=${PACKER:-$TMPDIR/vbwork-twrp}
+BASE_OUT=${BASE_OUT:-$TMPDIR/x6871}
 MODLIST="$ROOT/tools/recovery-modules.txt"
 LOAD_LIST="$ROOT/tools/modules.load"
 RECOVERY_LOAD_LIST="$ROOT/tools/modules.load.recovery"
 STRIP=${STRIP:-llvm-strip}
 DEPMOD=${DEPMOD:-depmod}
+
+mkdir -p "$TMPDIR"
 
 OUT=""
 STAGING=""
@@ -58,7 +61,7 @@ mkdir -p "$(dirname "$OUT")"
 if [ "$SKIP_BUILD" = "0" ]; then
     info "build: $TREE"
     ( cd "$KERNEL_ROOT" && \
-      TMPDIR=/serverhive1/ramabondanp/tmp \
+      TMPDIR="$TMPDIR" \
       BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1 \
       ./tools/bazel --output_user_root="$KERNEL_ROOT/out_bazel" build \
         --config=stamp \
@@ -97,7 +100,7 @@ info "pack bbootimg"
 cp -f "$PACKER/vendor_boot.img" "$OUT"
 
 info "verifikasi isi image"
-WORK=$(mktemp -d /serverhive1/ramabondanp/tmp/repack-verify.XXXXXX)
+WORK=$(mktemp -d "$TMPDIR/repack-verify.XXXXXX")
 trap 'rm -rf "$WORK"' EXIT
 UNPACK="$KERNEL_ROOT/tools/mkbootimg/unpack_bootimg.py"
 [ -f "$UNPACK" ] || die "unpack_bootimg tidak ada: $UNPACK"
@@ -154,11 +157,14 @@ MD5=$(md5sum "$OUT" | cut -d' ' -f1)
 SIZE=$(stat -c%s "$OUT")
 COMMIT=$(git -C "$TREE" rev-parse --short HEAD 2>/dev/null || echo unknown)
 DIRTY=$(git -C "$TREE" status --porcelain 2>/dev/null | wc -l)
+VM_TREE="$KERNEL_ROOT/vendor/mediatek/kernel_modules"
+VM_COMMIT=$(git -C "$VM_TREE" rev-parse --short HEAD 2>/dev/null || echo split)
 COUNT=$(ls "$MODDIR"/*.ko | wc -l)
 cat > "$OUT.buildinfo" <<EOF
 utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 kernel_commit=$COMMIT
 kernel_dirty_files=$DIRTY
+vendor_modules_commit=$VM_COMMIT
 staging=$STAGING
 module_count=$COUNT
 image_md5=$MD5
