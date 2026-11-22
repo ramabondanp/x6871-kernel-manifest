@@ -1,10 +1,10 @@
 # BOOTTEST — Prosedur Uji Boot & Checklist X6871
 
-> **Status 2026-11-22:** Earpiece lulus pada v16. USB masih gagal setelah
-> role DEVICE, sehingga kandidat v17 menguji jalur pullup MTU3. Fokus uji:
-> **USB replug (ADB kabel dan MTP)**, lalu pastikan charging HVDCP20/PD
-> dan earpiece tidak regresi. Prosedur repack ada di §2 dan §11;
-> §9–§10 adalah arsip historis.
+> **Status 2026-11-22:** Seluruh subsistem modul 100% lulus/clear (earpiece
+> lulus v16; `mtu3.ko` sejajar stock di v18 / `32a8db7`). Bug USB replug
+> terkonfirmasi berasal dari kernel GKI custom (`boot.img`) karena tetap
+> terjadi identik saat seluruh DLKM & modul stock di-flash (`PRETEST.md` §67).
+> Prosedur repack ada di §2 dan §11; §9–§10 adalah arsip historis.
 
 Tujuan: memvalidasi **seluruh boot** (recovery + Android system), bukan hanya satu modul.
 
@@ -41,7 +41,7 @@ Tujuan: memvalidasi **seluruh boot** (recovery + Android system), bukan hanya sa
 
 | Artefak | Sumber | Catatan |
 |---|---|---|
-| `x6871-twrp-vendor_boot-v18.img` | `tools/repack-vendor-boot-latest.sh` | **222** modul source (`md5 73b94a9f88ed39a852e8a1343978d37e`), revert `6230061` + samakan `mtu3.ko` dengan stock (`f661c15`); dtb/bootconfig/recovery TWRP tetap |
+| `x6871-twrp-vendor_boot-v18.img` | `tools/repack-vendor-boot-latest.sh` | **222** modul source (`md5 73b94a9f88ed39a852e8a1343978d37e`), `mtu3.ko` sejajar stock (`32a8db7`); dtb/bootconfig/recovery TWRP tetap |
 | `vendor_dlkm.img` | EROFS + AVB (`fastbootd`) | **212** modul source (`md5 72daa1f10eba75d9cd0e3359a27ff76f`), identik dengan v16 |
 | `odm_dlkm.img` | EROFS + AVB (`fastbootd`) | **57** modul source (`md5 99b2194fa63cab8c751f71b8fbd4eb5e`), identik dengan v16 |
 | kernel `Image` | `out_bazel/.../mgk_64_k612_kernel_aarch64.user/Image` | opsional, hanya jika `boot.img` ikut diganti |

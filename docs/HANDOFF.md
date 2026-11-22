@@ -16,14 +16,14 @@ Ditulis 2026-11-19, diperbarui 2026-11-22 untuk sesi AI berikutnya. Baca ini dul
 | DLKM (`vendor_dlkm` + `odm_dlkm`) | **269**, 100% source, image siap |
 | Build target | `//kernel_device_modules-6.12:mgk_64_k612_customer_modules_install.user` |
 | Build terakhir | sukses (inkremental), 2026-11-22 |
-| Kernel HEAD | `f661c15` (`alps-kernel_device_modules-6.12`, `x6871-android16-6.12`, 104 commit di atas `06079c2`) |
+| Kernel HEAD | `32a8db7` (`alps-kernel_device_modules-6.12`, `x6871-android16-6.12`, 103 commit di atas `06079c2`) |
 | Vendor MTK modules HEAD | `83b4fa6` (`alps-vendor_mediatek_kernel_modules`, `x6871-android16-6.12`) |
 | Active clean workspace | `/serverhive1/ramabondanp/x6871-clean/ws` (keep old `/serverhive1/ramabondanp/w1vo` untouched) |
-| Runtime | **Boot + layar + AOD + kamera foto + rekam video + FOD normal/AOD/screen-off + DT2W + flashlight + Wi-Fi + GPU + charging HVDCP20/PD OK**; **earpiece lulus di v16**, USB replug menunggu uji bersih pada v18 (`PRETEST.md` §66) |
+| Runtime | **Seluruh subsistem modul lulus**: boot + layar + AOD + kamera foto + rekam video + FOD normal/AOD/screen-off + DT2W + flashlight + Wi-Fi + GPU + charging HVDCP20/PD + earpiece (`v16`); bug USB replug terkonfirmasi berasal dari kernel GKI custom (`boot.img`), bukan modul kita (`PRETEST.md` §67) |
 
 ## Status Rilis Terbaru & Ringkasan Riwayat (2026-11-22)
 
-### Rilis uji terbaru: `mtu3-stock-20261122` (kernel `f661c15`, `vendor_boot` v18)
+### Rilis terbaru: `mtu3-stock-20261122` (kernel `32a8db7`, `vendor_boot` v18)
 
 ```text
 x6871-twrp-vendor_boot-v18.img  md5 73b94a9f88ed39a852e8a1343978d37e  67.108.864 B
@@ -35,18 +35,18 @@ odm_dlkm.img                    md5 99b2194fa63cab8c751f71b8fbd4eb5e   4.206.592
 Audit v17 (`6230061`) terhadap `mtu3.ko` stock dan `common-6.12/drivers/usb/gadget/udc/core.c`
 membuktikan `usb_gadget_connect()` di `ssusb_mode_sw_work_v2()` bukan perilaku stock dan akan
 selalu no-op untuk seluruh jalur Android yang mematikan pullup (unbind configfs, FunctionFS
-`unregister_gadget_item()`, `soft_connect disconnect`, atau deactivate). Selain itu, kegagalan
-`dmesg9.txt` (`65.742`–`65.847`) terbukti dipicu `stop adbd; start adbd` (`FFS_DEACTIVATED` →
-`ffs_data_opened()` → `unregister_gadget_item()`).
+`unregister_gadget_item()`, `soft_connect disconnect`, atau deactivate).
 
-Commit `f661c15` me-revert `6230061` dan menyamakan `mtu3.ko` dengan binary stock X6871:
+Commit `32a8db7` (hasil squash dari revert `6230061` + `f661c15`) menyamakan `mtu3.ko` dengan binary stock X6871:
 1. Tambah `mdelay(4)` pada `mtu3_dev_on_off(is_on=0)` (identik `__const_udelay(0x1062560)` stock di `mtu3_dev_on_off` & `mtu3_stop`).
 2. Tambah `ssusb_phy_dp_pullup()` di `mtu3_stop()` saat `!softconnect && !is_gadget_ready` (dijaga `dp_work.func` agar bebas `WARN_ON` saat probe).
 3. Pindahkan penghapusan properti DT `cdp-block` dari `mtu3_gadget_pullup()` ke `ssusb_gadget_init()` sesuai stock (`mtu3_dev_on_off` `0x15c`, `mtu3_gadget_pullup` `0x2a8`, dan `ssusb_mode_sw_work_v2` `0x2e0` kini identik ukuran dengan stock).
 
-Hanya `mtu3.ko` berubah dari v16/v17; kedua DLKM identik. Uji perangkat murni tanpa `stop/start adbd` masih diperlukan (`PRETEST.md` §66).
+**Hasil uji v18 (`dmesg10.txt`/`logcat10.txt`) & isolasi akar masalah:**
+- `dmesg10.txt` menunjukkan `mtu3_gadget_pullup (off)` kembali terpicu saat `adbd` restart (`30.537`–`30.595`, 7,4 detik sebelum kabel pertama kali dicabut di `37.978`).
+- Pengguna mem-flash kembali **seluruh DLKM dan modul stock** di atas kernel GKI custom yang sama dan **bug tetap terjadi secara identik** — membuktikan akar masalah berasal dari **kernel GKI custom (`boot.img`)**, bukan dari modul `vendor_boot`/`vendor_dlkm`/`odm_dlkm` kita (`PRETEST.md` §67). Investigasi USB pada sisi modul ditutup/di-skip.
 
-### Rilis sebelumnya (dibatalkan/direvert): `mtu3-replug-20261122` (kernel `6230061`, `vendor_boot` v17)
+### Rilis sebelumnya (dibatalkan/di-squash): `mtu3-replug-20261122` (kernel `6230061`, `vendor_boot` v17)
 
 ```text
 x6871-twrp-vendor_boot-v17.img  md5 68df06607016a34d12bfbe19e2c6df77  67.108.864 B
@@ -55,7 +55,7 @@ odm_dlkm.img                    md5 99b2194fa63cab8c751f71b8fbd4eb5e   4.206.592
 /srv path                       /serverhive1/ramabondanp/x6871-clean/out/
 ```
 
-Digantikan oleh v18 (`f661c15`) sebelum uji perangkat karena `usb_gadget_connect()` terbukti no-op dan non-stock (`PRETEST.md` §65–§66).
+Digantikan oleh v18 (`32a8db7`, di-squash dari `6230061`+`f661c15`) karena `usb_gadget_connect()` terbukti no-op dan non-stock (`PRETEST.md` §65–§67).
 
 ### Rilis sebelumnya: `rcv-usb-20261122` (kernel `68db913`, `vendor_boot` v16 + DLKM v15)
 

@@ -2,14 +2,14 @@
 
 Workspace Bazel+Kleaf untuk membangun modul kernel **Android 16 / kernel 6.12 / MediaTek MT6895** untuk **Infinix GT 20 Pro (X6871)** (berbasis donor MTK 6.12 Motorola `w1vo36.88-36-7` + OPPO `mt6896`).
 
-- **Device modules (`kernel_device_modules-6.12`)**: [`alps-kernel_device_modules-6.12`](https://github.com/ramabondanp/alps-kernel_device_modules-6.12/tree/x6871-android16-6.12) (`x6871-android16-6.12`, **104 commit** di atas baseline `06079c2`, HEAD `f661c15`)
+- **Device modules (`kernel_device_modules-6.12`)**: [`alps-kernel_device_modules-6.12`](https://github.com/ramabondanp/alps-kernel_device_modules-6.12/tree/x6871-android16-6.12) (`x6871-android16-6.12`, **103 commit** di atas baseline `06079c2`, HEAD `32a8db7`)
 - **Vendor MTK modules (`vendor/mediatek/kernel_modules`)**: [`alps-vendor_mediatek_kernel_modules`](https://github.com/ramabondanp/alps-vendor_mediatek_kernel_modules/tree/x6871-android16-6.12) (`x6871-android16-6.12`, **4 commit** X6871 di atas base Motorola + 13 donor OPPO `86edba6`, HEAD `83b4fa6`)
 - **Output build X6871**: staging **806 file** (**805** nama unik), flat customer install **702** `.ko`
 - **Output baseline MTK murni** (`mtk-base-latest`): **1.401** `.ko`
 - **Panduan cepat dokumen**:
   - [`docs/HANDOFF.md`](docs/HANDOFF.md) — ringkasan status terkini, aturan kerja, perintah build/repack, dan pengetahuan kritis
   - [`docs/BOOTTEST.md`](docs/BOOTTEST.md) — prosedur flash, rollback, dan checklist uji boot per subsistem
-  - [`docs/PRETEST.md`](docs/PRETEST.md) — log teknis kronologis (§1–§66) hasil audit statis, RE biner, dan uji device
+  - [`docs/PRETEST.md`](docs/PRETEST.md) — log teknis kronologis (§1–§67) hasil audit statis, RE biner, dan uji device
   - [`docs/PLAN.md`](docs/PLAN.md) — rencana porting awal dan bukti investigasi per modul (§6.x)
   - [`docs/DEVICES.md`](docs/DEVICES.md) / [`docs/DEVICES-OVERLAY.md`](docs/DEVICES-OVERLAY.md) — tabel pemetaan node Device Tree X6871 ke driver
 
@@ -81,9 +81,9 @@ Seluruh partisi modul (**222** modul `vendor_boot` + **212** `vendor_dlkm` + **5
 | DT2W & Flashlight / Torch | ✅ Terbukti | Fix `al2` (`e4ed999`) + `#undef` PT throttling (`ebca3e1`) |
 | **Fast Charging (HVDCP20/TC30 adapter)** | ✅ Terbukti (`v14`) | `tc30`/`hvdcp20` di `alg_name_array` + guard bounds check (`0af45b1`); uji v14 tanpa panic |
 | **Earpiece speaker (`RCV Mux`)** | ✅ Lulus (`v16`) | Restore `RCV Select=Playback_R_DAC` (`aca5276`); terkonfirmasi di `dmesg9.txt` (`mt_rcv_event`, mux 1) |
-| **USB replug berulang** | 🔄 Menunggu uji bersih (`v18`) | Revert `6230061` (no-op) + samakan `mtu3.ko` dengan stock X6871 (`f661c15`); uji tanpa `stop/start adbd` |
+| **USB replug berulang** | ✅ Modul clear (bug GKI custom) | `mtu3.ko` sejajar stock (`32a8db7`); uji balik seluruh DLKM & modul stock tetap memicu bug yang sama → sumber masalah ada di kernel GKI custom (`boot.img`), bukan modul kita (`PRETEST.md` §67) |
 
-### Rilis uji terbaru: `mtu3-stock-20261122` (kernel `f661c15`)
+### Rilis terbaru: `mtu3-stock-20261122` (kernel `32a8db7`, squash dari `f661c15`)
 
 ```text
 x6871-twrp-vendor_boot-v18.img  md5 73b94a9f88ed39a852e8a1343978d37e  67.108.864 B
@@ -97,8 +97,8 @@ Jika sudah memakai v16, cukup flash `vendor_boot` v18; kedua DLKM identik.
 
 | Rilis | `vendor_boot` | Sorotan utama |
 |---|---|---|
-| `mtu3-stock-20261122` | v18 | Revert `6230061` (no-op non-stock) + samakan `mtu3.ko` dengan stock (`mdelay(4)`, `ssusb_phy_dp_pullup`, hapus `cdp-block` di `ssusb_gadget_init`); menunggu uji bersih |
-| `mtu3-replug-20261122` | v17 | (Direvert di v18) `usb_gadget_connect()` pada NONE → DEVICE |
+| `mtu3-stock-20261122` | v18 | Samakan `mtu3.ko` dengan stock (`mdelay(4)`, `ssusb_phy_dp_pullup`, hapus `cdp-block` di `ssusb_gadget_init`, squash `32a8db7`); uji modul stock membuktikan bug USB berasal dari GKI custom |
+| `mtu3-replug-20261122` | v17 | (Direvert & di-squash di `32a8db7`) `usb_gadget_connect()` pada NONE → DEVICE |
 | `rcv-usb-20261122` | v16 | Fix earpiece `Playback_R_DAC` (enum/route/event stock) + pullup UDC saat replug (workqueue/urutan role switch stock) |
 | `iommu-chg-earpiece-usb-20261122` | v14 | Fix boot race panic `mtk_iommu` (`hw_list` sebelum `iommu_device_register` + NULL guard `larbdev`) di atas v13 |
 | `chg-earpiece-usb-20261122` | v13 | Fix panic charging HVDCP20 (`tc30`/`hvdcp20` `alg_name_array`), earpiece speaker (`RCV Mux`), USB replug (`mt6375_get_vbus_gd_stat` + `extcon_wq`) |
@@ -117,7 +117,7 @@ Jika sudah memakai v16, cukup flash `vendor_boot` v18; kedua DLKM identik.
 | `dlkm-ocfix-20261121` | v2 | Fix spam IRQ battery OC 65 Hz + timing switch 144/120/60/40 Hz |
 | `dlkm-20261120`..`gpu3` | v1 | DLKM 100% source (269 modul), `SCP_IPI_COUNT=59`, Mali r54p1-11eac0, `gpufreq_shared_status` |
 
-Detail tiap rilis ada di [`docs/HANDOFF.md`](docs/HANDOFF.md) dan [`docs/PRETEST.md`](docs/PRETEST.md) §40–§66.
+Detail tiap rilis ada di [`docs/HANDOFF.md`](docs/HANDOFF.md) dan [`docs/PRETEST.md`](docs/PRETEST.md) §40–§67.
 
 ---
 

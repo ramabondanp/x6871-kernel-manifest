@@ -3968,3 +3968,16 @@ odm_dlkm.img                    md5 99b2194fa63cab8c751f71b8fbd4eb5e   4.206.592
 ```
 
 Repack terverifikasi (`222` modul cocok staging, `dtb`/`bootconfig`/`vendor_ramdisk01` identik, `kernel_commit=f661c15`, `dirty files: 0`). Uji pembeda tetap wajib dilakukan **tanpa** `stop/start adbd` di tengah pengujian.
+
+## 67. Uji v18 (`dmesg10`/`logcat10`) & uji balik modul stock: bug USB berasal dari kernel GKI custom; squash `32a8db7`
+
+1. **Analisis `dmesg10.txt`/`logcat10.txt` (v18)**:
+   - Enumerasi awal sukses penuh: `mtp,adb` aktif (`23.434`–`28.204`), lalu switch ke `adb` sukses (`29.617` `mtu3_gadget_pullup (on)`, `30.028` `high-speed` + `gadget RESET`, `30.161` `mtu3_ep_enable ep1out/ep1in`).
+   - Pada `30.537` (7,4 detik **sebelum** kabel pertama kali dicabut di `37.978`), `adbd` (`pid 4420`) keluar dengan `status 0` lalu langsung di-restart `init` sebagai `pid 4553` (`30.544`, `KernelSU: escape to root for adb`). 51 ms kemudian (`30.595`), `mtu3_gadget_pullup (off)` terpicu sehingga gadget sudah unbound sebelum 3× uji cabut-colok (`37.978`–`57.520`).
+   - Seluruh jalur `rt-pd-manager` (`rt_pd_manager.ko` identik biner dengan stock), `TC_CHG_TYPE_DET` (BC1.2 SDP + `vbus_gd ready`), `tran_extcon_usb` (`cur_dr(0) new_dr(2)`), dan `mtu3` (`ssusb_mode_sw_work_v2: none to device` → `port on (6)`) berjalan normal.
+2. **Isolasi akar masalah dengan modul stock**:
+   - Pengguna mem-flash kembali **seluruh DLKM dan modul stock** di atas kernel GKI custom yang sama dan mengonfirmasi **bug USB yang sama tetap terjadi**.
+   - Kesimpulan: bug berasal dari **kernel GKI custom (`boot.img`)**, bukan dari `mtu3.ko` maupun modul `vendor_boot`/`vendor_dlkm`/`odm_dlkm` yang kita bangun. Investigasi USB replug pada repo modul resmi ditutup/di-skip.
+3. **Squash 2 commit terakhir `mtu3` (`alps-kernel_device_modules-6.12`)**:
+   - Commit `6230061` + `f661c15` di-squash menjadi satu commit bersih **`32a8db7`** (`usb: mtu3: match stock X6871 mtu3 pullup, stop, and cdp-block behavior`, force-pushed ke `alps/x6871-android16-6.12`).
+   - Sisa `#include <linux/of_device.h>` yang tidak terpakai di `mtu3_dr.c` ikut dibersihkan sehingga hanya `mtu3_core.c` dan `mtu3_gadget.c` yang berubah di atas `68db913` (**103 commit** total di atas baseline `06079c2`). Isi kode `.ko` pada `x6871-twrp-vendor_boot-v18.img` (`md5 73b94a9f88ed39a852e8a1343978d37e`) identik secara fungsional.
