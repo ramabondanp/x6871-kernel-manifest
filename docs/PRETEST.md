@@ -1,8 +1,9 @@
 # PRETEST — Log Analisis Statis, RE Biner & Investigasi Boot X6871
 
 Catatan kronologis (§1–§68), termasuk reverse engineering modul kernel (`.ko`)
-dari firmware bawaan X6871. HEAD tree modul perangkat
-`x6871-android16-6.12` saat ini berada di **`fa18f7f`** (diperbarui 2026-11-22).
+dari firmware bawaan X6871. Log rilis KMI 6 di bawah memakai tree modul perangkat
+`fa18f7f`. Refaktor konfigurasi setelah rilis (`f8198be`) dicatat di
+[HANDOFF](HANDOFF.md#konfigurasi-x6871).
 
 > **Status 2026-11-22:** Rilis terbaru adalah **`gki-kmi6-20261122`**
 > (`x6871-twrp-vendor_boot-v19-kmi6.img` + `vendor_dlkm.img` + `odm_dlkm.img`,
@@ -228,6 +229,9 @@ selama `modules.dep`/`modules.alias` diregenerasi untuk tree staging.
    `tran_fp.allow_ree_transfer=1` untuk uji terbatas.
 
 ## 8. Reproduksi
+
+Perintah di bawah mereproduksi build historis sebelum `X6871.config` dibuat.
+Untuk build port saat ini, ikuti [HANDOFF](HANDOFF.md#perintah-build).
 
 ```bash
 # build

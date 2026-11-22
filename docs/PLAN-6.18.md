@@ -70,6 +70,9 @@ Audit langsung dilakukan dengan mencocokkan seluruh **488 `.ko` runtime** (`v19-
    - `kernel-6.18` **JANGAN PERNAH diedit** (Aturan Keras #15).
    - Jangan masukkan modul GKI terproteksi ke `vendor_boot`/`vendor_dlkm`/`odm_dlkm` (Aturan Keras #16).
    - Wajib lulus 8 gerbang `tools/verify-kmi-abi.py --kver 6.18` sebelum flash/rilis (Aturan Keras #17).
+7. **Konfigurasi perangkat tetap di `X6871.config`**:
+   - Bawa `kernel/configs/Kconfig.x6871` dan `X6871.config` dari commit 6.12 `f8198be`, beserta integrasi `Kconfig.ext`. Terapkan `entry_level_legacy.config` terlebih dahulu, lalu `X6871.config`.
+   - Sesuaikan simbol dan dependensinya dengan 6.18, lalu verifikasi `.config` akhir build DDK. Jangan mengembalikan override `-DCONFIG_*` atau `#define`/`#undef` di C, dan jangan tambahkan opsi perangkat ke defconfig GKI. Lihat [panduan konfigurasi X6871](HANDOFF.md#konfigurasi-x6871).
 
 ---
 
@@ -105,7 +108,7 @@ Fase 5: Repack penuh + verify-kmi-abi.py --kver 6.18 (8 gerbang) + uji boot penu
   - **Pin tag GKI eksplisit**: branch `android17-6.18-2026-09` di `default.xml` sudah bergerak melewati `r13` (`r14`+), sehingga wajib `<remove-project name="kernel/common" />` lalu pin `path="kernel-6.18" revision="refs/tags/android17-6.18-2026-09_r13"` (`ecdaacc9...`).
   - **Hemat disk via `groups="ddk,ddk-external"` / `<remove-project>`**: buang ~24 repo berat non-DDK di `default.xml` (stack GBL `bootable/libbootloader`, `prebuilts/fuchsia_sdk`, `prebuilts/vmm`, `external/rust/android-crates-io`, `u-boot` + GCC 4.9, `devices/google/raviole`, `common-modules/*`, `test/ltp`, `prebuilts/jdk/jdk11`) untuk menghemat puluhan GB ruang disk.
   - **Perubahan struktur AOSP 6.18**: `WORKSPACE.bzlmod` linkfile dihapus (murni Bzlmod); `prebuilts/rust` → `prebuilts/rust-toolchain/linux-x86`; `prebuilts/ndk-r26` → `prebuilts/ndk-r27`; tambahan dep DDK `external/{dwarves,kmod,zstd,argp-standalone,obstack,bazel-contrib-rules_devicetree,bazel-contrib-supply-chain}`.
-   - Buat branch `x6871-android17-6.18` dari baseline stabil `x6871-android16-6.12` pada `alps-kernel_device_modules-6.12` (`fa18f7f`, sudah termasuk trim) dan `alps-vendor_mediatek_kernel_modules` (`83b4fa6`).
+- Buat branch `x6871-android17-6.18` dari `x6871-android16-6.12` pada `alps-kernel_device_modules-6.12` (`f8198be`, mencakup trim dan fragment X6871; build & ABI terverifikasi, uji perangkat masih menunggu) dan `alps-vendor_mediatek_kernel_modules` (`83b4fa6`).
 - Parameterisasi `KVER=${KVER:-6.12}` / `--kver 6.18` pada `setup.sh`, `build.sh`, `tools/repack-vendor-boot-latest.sh`, `tools/repack-dlkm-latest.sh`, dan `tools/verify-kmi-abi.py` (default tetap `6.12`):
   - **Path prebuilt tools 6.18 berubah**: di `main-kernel-2026`, `tools/mkbootimg` dihapus sebagai repo terpisah dan dipindahkan sebagai binary prebuilt ke **`prebuilts/kernel-build-tools/linux_musl-x86/bin/`** (menggantikan `linux-x86/bin/`), berisi sekaligus `mkbootimg`, `unpack_bootimg`, `mkfs.erofs`, `fsck.erofs`, `avbtool`, dan `fec`. Kedua skrip repack harus mendukung fallback `linux_musl-x86/bin` → `linux-x86/bin` (dan `unpack_bootimg` binary → `tools/mkbootimg/unpack_bootimg.py`).
 
@@ -120,7 +123,7 @@ Fase 5: Repack penuh + verify-kmi-abi.py --kver 6.18 (8 gerbang) + uji boot penu
   - `kernel/kleaf/ack_headers.bzl`: audit otomatis 4.192 entri terhadap pohon `kernel-6.18` dan buang/sesuaikan path yang berubah.
   - `kernel/kleaf/mgk_64.bzl`: pangkas ke closure ~430 modul runtime X6871.
   - `arch/arm64/configs/mgk_64_k618_defconfig`: adaptasi dari `mgk_64_k612_defconfig` (`CONFIG_CFI_CLANG` → `CONFIG_CFI`, hapus `CONFIG_MEMCG_V1`).
-- **Kriteria selesai Fase 1**: `mgk_64_k618_kernel_aarch64.user` selesai dibangun bersih.
+- **Kriteria selesai Fase 1**: `mgk_64_k618_kernel_aarch64.user` selesai dibangun bersih; konfigurasi build modul memuat nilai `X6871.config` yang diharapkan tanpa menambahkannya ke konfigurasi GKI.
 
 ### Fase 2 — Codemod API Mekanis (Skrip `scripts/port-6.18-mechanical.py`)
 

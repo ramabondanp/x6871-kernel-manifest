@@ -17,7 +17,7 @@ Ditulis 2026-11-19, diperbarui 2026-11-22 sebagai referensi teknis & panduan kel
 | DLKM (`vendor_dlkm` + `odm_dlkm`) | **266** `.ko` (`209` + `57`) dibangun dari kode sumber (KMI 6, tanpa bentrok `CONFIG_MODULE_SIG_PROTECT`) |
 | Build target | `//kernel_device_modules-6.12:mgk_64_k612_customer_modules_install.user` |
 | Build terakhir | sukses (clean KMI 6 + trimmed X6871 allowlist), 2026-11-22 |
-| HEAD tree modul perangkat | `fa18f7f` (`alps-kernel_device_modules-6.12`, `x6871-android16-6.12`, 106 commit di atas `06079c2`) |
+| Revisi modul perangkat untuk build dari source | [`f8198be`](https://github.com/ramabondanp/alps-kernel_device_modules-6.12/commit/f8198be2a86948bd1fd59b817b9d6015cdfdcc5b) (`x6871-android16-6.12`, dengan fragment X6871; image rilis tetap dari `fa18f7f`) |
 | Vendor MTK modules HEAD | `83b4fa6` (`alps-vendor_mediatek_kernel_modules`, `x6871-android16-6.12`) |
 | Active clean workspace | `~/x6871-kernel` |
 | Runtime | **Lulus boot di GKI KMI 6 (`android16-6.12-2026-09_r16`, `v19-kmi6`)** dengan `boot-lz4.img` + `system_dlkm.erofs.img` resmi Google (0 mismatch CRC vs `abi.stg` `10.630` simbol, 0 kolisi `CONFIG_MODULE_SIG_PROTECT`, 0 unresolved symbol). Rincian log fitur di bawah berasal dari KMI 5; konfirmasi uji langsung oleh maintainer dicatat di [GitHub Release](https://github.com/ramabondanp/x6871-kernel-manifest/releases/tag/gki-kmi6-20261122). |
@@ -218,7 +218,7 @@ Ikuti `BOOTTEST.md` §2–§4 untuk setiap pembaruan GKI atau modul:
 - **Kamera (`PRETEST.md` §26, §51, §53)**: 4 sensor kamera X6871 (`s5khm6sx`, `gc32e1`, `gc02m3`, `gc02m3macro`) + `camera_eeprom_v4l2` sudah diport (`75ca1ac4a1ae`, `scripts/add-camera-x6871.sh`) dan kamera foto + rekam video sudah berjalan. Yang tidak dipublikasikan vendor hanya 46 fungsi kalibrasi OTP per sensor di `camera_eeprom_v4l2` dan patch Ext-ISP (tidak ada node DT/konsumennya di X6871).
 - **Device table (`DEVICES.md` / `DEVICES-OVERLAY.md`)**: 978 node `okay` (470 modul source, 130 built-in, 371 node platform, 7 tanpa driver; bug `of_match` flash LED `_v4l2` sudah diperbaiki).
 - **Repo**:
-  - `alps-kernel_device_modules-6.12` bersih dan ter-push ke `alps`, default branch `x6871-android16-6.12`, HEAD **`fa18f7f`** (**106 commit** di atas `06079c2`).
+  - `alps-kernel_device_modules-6.12`: branch `x6871-android16-6.12` memuat refaktor konfigurasi mulai `f8198be`. Image rilis `gki-kmi6-20261122` memakai `fa18f7f`.
   - `alps-vendor_mediatek_kernel_modules` (vendoring terpadu 6 repo vendor Motorola `w1vo36` + 13 modul donor OPPO `mt6896` + 4 commit GPU Mali r54p1 & kamera X6871) ter-push ke `origin`, default branch `x6871-android16-6.12`, HEAD **`83b4fa6`** (di atas base `86edba6`).
   - Manifest `ramabondanp/x6871-kernel-manifest` (`main`, `~/x6871-kernel-manifest`) mengarah langsung ke kedua repo `alps-*` di branch `x6871-android16-6.12`.
 
@@ -314,7 +314,7 @@ TMPDIR=~/tmp BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1 \
   --experimental_writable_outputs --allow_ddk_unsafe_headers=1 \
   --user_ddk_unsafe_headers=//kernel_device_modules-6.12:mtk_use_gki_unsafe_headers \
   --repo_env=KERNEL_VERSION=kernel-6.12 --repo_env=KERNEL_BUILD_VARIANT=user \
-  --repo_env=DEFCONFIG_OVERLAYS=entry_level_legacy.config \
+  --repo_env=DEFCONFIG_OVERLAYS="entry_level_legacy.config X6871.config" \
   --repo_env=SUPPORT_PLATFORM=mt6895 --repo_env=SOURCE_DATE_EPOCH=0 \
   --//build/bazel_mgk_rules:kernel_version=6.12 \
   "//kernel_device_modules-6.12:mgk_64_k612_customer_modules_install.user"
@@ -322,6 +322,47 @@ TMPDIR=~/tmp BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1 \
 
 Staging hasil build:
 `out_bazel/e3662dd3043d825281b1dcd92c77f735/execroot/_main/bazel-out/k8-fastbuild/bin/kernel_device_modules-6.12/mgk_64_k612_customer_modules_install.user/`
+
+### Konfigurasi X6871
+
+Refaktor ini masuk di commit modul perangkat [`f8198be`](https://github.com/ramabondanp/alps-kernel_device_modules-6.12/commit/f8198be2a86948bd1fd59b817b9d6015cdfdcc5b).
+`entry_level_legacy.config` tetap dipakai untuk modul legacy MT6895.
+`X6871.config` diterapkan sesudahnya untuk fitur perangkat. Simbol baru
+dideklarasikan di `kernel/configs/Kconfig.x6871` dan dibaca melalui
+`Kconfig.ext`; aturan DDK memakai konfigurasi yang dihasilkan Kconfig.
+Tidak ada perubahan pada tree `kernel-6.12` (GKI).
+Gunakan kedua fragment saat membangun branch port X6871. `OVERLAYS=""`
+ditujukan untuk checkout baseline MTK yang dijelaskan di bawah.
+
+Audit 106 commit modul perangkat (`06079c2..fa18f7f`):
+
+| Asal override | Di build X6871 |
+| --- | --- |
+| Pengisian dan USB (`fdc1174`, `fb88495`, `93b7ebc`) | `TC_CLASS_SUPPORT=m`, `TC_CHARGER=m`; implementasi tetap berupa modul. |
+| Audio (`4bd2024`, `7aa967a`, `eadd5eb`) | `SND_SOC_FS1599=m`, `USB_SWITCH_ET7480=y`; dependensi DDK tetap terdaftar. |
+| Touch dan sidik jari (`1f42363`, `0e527bf`, `55aa132`) | `TOUCHSCREEN_GOODIX_BRL_SPI`, `TRAN_FP_DRV_MODE_SPI` dan `TRAN_HBM_NOTIFY_FINGERPRINT` aktif. Cabang API SPI pra-5.10 yang tidak dipakai dihapus. |
+| Display (`2b880e6`, `381f45e`, `a31d53a`) | `PXLW_IRIS` memilih source Iris dan `TRANSSION_DOZE_BRIGHTNESS_SUPPORT` mengaktifkan doze brightness. RM69220 selalu membutuhkan ekstensi panel MTK, jadi makro lokal `CONFIG_MTK_PANEL_EXT` tidak diperlukan. |
+| Senter (`1d3f17a`, `ebca3e1`) | `TRAN_FLASHLIGHT_TELE_SUPPORT=y`; kedua opsi `MTK_FLASHLIGHT_PT*` dinonaktifkan lewat fragment untuk menyamai stock. |
+| LED (`39044a9`) | `CONFIG_TC_LEDS_CLASS` dihapus karena tidak dibaca oleh source. |
+
+Konstanta protokol dan makro internal pustaka donor (misalnya Goodix dan
+FourSemi) bukan opsi perangkat. Driver GPU Mali tetap memakai fragment DDK
+milik modul vendor. Catatan dan skrip porting historis masih
+mendokumentasikan override lama; jangan jalankan ulang skrip tersebut pada
+branch yang sudah memakai fragment ini.
+
+Validasi profil baru (`mt6895`, `user`): daftar modul hasil build tidak
+berubah (553 file staging, 419 file flat). Semua 488 modul yang ditargetkan
+untuk paket lulus delapan pemeriksaan `verify-kmi-abi.py` terhadap GKI KMI 6.
+Hasil refaktor konfigurasi ini belum diuji di perangkat.
+
+**Untuk port berikutnya:** deklarasikan opsi baru di Kconfig tree modul dan
+tetapkan nilainya di `X6871.config`, bukan lewat `-DCONFIG_*` di Bazel atau
+`#define`/`#undef` di C. Pertahankan `=m` untuk implementasi modular dan
+gunakan `IS_ENABLED()` bila kode harus aktif untuk `y` maupun `m`.
+Setelah pindah versi, cek `.config` akhir build modul (Kconfig dapat membuang
+opsi jika dependensinya tidak terpenuhi), pastikan konfigurasi GKI tetap
+terpisah, lalu cek daftar modul, ABI/KMI, dan regresi di perangkat.
 
 ### Build baseline MTK tanpa driver X6871
 

@@ -27,6 +27,10 @@ repo sync
 ~/x6871-kernel-manifest/build.sh user
 ```
 
+`build.sh` menerapkan `entry_level_legacy.config` lalu `X6871.config` dari
+`kernel_device_modules-6.12/kernel/configs/`. Keduanya mengatur build modul
+perangkat, bukan image GKI resmi. Lihat [konfigurasi X6871](docs/HANDOFF.md#konfigurasi-x6871).
+
 Modul `.ko` hasil build ada di direktori berikut, relatif terhadap `~/x6871-kernel`:
 
 ```text

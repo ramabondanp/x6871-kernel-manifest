@@ -2,13 +2,13 @@
 # Build kernel_device_modules-6.12 (Infinix GT 20 Pro / X6871, MT6895).
 # Jalankan dari root workspace kernel.
 #
-#   ./build.sh                              # user, mt6895, entry_level_legacy.config (X6871)
-#   ./build.sh userdebug                    # userdebug, mt6895, entry_level_legacy.config
+#   ./build.sh                              # user, mt6895, overlay X6871
+#   ./build.sh userdebug                    # userdebug, mt6895, overlay X6871
 #   OVERLAYS="" ./build.sh user             # tanpa overlay (untuk baseline MTK murni)
 #   PLATFORM=mt6991 ./build.sh user         # override SoC target
 #
 # OVERLAYS: nama file di kernel_device_modules-6.12/kernel/configs/,
-# dipisah spasi. Default untuk port X6871: entry_level_legacy.config
+# dipisah spasi. Default: entry_level_legacy.config X6871.config
 # (set OVERLAYS="" untuk menonaktifkan). Lihat docs/PLAN.md & docs/HANDOFF.md.
 #
 # Output terverifikasi:
@@ -29,7 +29,7 @@ set -e
 
 VARIANT=${1:-user}
 PLATFORM=${PLATFORM:-mt6895}
-OVERLAYS=${OVERLAYS-entry_level_legacy.config}
+OVERLAYS=${OVERLAYS-entry_level_legacy.config X6871.config}
 
 # Jangan pakai /tmp. Override dengan TMPDIR=... kalau perlu.
 export TMPDIR=${TMPDIR:-$PWD/../tmp}

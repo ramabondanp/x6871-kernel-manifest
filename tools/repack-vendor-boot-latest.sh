@@ -78,7 +78,7 @@ if [ "$SKIP_BUILD" = "0" ]; then
         --experimental_writable_outputs --allow_ddk_unsafe_headers=1 \
         --user_ddk_unsafe_headers=//kernel_device_modules-6.12:mtk_use_gki_unsafe_headers \
         --repo_env=KERNEL_VERSION=kernel-6.12 --repo_env=KERNEL_BUILD_VARIANT=user \
-        --repo_env=DEFCONFIG_OVERLAYS=entry_level_legacy.config \
+        --repo_env=DEFCONFIG_OVERLAYS="entry_level_legacy.config X6871.config" \
         --repo_env=SUPPORT_PLATFORM=mt6895 --repo_env=SOURCE_DATE_EPOCH=0 \
         --//build/bazel_mgk_rules:kernel_version=6.12 \
         "//kernel_device_modules-6.12:mgk_64_k612_customer_modules_install.user" )

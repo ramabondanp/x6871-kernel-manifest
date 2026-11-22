@@ -8,7 +8,7 @@ rilis dan panduan pemeliharaan, lihat [HANDOFF](HANDOFF.md).
 > `vendor_dlkm` (209), dan `odm_dlkm` (57) dibangun dari kode sumber port dan GKI;
 > tidak ada `.ko` yang disalin dari firmware stock. Kernel dasar AOSP GKI
 > **`android16-6.12-2026-09_r16`** (`6.12.92-android16-6`, **KMI 6**) tidak diubah.
-> HEAD tree modul perangkat setelah trim: `fa18f7f`. Pada rilis `gki-kmi6-20261122`,
+> Revisi modul perangkat untuk rilis ini setelah trim: `fa18f7f`. Pada rilis `gki-kmi6-20261122`,
 > Android 16 terbukti boot sampai launcher dengan `boot-lz4.img` dan
 > `system_dlkm.erofs.img` resmi Google.
 > Pengujian TWRP dan fitur perangkat yang dirangkum di §10 berasal dari KMI 5.

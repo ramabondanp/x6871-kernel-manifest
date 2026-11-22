@@ -106,4 +106,4 @@ else
 fi
 
 echo
-echo "Selesai. Lanjut:  ./build.sh user  (default OVERLAYS=entry_level_legacy.config)"
+echo 'Selesai. Lanjut:  ./build.sh user  (default OVERLAYS="entry_level_legacy.config X6871.config")'
