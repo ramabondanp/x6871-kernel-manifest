@@ -354,7 +354,8 @@ branch yang sudah memakai fragment ini.
 Validasi profil baru (`mt6895`, `user`): daftar modul hasil build tidak
 berubah (553 file staging, 419 file flat). Semua 488 modul yang ditargetkan
 untuk paket lulus delapan pemeriksaan `verify-kmi-abi.py` terhadap GKI KMI 6.
-Hasil refaktor konfigurasi ini belum diuji di perangkat.
+Maintainer melaporkan bahwa [pre-release KMI 6 dengan `X6871.config`](https://github.com/ramabondanp/x6871-kernel-manifest/releases/tag/gki-kmi6-x6871-config-f8198be)
+sudah diuji langsung di X6871. Rincian hasil uji per fitur belum dicatat.
 
 **Untuk port berikutnya:** deklarasikan opsi baru di Kconfig tree modul dan
 tetapkan nilainya di `X6871.config`, bukan lewat `-DCONFIG_*` di Bazel atau
@@ -454,7 +455,8 @@ Semua CRC untuk 2.657 simbol impor unik dari GKI cocok dengan ekspor
 `vmlinux.symvers` dan modul `system_dlkm` CI. Kedua AVB hashtree DLKM
 juga lulus verifikasi. Ketiga image tersedia di
 [GitHub Pre-release `gki-kmi7-16987858`](https://github.com/ramabondanp/x6871-kernel-manifest/releases/tag/gki-kmi7-16987858).
-Uji boot KMI 7 di perangkat belum dilakukan.
+Maintainer melaporkan bahwa pre-release KMI 7 ini sudah diuji langsung
+di X6871. Rincian hasil uji per fitur belum dicatat.
 
 Saat repack, ambil `--staging` secara eksplisit dari `out_bazel_kmi7/`,
 bukan dari keluaran default `out_bazel/`. Pakai `--out-dir

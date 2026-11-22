@@ -6,6 +6,8 @@ Repo ini menyediakan manifest dan skrip untuk mengambil kode sumber dan membangu
 
 **[Rilis eksperimental `gki-kmi6-20261122`](https://github.com/ramabondanp/x6871-kernel-manifest/releases/tag/gki-kmi6-20261122)** berhasil boot sampai launcher dengan GKI resmi Google `android16-6.12-2026-09_r16` (Linux 6.12.92, KMI 6). Maintainer telah menguji langsung fungsi perangkat yang tercantum di bawah pada X6871 dan melaporkan semuanya berfungsi.
 
+Maintainer juga melaporkan bahwa kedua pre-release, [KMI 6 dengan `X6871.config`](https://github.com/ramabondanp/x6871-kernel-manifest/releases/tag/gki-kmi6-x6871-config-f8198be) dan [KMI 7 dari Google CI `16987858`](https://github.com/ramabondanp/x6871-kernel-manifest/releases/tag/gki-kmi7-16987858), sudah diuji langsung di X6871. Rincian hasil uji per fitur untuk kedua pre-release belum dicatat.
+
 Pada build sebelumnya (KMI 5), TWRP, layar hingga 144 Hz dan Always-On Display (AOD), GPU, Wi-Fi, audio speaker dan earpiece, kamera foto dan video, senter, getar, ketuk dua kali untuk membangunkan layar, sidik jari dalam layar, dan pengisian daya cepat sudah diuji dan berfungsi. Masalah USB saat kabel dicabut dan dipasang kembali ditemukan pada GKI kustom, bukan pada modul perangkat. Lihat [hasil pengujian](docs/HANDOFF.md) untuk rinciannya.
 
 ## Build dari source
