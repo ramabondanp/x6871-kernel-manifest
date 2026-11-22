@@ -17,7 +17,7 @@
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-KERNEL_ROOT=${KERNEL_ROOT:-/serverhive1/ramabondanp/w1vo}
+KERNEL_ROOT=${KERNEL_ROOT:-/serverhive1/ramabondanp/x6871-clean/ws}
 TREE="$KERNEL_ROOT/kernel_device_modules-6.12"
 TMPDIR=${TMPDIR:-/serverhive1/ramabondanp/tmp}
 PACKER=${PACKER:-$TMPDIR/vbwork-twrp}

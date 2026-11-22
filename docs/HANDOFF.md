@@ -208,7 +208,7 @@ kalau memang tidak ada source.
 
 ## Lingkungan
 
-- Workspace: `/serverhive1/ramabondanp/w1vo`
+- Workspace: `/serverhive1/ramabondanp/x6871-clean/ws` (tree lama `/serverhive1/ramabondanp/w1vo` jangan dipakai)
 - Manifest: `/serverhive1/ramabondanp/w1vo36-kernel-manifest`
 - Oracle firmware (237 `.ko`): `/serverhive1/ramabondanp/tmp/x6871/vr/root/lib/modules/`
 - DTBO otoritatif: `/serverhive1/ramabondanp/tmp/x6871/frag0.dts`
@@ -220,7 +220,7 @@ kalau memang tidak ada source.
 ### Perintah build
 
 ```bash
-cd /serverhive1/ramabondanp/w1vo
+cd /serverhive1/ramabondanp/x6871-clean/ws
 TMPDIR=/serverhive1/ramabondanp/tmp BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1 \
 ./tools/bazel --output_user_root="$PWD/out_bazel" build --config=stamp \
   --repo_manifest="$PWD/kernel_device_modules-6.12/fake_manifest.xml" \
@@ -234,7 +234,7 @@ TMPDIR=/serverhive1/ramabondanp/tmp BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1 \
 ```
 
 Staging hasil build:
-`out_bazel/ad3c7b30a704e8551ed600a0d11ef0f0/execroot/_main/bazel-out/k8-fastbuild/bin/kernel_device_modules-6.12/mgk_64_k612_customer_modules_install.user/`
+`out_bazel/e3662dd3043d825281b1dcd92c77f735/execroot/_main/bazel-out/k8-fastbuild/bin/kernel_device_modules-6.12/mgk_64_k612_customer_modules_install.user/`
 
 ### Repack vendor_boot (WAJIB dari build terbaru)
 
