@@ -62,7 +62,7 @@ Branch ini dibuat baru (bukan di atas `android16`) supaya riwayat `android16`
 tidak tersentuh. `android16` (`30a0466a`) memang ancestor dari baseline
 w1vo36.88-36-7 (`06079c2`), jadi branch ini juga fast-forward-able ke sana.
 
-Branch berisi **65 commit** di atas `06079c2`, satu commit per fitur.
+Branch berisi **90 commit** di atas `06079c2`, satu commit per fitur.
 Ringkasan commit awal dan commit final yang penting:
 
 | commit | isi |
@@ -75,6 +75,7 @@ Ringkasan commit awal dan commit final yang penting:
 | `618a8c5` | `tc_charger_class`/`adapter`/`algorithm`/`misc_intf` |
 | `91640cd`..`28f5237` | panel final: init table, DSC, rails, 8bpc/1056 Mbps |
 | `af55c9c` | `tran_extcon_usb`: role DEVICE/NONE/HOST saat cabut-colok |
+| `6b45fda`..`17a6b66` | DRM AOD/HBM notifier ABI, DT2W+FOD touch, `/dev/goodix_fp`, VENC `VENC_H264=1` + ADAB + SLBC |
 
 Daftar lengkap: `git log --oneline 06079c2..HEAD`.
 

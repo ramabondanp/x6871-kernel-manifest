@@ -1,6 +1,6 @@
 # HANDOFF — W1VO36 / X6871 kernel device modules
 
-Ditulis 2026-11-19, diperbarui 2026-11-21 untuk sesi AI berikutnya. Baca ini dulu, lalu `PLAN.md`
+Ditulis 2026-11-19, diperbarui 2026-11-22 untuk sesi AI berikutnya. Baca ini dulu, lalu `PLAN.md`
 (bagian §6.1b, §6.2k, §6.2m, §6.2n, §6.2o, §6.2p, §6.2q, §6.2r, §6.2s,
 §6.2t, §6.2u) dan `PRETEST.md`.
 
@@ -15,9 +15,9 @@ Ditulis 2026-11-19, diperbarui 2026-11-21 untuk sesi AI berikutnya. Baca ini dul
 | Modul recovery vendor_boot | **222**, 100% source |
 | DLKM (`vendor_dlkm` + `odm_dlkm`) | **269**, 100% source, image siap |
 | Build target | `//kernel_device_modules-6.12:mgk_64_k612_customer_modules_install.user` |
-| Build terakhir | sukses (inkremental), 2026-11-21 |
-| Kernel HEAD | `6566cb27da18` (`w1vo36-6.12-port`) |
-| Runtime | **Android boot + layar + audio + AOD + kamera foto + video preview + Wi-Fi + GPU OK**; touch normal; rilis `video-touch-20261121` memperbaiki urutan wake gestur, menonaktifkan SLBC yang gagal registrasi, dan menambah log FOD/VENC; video-save, FOD, DT2W perlu uji ulang |
+| Build terakhir | sukses (inkremental), 2026-11-22 |
+| Kernel HEAD | `17a6b66d7927` (`w1vo36-6.12-port`) |
+| Runtime | **Android boot + layar + audio + AOD + kamera foto + video preview + Wi-Fi + GPU OK**; rilis `venc-fod-dt2w-20261122` memperbaiki akar masalah VENC (`VENC_H264=1`), ABI notifier AOD/HBM DRM (`mediatek_drm_v1`), DT2W saat AOD (`adaptive-ts`), FOD key/proc (`gt9916_common`), dan `/dev/goodix_fp` + HBM uevent (`tran_fp`); siap uji device |
 
 ## Status per 2026-11-20 (TWRP final)
 
@@ -88,12 +88,29 @@ dibaca dari biner stock (`mov w3,#0x3b`). Fix kernel `5ba6fb6559ab`,
 hanya `vendor_dlkm` yang di-repack. Detail: `PRETEST.md` §46.
 
 ```text
+twrp-vendor_boot-allsrc-display-usb-v10.img  md5 3409f68913613b38d43052458435558b  67.108.864 B
+vendor_dlkm.img                              md5 764c2d3f6fbd14aff802a0614ec7d014  24.551.424 B
+odm_dlkm.img                                 md5 af60243be2a87943f78fc7d254bb690a   4.206.592 B
+twrp-dlkm-venc-fod-dt2w-20261122.zip         md5 92ab587de697a955fceba15ecf335d52
+release terbaru                              venc-fod-dt2w-20261122 (vendor_boot v10 + vendor_dlkm + odm_dlkm)
+/srv path                                    /serverhive1/ramabondanp/tmp/dlkm-out/ (+ tmp/x6871/)
+```
+
+**`dmesg4`/`normal2` (akar masalah VENC + DT2W + FOD terbukti 100% dari log stock + disassembly)**:
+Boot `normal2.txt` memakai GKI `Image` kita + modul stock dan sukses merekam video 1080p, DT2W saat AOD, serta FOD — membuktikan ketiga bug 100% ada di modul kita:
+1. **Video gagal simpan (`mtk-vcodec-enc.ko`, `17a6b66d7927`)**: `normal2.txt` mencetak `check_codec_id ipi id 1 is correct` saat init VENC; `dmesg3`/`dmesg4` tidak pernah mencetaknya. Di `mtk_vcodec_drv.h`, `VENC_H264..VENC_H263` menyambung enum setelah `VDEC_AV1 (12)` sehingga `VENC_H264 == 13` alih-alih `1`. VCP mengirim `VCU_IPIMSG_ENC_CHECK_CODEC_ID` (`codec_id=1`), `check_codec_id()` diam-diam menolak (`status=-1`), sehingga VCP tidak pernah mengalokasikan buffer ref/rec/comv HW (`0x74..0x88 == 0` -> IOMMU fault `LARB7_PORT24`/`PORT3 mva=0x0` -> VCP WDT). Fix: reset `VENC_H264 = 1`, perluas `struct mtk_codec_capability` ke 24 B + kontrol `ADAB_CAPABILITY` 4x `U32`, kembalikan `slbc_request()` walau `slbc_register_activate_ops` gagal (seperti `normal2.txt`), cek `msg->status != 0` pada `VCU_IPIMSG_ENC_SET_PARAM_DONE`, dan guard NULL `inst`/`vsi` di `mtk_venc_dvfs_sync_vsi_data`.
+2. **DT2W + AOD (`mediatek_drm_v1.ko` `6b45fdaa1ef1` + `adaptive-ts.ko` `379924bf2586`)**: enum `mtk_disp_notify.h` kehilangan `TRAN_DISP_BLANK_NOTIFY_FINGERPRINT (2)` sehingga `TRAN_DISP_BLANK_AOD_NOTIFY` bergeser ke `2` (stock `3`). `mtk_dsi_encoder_enable()` tidak pernah mengirim `TRAN_DISP_BLANK_AOD_NOTIFY`, dan `adaptive-ts` ikut resume pada `MTK_DISP_BLANK_UNBLANK (0)` sehingga masuk AOD langsung mengeluarkan touch dari mode gestur. Fix: samakan enum stock, kirim `TRAN_DISP_BLANK_AOD_NOTIFY (3)` hanya saat `!mtk_dsi_doze_state(dsi)` (keluar AOD / unblank penuh), dan `adaptive-ts` hanya resume pada `TRAN_DISP_BLANK_AOD_NOTIFY (3)`.
+3. **FOD (`tran_fp.ko` `55aa13232a43` + `mediatek_drm_v1.ko` `6b45fdaa1ef1` + `gt9916_common.ko` `379924bf2586`)**:
+   - `tran_fp`: daftarkan `/dev/goodix_fp` (sebelumnya `"tran_fp"` sehingga HAL Goodix gagal buka device), set SPI 8-bit/4 MHz/mode 0, aktifkan `tran_fp_irq_init()` (pilih pinctrl `pins_irq` dengan guard NULL `irq_init`), dan aktifkan tanpa syarat pengiriman uevent `TRAN_FULL_HBM_EVENT=FULL_HBM_SET` saat `TRAN_DISP_BLANK_NOTIFY_FINGERPRINT (2)`.
+   - `mediatek_drm_v1`: kirim `TRAN_DISP_BLANK_NOTIFY_FINGERPRINT (2)` di akhir `mtk_drm_crtc_set_panel_hbm(crtc, true)`.
+   - `gt9916_common`: `/proc/fingerprint_status` menulis perintah Goodix `0x30` (`len=5`, `data[0]=0`/`1`), `brl_gesture()` zero-init `cmd`, `brl_event_handler()` mendeteksi FOD down (`0x88`) / up (`(pre_buf[0] & 0xf) == 0`) dan melaporkan key `195` (`0xc3`), serta `goodix_ts_resume()` membersihkan `g_fp_flag`. Detail: `PRETEST.md` §59.
+
+**Rilis sebelumnya (`video-touch-20261121`, kernel `6566cb27da18`)**:
+```text
 twrp-vendor_boot-allsrc-display-usb-v9.img  md5 e6c1d4300ec7237de942444c02574890  67.108.864 B
 vendor_dlkm.img                             md5 af17ac6c8a9ab7769832264309919d06  24.551.424 B
 odm_dlkm.img                                md5 8eedcdc26ed7824fb3c1675fa1b92b09   4.206.592 B
 twrp-dlkm-video-touch-20261121.zip          md5 9de4714014cc820a068dd92b65cc7604
-release terbaru                             video-touch-20261121 (vendor_boot v9 + vendor_dlkm + odm_dlkm)
-/srv path                                   /serverhive1/ramabondanp/tmp/dlkm-out/ (+ tmp/x6871/)
 ```
 
 **dmesg3 (rilis `touchfix-20261121`, kernel `a453c308cc33`)**:
@@ -259,16 +276,11 @@ sama dengan partisi stock. Zip `twrp-dlkm-ocfix-20261121.zip` menulis
 `twrp-vendor_boot-allsrc-display-usb-v2.img` untuk panel fix. Detail:
 `PRETEST.md` §45–§49.
 
-**Langkah berikutnya**: flash `twrp-vendor_boot-allsrc-display-usb-v9.img`
-+ `twrp-dlkm-video-touch-20261121.zip`, lalu uji:
-1. rekam video 1080p dan putar ulang; dmesg harus menunjukkan `slbc 0` di
-   `vb2ops_venc_start_streaming`, lalu `VSI venc: input0=... bs_addr=...`.
-   Kalau masih `mtk_venc_translation_fault_callback`, kirim baris VSI tersebut;
-2. double-tap saat layar mati; harus ada `got valid gesture type 0xcc` dan key
-   198, bukan `touch_head ...` checksum error;
-3. FOD saat layar mati; cari `TRAN_IOC_INIT`, `TRAN_IOC_ENABLE_POWER`,
-   `TRAN_FP_READ_FP_ID`, `tran_netlink_send` di dmesg;
-4. touch biasa tetap harus menghasilkan `goodix_ts_report_finger`.
+**Langkah berikutnya**: flash `twrp-vendor_boot-allsrc-display-usb-v10.img`
++ `twrp-dlkm-venc-fod-dt2w-20261122.zip` (rilis `venc-fod-dt2w-20261122`), lalu uji:
+1. **Rekam video 1080p dan simpan**: dmesg harus menunjukkan `check_codec_id ipi id 1 is correct`, `slbc_request 1, 0xf000000`, dan `mtk_vcodec_enc_clock_on` tanpa `LARB7_PORT24`/`mva=0x0` fault ataupun VCP WDT;
+2. **DT2W saat AOD / layar mati**: saat masuk AOD tidak boleh ada `drm notify tp resume start`; double-tap harus memicu `got valid gesture type 0xcc` dan layar menyala;
+3. **FOD**: `/dev/goodix_fp` harus terdaftar, sentuh ikon FOD memicu `fp key finger pre_buf[0] = 0x88` (key 195), HBM memicu `mtk_drm_crtc_set_panel_hbm notify fingerprint end` + `TRAN_DISP_BLANK_NOTIFY_FINGERPRINT` (`TRAN_FULL_HBM_EVENT=FULL_HBM_SET`).
 Ambil dmesg segera setelah boot (ring buffer penuh oleh spam kamera/vcodec
 sehingga `dmesg1` baru mulai t=83 s). Fitur dari 25 modul stock tanpa source
 (tranlog, thd, varian touch alternatif, dll) hilang; driver sensor kamera X6871

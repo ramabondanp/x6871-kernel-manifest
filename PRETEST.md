@@ -3681,3 +3681,40 @@ release                                     video-touch-20261121
 ```
 
 Kernel `6566cb27da18`.
+
+## 59. `dmesg4`/`normal2`: akar masalah VENC (`VENC_H264=1`), AOD/HBM notifier ABI, DT2W, dan FOD
+
+Boot pembanding `normal2.txt` + `logcat-normal.txt` (GKI `Image` kita + modul stock) berhasil merekam video 1080p, DT2W saat AOD, dan FOD — memastikan seluruh bug ada di modul kita.
+
+1. **Video encoder (`mtk-vcodec-enc.ko`, `17a6b66d7927`)**:
+   - Di `normal2.txt` t=123.996 (`mtk_venc_init_ctx_pm` -> `vidioc_try_fmt`), VCP mengirim `VCU_IPIMSG_ENC_CHECK_CODEC_ID` dan driver stock mencetak `check_codec_id ipi id 1 is correct`. Di `dmesg3`/`dmesg4`, baris ini tidak pernah muncul untuk VENC.
+   - Disassembly stock `vcp_enc_ipi_handler`: `VENC_H264=1, VENC_H265=2, VENC_HEIF=3, VENC_VP8=4, VENC_MPEG4=5, VENC_H263=7`. Di `mtk_vcodec_drv.h` kita, `VENC_H264` tidak di-reset ke `= 1` setelah `VDEC_AV1 (12)`, sehingga `VENC_H264 == 13` (`0xd`). `check_codec_id()` diam-diam membalas `status=-1`, membuat VCP tidak mengalokasikan buffer ref/rec/comv HW -> register `0x74..0x88 == 0` -> fault `LARB7_PORT24`/`PORT3 mva=0x0` -> VCP WDT.
+   - Sekaligus diselaraskan dengan stock: `struct mtk_codec_capability` 24 B + kontrol `V4L2_CID_MTK_VIDEO_ENC_GET_ADAB_CAPABILITY` 4x `U32`, `slbc_request()` tetap dijalankan walau `slbc_register_activate_ops()` gagal (seperti `normal2.txt` t=123.995), `VCU_IPIMSG_ENC_SET_PARAM_DONE` memeriksa `msg->status != 0`, dan guard NULL `inst`/`vsi` di `mtk_venc_dvfs_sync_vsi_data()`.
+2. **Display notifier ABI (`mediatek_drm_v1.ko`, `6b45fdaa1ef1`)**:
+   - `mtk_disp_notify.h`: tambah `TRAN_DISP_BLANK_NOTIFY_FINGERPRINT` (`2`) sebelum `TRAN_DISP_BLANK_AOD_NOTIFY` (`3`) dan `TRAN_DISP_BLANK_ENTER_LCD_AOD_NOTIFY` (`4`).
+   - `mtk_dsi_encoder_enable()`: kirim `TRAN_DISP_BLANK_AOD_NOTIFY` hanya saat `!mtk_dsi_doze_state(dsi)`, dan `TRAN_DISP_BLANK_ENTER_LCD_AOD_NOTIFY` saat doze jika DT memiliki `mediatek,tran-lcd-aod-notify-support`.
+   - `mtk_drm_crtc_set_panel_hbm()`: kirim `TRAN_DISP_BLANK_NOTIFY_FINGERPRINT` setelah `cmdq_pkt_destroy` saat `en == true`.
+3. **DT2W + Goodix FOD (`adaptive-ts.ko` + `gt9916_common.ko`, `379924bf2586`)**:
+   - `adaptive-ts` (`transsion_mtk_platform.c`): resume hanya pada `TRAN_DISP_BLANK_AOD_NOTIFY (3)`, bukan `MTK_DISP_BLANK_UNBLANK (0)`, sehingga masuk AOD tidak membangunkan touch dari mode gestur; lepas `dsp_event_mutex` jika `queue_work()` mengembalikan `false`.
+   - `gt9916_common`: `/proc/fingerprint_status` mengirim perintah `0x30` (`len=5`, `data[0]=0`/`1`), `brl_gesture()` zero-init `cmd`, `brl_event_handler()` mendeteksi `pre_buf[0] == 0x88` (FOD down) dan `(pre_buf[0] & 0x0f) == 0` (FOD up) untuk key `195` (`0xc3`), dan `goodix_ts_resume()` merilis `g_fp_flag` yang tersisa.
+4. **Optical FP (`tran_fp.ko`, `55aa13232a43`)**:
+   - Daftarkan `miscdev.name = "goodix_fp"` sebelum `misc_register()` (baik saat chip terdeteksi maupun fallback DT `goodix`).
+   - Set SPI 8-bit / 4 MHz / `SPI_MODE_0`, aktifkan `tran_fp_irq_init()` (guard NULL pada `irq_init` agar pinctrl `pins_irq` tetap dipilih), dan buka guard `CONFIG_TRAN_HBM_NOTIFY_FINGERPRINT` agar uevent `TRAN_FULL_HBM_EVENT=FULL_HBM_SET` selalu terkirim.
+5. **Verifikasi biner (5 `.ko`)**:
+   - `mtk-vcodec-enc.ko`: `mtk_venc_cap_common` = 24 B, `check_codec_id` H264 `mov w2, #0x1`, `slbc_request` ada di `mtk_venc_init_ctx_pm`, error check `SET_PARAM_DONE` ada.
+   - `mediatek_drm_v1.ko`: 1 panggilan notifier di `mtk_drm_crtc_set_panel_hbm`, 4 di `mtk_dsi_encoder_enable`.
+   - `tran_fp.ko`: `goodix_fp`, `TRAN_FULL_HBM_EVENT=FULL_HBM_SET`, `tran_fasync_for_lcm_full_HBM` di `*blank == 2`, `tran_fp_irq_init` + 4 MHz (`0x3d0900`) di `tran_fp_probe`.
+   - `adaptive-ts.ko`: `EVENT_BLANK` hanya membandingkan `#0x3`, `EARLY_EVENT_BLANK` membandingkan `#0x1`.
+   - `gt9916_common.ko`: simbol `tran_fingerprint_status` + `g_fp_flag`, deteksi `0x88` & key `0xc3` di `brl_event_handler`, `single_double_finger`, `fp key finger up`, `resume key finger up`.
+
+### Artefak (`venc-fod-dt2w-20261122`)
+
+```text
+twrp-vendor_boot-allsrc-display-usb-v10.img  md5 3409f68913613b38d43052458435558b  67.108.864 B
+vendor_dlkm.img                              md5 764c2d3f6fbd14aff802a0614ec7d014  24.551.424 B
+odm_dlkm.img                                 md5 af60243be2a87943f78fc7d254bb690a   4.206.592 B
+twrp-dlkm-venc-fod-dt2w-20261122.zip         md5 92ab587de697a955fceba15ecf335d52
+release                                      venc-fod-dt2w-20261122
+```
+
+Kernel `17a6b66d7927`.
