@@ -215,7 +215,7 @@ Ikuti `BOOTTEST.md` §2–§4 untuk setiap pembaruan GKI atau modul:
 
 ### Catatan kamera, device table & repo
 
-- **Kamera (`PRETEST.md` §26, §51, §53)**: 4 sensor kamera X6871 (`s5khm6sx`, `gc32e1`, `gc02m3`, `gc02m3macro`) + `camera_eeprom_v4l2` sudah diport (`75ca1ac4a1ae`, `scripts/add-camera-x6871.sh`) dan kamera foto + rekam video sudah berjalan. Yang tidak dipublikasikan vendor hanya 46 fungsi kalibrasi OTP per sensor di `camera_eeprom_v4l2` dan patch Ext-ISP (tidak ada node DT/konsumennya di X6871).
+- **Kamera (`PRETEST.md` §26, §51, §53)**: 4 sensor kamera X6871 (`s5khm6sx`, `gc32e1`, `gc02m3`, `gc02m3macro`) + `camera_eeprom_v4l2` sudah diport (`75ca1ac4a1ae`, `scripts/add-camera-x6871.sh`) dan kamera foto + rekam video sudah berjalan pada uji terdahulu. Build KMI 7 kemudian menambahkan port OTP baca-saja untuk S5KHM6SX dan GC32E1 (`1d259ab`). [Uji kamera KMI 7](PRETEST.md#69-uji-kamera-dengan-port-otp--kmi-7) dilaporkan normal, tetapi penggunaan data OTP oleh HAL belum terverifikasi. Ext-ISP tidak diport karena tidak ditemukan node DT atau konsumen stock di X6871.
 - **Device table (`DEVICES.md` / `DEVICES-OVERLAY.md`)**: 978 node `okay` (470 modul source, 130 built-in, 371 node platform, 7 tanpa driver; bug `of_match` flash LED `_v4l2` sudah diperbaiki).
 - **Repo**:
   - `alps-kernel_device_modules-6.12`: branch `x6871-android16-6.12` memuat refaktor konfigurasi di `0fba8e7`. Image rilis `gki-kmi6-20261122` memakai `fa18f7f`.

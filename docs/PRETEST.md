@@ -1,6 +1,6 @@
 # PRETEST — Log Analisis Statis, RE Biner & Investigasi Boot X6871
 
-Catatan kronologis (§1–§68), termasuk reverse engineering modul kernel (`.ko`)
+Catatan kronologis, termasuk reverse engineering modul kernel (`.ko`)
 dari firmware bawaan X6871. Log rilis KMI 6 di bawah memakai tree modul perangkat
 `fa18f7f`. Refaktor konfigurasi setelah rilis (`f8198be`) dicatat di
 [HANDOFF](HANDOFF.md#konfigurasi-x6871).
@@ -25,6 +25,7 @@ Indeks bagian penting:
 - §46–§51: SCP, Mali r54p1-11eac0, `gpufreq_shared_status`, battery OC + mode switch panel, C3D dual-pipe, kamera X6871
 - §52–§61: audio FS1599, AOD, `mtk-cam-isp`, flashlight, touch/DT2W, FOD (normal/AOD/screen-off), dan akar masalah VENC (`VENC_H264=1`)
 - §62–§68: fast charging HVDCP20 (`alg_name_array`), race `mtk_iommu`, earpiece `Playback_R_DAC`, penyelarasan `mtu3.ko` stock, dan bringup GKI KMI 6 (`android16-6.12-2026-09_r16`) + trim `x6871_modules.bzl`
+- [§69: Uji kamera dengan port OTP](#69-uji-kamera-dengan-port-otp--kmi-7)
 
 Tujuan awal (§1–§39): memastikan modul tidak menggantung/menimpa simbol stock
 dan tidak melakukan operasi berbahaya terhadap hardware **sebelum** boot. Bagian
@@ -4032,3 +4033,13 @@ odm_dlkm.img                         md5 6ee3cadceb5c4750dbbfe3d0056b6ea8   4.20
 /srv path                            ~/x6871-out/
 rollback KMI 5                       x6871-twrp-vendor_boot-v18.img, vendor_dlkm-v16-kmi5.img, odm_dlkm-v16-kmi5.img
 ```
+
+## 69. Uji kamera dengan port OTP — KMI 7
+
+Pada X6871 dengan GKI KMI 7 dari Google CI `16987858`, maintainer
+menguji `vendor_dlkm.img` yang memuat port OTP baca-saja untuk S5KHM6SX
+dan GC32E1 (commit modul vendor `1d259ab`) dan melaporkan kamera berjalan
+normal. Tidak ada hasil uji per fitur atau log HAL yang memastikan data
+OTP dipakai alih-alih fallback. Ini bukan hasil uji Ext-ISP, yang tidak
+diport. Lihat [PLAN §11](PLAN.md#11-kalibrasi-kamera-x6871--kmi-7) untuk
+layout, ABI, dan verifikasi build.

@@ -142,6 +142,7 @@ Ambil `dmesg` penuh setelah boot, lalu periksa:
 | Charger/USB | cabut-colok kabel; `dmesg \| grep -iE 'tran_extcon\|ssusb_set_mode\|online=.*type=\|pullup\|gadget RESET'` | cabut → role NONE, colok → `online=1, type=1` (SDP), `pullup D+`, `gadget RESET`; ADB kabel/MTP tersambung kembali |
 | Audio | `dmesg \| grep -iE 'mt6895-afe\|fs15xx\|snd'`; uji speaker | card terdaftar, PA aktif, tidak ada timeout IPI |
 | Kamera & Video | foto + rekam video 1080p lalu simpan; `dmesg \| grep -iE 'check_codec_id\|venc\|LARB7'` | `check_codec_id ipi id 1 is correct`, `slbc_request 1`, `mtk_vcodec_enc_clock_on`, **0** fault `LARB7_PORT24`/`mva=0x0` |
+| OTP kamera (build uji KMI 7) | uji S5KHM6SX dan GC32E1, lalu cek log HAL untuk jalur kalibrasi | catat operasi kamera dan pemakaian data OTP secara terpisah; kamera normal saja tidak membuktikan HAL tidak memakai fallback. Lihat [PRETEST §69](PRETEST.md#69-uji-kamera-dengan-port-otp--kmi-7). |
 | Connectivity | `dmesg \| grep -iE 'wlan\|wmt\|bt'`; `ip link` | `wlan0` ada dan tersambung |
 | Sensor/thermal | `dmesg \| grep -iE 'thermal\|lvts\|sensorhub'` | tidak ada trip panic |
 | RTC/PMIC | `dmesg \| grep -iE 'mt6685\|rtc\|spmi'` | RTC jalan, tidak ada error SPMI |

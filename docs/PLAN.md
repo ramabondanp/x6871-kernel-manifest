@@ -1924,11 +1924,64 @@ bisa dipakai membandingkan `CONFIG_*` kita vs device.
 ## 10. Status ringkas (diperbarui 2026-11-22)
 
 - **KMI 6 (`gki-kmi6-20261122`):** Android 16 boot sampai launcher dengan GKI resmi Google `android16-6.12-2026-09_r16`. `vendor_boot` (222 modul), `vendor_dlkm` (209), dan `odm_dlkm` (57) dibangun dari source; audit mencatat 0 mismatch CRC, 0 kolisi `CONFIG_MODULE_SIG_PROTECT`, dan 0 simbol tak terselesaikan.
+- **KMI 7 (Google CI `16987858`):** maintainer melaporkan operasi kamera normal setelah menguji build dengan port OTP di X6871. Lihat [hasil uji dan cakupan port](#11-kalibrasi-kamera-x6871--kmi-7).
 - **KMI 5 (build sebelumnya):** TWRP, GPU, Wi-Fi, storage, haptic, fast charging, audio speaker dan earpiece, layar hingga 144 Hz dan AOD, touch dan DT2W, sidik jari dalam layar, senter, serta kamera foto dan video 1080p telah diuji. Lihat [HANDOFF](HANDOFF.md#hasil-uji-perangkat-sebelum-migrasi-kmi-5) untuk rincian dan status USB.
 
 Belum / sengaja dilewati:
 
-- Kalibrasi OTP `camera_eeprom_v4l2` (46 fungsi per sensor) dan patch Ext-ISP tidak dipublikasikan vendor.
+- Sumber kalibrasi OTP `camera_eeprom_v4l2` dan patch Ext-ISP tidak tersedia di donor. Lihat audit dan cakupan port X6871 di §11.
 - 25 modul stock tanpa source (`transsion_tranlog`, `thd`, dll.) dan 7 modul fork storage `fs/atomic_storage/` (diganti baseline GKI/MTK yang sudah terbukti boot).
 - Tingkat B rename `fpsgo`/`game` belum dikerjakan; target build di `mgk_64.bzl` kini sudah di-trim ke allowlist 413 target OOT X6871 (`kernel/kleaf/x6871_modules.bzl`).
 - Target ABI `user_customer_abi` tidak bisa lulus (328 simbol duplikat antar varian driver, gagal di `stg merge`); sebagai gantinya verifikasi KMI/ABI resmi dilakukan oleh `./tools/verify-kmi-abi.py` (8 gerbang). Lihat `HANDOFF.md`.
+
+## 11. Kalibrasi kamera X6871 — KMI 7
+
+Gunakan GKI 6.12.96 (4 KB) dari Google CI `16987858`, lewat
+[`local_manifest-kmi7.xml`](../local_manifest-kmi7.xml). Baseline port sensor
+dan probe EEPROM ada di [PRETEST §51](PRETEST.md#51-port-driver-kamera-x6871-imgsensorko--camera_eeprom_v4l2ko).
+
+Angka **46** di [audit awal](PRETEST.md#modul-kamera-yang-beda) adalah jumlah
+fungsi tambahan di seluruh modul EEPROM stock, bukan 46 fungsi untuk setiap
+sensor X6871. DT stock punya dua node EEPROM: S5KHM6SX di `camera_eeprom0@50`
+dan GC32E1 di `camera_eeprom1@51`. Kedua slot GC02M3 tidak punya node EEPROM
+terpisah di DT tersebut.
+
+Implementasi baca-saja di `mtkcam/cam_cal/src_v4l2/custom/x6871_cam_cal.c`
+([commit modul vendor `1d259ab`](https://github.com/ramabondanp/alps-vendor_mediatek_kernel_modules/commit/1d259ab7de1727b1ecf0615907d4f1980175d88f))
+memakai layout berikut, ditelusuri dari tabel, relokasi, dan jalur baca
+di `camera_eeprom_v4l2.ko` stock (SHA-256
+`021fa9a16d2ad9676f10921921fe64602d57b8bd66c9f105383e47590bdc734e`):
+
+| Sensor | AWB unit / golden | AF | LSC (1868 byte) | PDAF |
+|---|---|---|---|---|
+| S5KHM6SX | `0x0c81` / `0x0c87`, checksum `0x0c8f` | `0x0c91`–`0x0c9c` | `0x0ca1`, checksum `0x13ed` | `0x13ef`, checksum `0x19cb` |
+| GC32E1 | `0x0a8c` / `0x0a92` | — | `0x0a9c`, checksum `0x11e8` | Dinonaktifkan di tabel stock |
+
+Kedua layout memeriksa ID `0x010b00ff` pada offset `0x01` sebelum membaca
+isi kalibrasi. Port lebih ketat daripada biner stock: pembacaan yang tidak
+lengkap, ID yang berbeda, atau checksum yang salah ditolak. Belum ada dump
+EEPROM perangkat untuk memastikan ID dan checksum ini pada semua varian modul.
+Ioctl baca/query stock memakai payload `0x2c30` byte, sedangkan donor memakai
+`0x2a88`. Port menerima kedua ukuran untuk kedua sensor X6871; hanya field
+AWB/AF, LSC dan PDAF dengan offset yang cocok yang diisi. Tidak menambah
+ioctl tulis EEPROM, OIS, kalibrasi multicam, atau Pre-ISP.
+
+**Ext-ISP:** tidak ditemukan node Ext-ISP/AI-ISP/fake-sensor pada DT gabungan
+stock dan tidak ditemukan impor callback Ext-ISP pada 527 file modul stock
+yang diaudit dari `vendor_boot`, `vendor_dlkm` dan `odm_dlkm`. Jangan port
+cabang ini ke build X6871 tanpa bukti jalur yang memakainya. `mtk-cam-isp`
+tidak diubah oleh port kalibrasi ini.
+
+**Validasi sebelum uji perangkat:** build KMI 7 `user` berhasil tanpa perubahan
+pada tree GKI. Uji parser dengan data sintetis mencakup kedua layout,
+normalisasi AWB, AF, LSC, PDAF, penolakan header/checksum yang salah, dan
+pembacaan parsial. Delapan pemeriksaan KMI/ABI lulus untuk 488 modul; 10.704
+CRC ekspor KMI dan 2.658 CRC impor GKI unik cocok dengan artefak CI. AVB
+hashtree `vendor_dlkm` lulus verifikasi dan satu-satunya `.ko` yang berubah
+adalah `camera_eeprom_v4l2.ko`. `vendor_boot` dan `odm_dlkm` tetap memakai
+image dari pre-release KMI 7.
+
+**Hasil uji perangkat:** maintainer menguji `vendor_dlkm.img` dengan port OTP
+pada X6871 yang memakai set KMI 7 `16987858` dan melaporkan operasi kamera
+normal. Penggunaan data OTP oleh HAL belum terverifikasi;
+lihat [PRETEST §69](PRETEST.md#69-uji-kamera-dengan-port-otp--kmi-7).
