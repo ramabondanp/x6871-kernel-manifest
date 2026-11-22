@@ -81,23 +81,24 @@ Seluruh partisi modul (**222** modul `vendor_boot` + **212** `vendor_dlkm` + **5
 | DT2W & Flashlight / Torch | ✅ Terbukti | Fix `al2` (`e4ed999`) + `#undef` PT throttling (`ebca3e1`) |
 | **Fast Charging (HVDCP20/TC30 adapter)** | ✅ Terbukti (`v14`) | `tc30`/`hvdcp20` di `alg_name_array` + guard bounds check (`0af45b1`); uji v14 tanpa panic |
 | **Earpiece speaker (`RCV Mux`)** | ✅ Lulus (`v16`) | Restore `RCV Select=Playback_R_DAC` (`aca5276`); terkonfirmasi di `dmesg9.txt` (`mt_rcv_event`, mux 1) |
-| **USB replug berulang** | 🔄 Gagal di v16; kandidat v17 belum diuji | BC1.2 dan role DEVICE sudah benar; MTU3 meminta pullup ulang untuk gadget yang masih terikat (`6230061`) |
+| **USB replug berulang** | 🔄 Menunggu uji bersih (`v18`) | Revert `6230061` (no-op) + samakan `mtu3.ko` dengan stock X6871 (`f661c15`); uji tanpa `stop/start adbd` |
 
-### Rilis uji terbaru: `mtu3-replug-20261122` (kernel `6230061`)
+### Rilis uji terbaru: `mtu3-stock-20261122` (kernel `f661c15`)
 
 ```text
-x6871-twrp-vendor_boot-v17.img  md5 68df06607016a34d12bfbe19e2c6df77  67.108.864 B
+x6871-twrp-vendor_boot-v18.img  md5 73b94a9f88ed39a852e8a1343978d37e  67.108.864 B
 vendor_dlkm.img                 md5 72daa1f10eba75d9cd0e3359a27ff76f  24.551.424 B
 odm_dlkm.img                    md5 99b2194fa63cab8c751f71b8fbd4eb5e   4.206.592 B
 ```
 
-Release GitHub: <https://github.com/ramabondanp/x6871-kernel-manifest/releases/tag/mtu3-replug-20261122>. Jika sudah memakai v16, cukup flash `vendor_boot` v17; kedua DLKM identik.
+Jika sudah memakai v16, cukup flash `vendor_boot` v18; kedua DLKM identik.
 
 ### Ringkasan perjalanan rilis
 
 | Rilis | `vendor_boot` | Sorotan utama |
 |---|---|---|
-| `mtu3-replug-20261122` | v17 | Minta pullup ulang lewat UDC core saat MTU3 kembali ke DEVICE dengan gadget terikat; menunggu uji perangkat |
+| `mtu3-stock-20261122` | v18 | Revert `6230061` (no-op non-stock) + samakan `mtu3.ko` dengan stock (`mdelay(4)`, `ssusb_phy_dp_pullup`, hapus `cdp-block` di `ssusb_gadget_init`); menunggu uji bersih |
+| `mtu3-replug-20261122` | v17 | (Direvert di v18) `usb_gadget_connect()` pada NONE → DEVICE |
 | `rcv-usb-20261122` | v16 | Fix earpiece `Playback_R_DAC` (enum/route/event stock) + pullup UDC saat replug (workqueue/urutan role switch stock) |
 | `iommu-chg-earpiece-usb-20261122` | v14 | Fix boot race panic `mtk_iommu` (`hw_list` sebelum `iommu_device_register` + NULL guard `larbdev`) di atas v13 |
 | `chg-earpiece-usb-20261122` | v13 | Fix panic charging HVDCP20 (`tc30`/`hvdcp20` `alg_name_array`), earpiece speaker (`RCV Mux`), USB replug (`mt6375_get_vbus_gd_stat` + `extcon_wq`) |

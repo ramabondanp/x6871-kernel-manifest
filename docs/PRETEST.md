@@ -3940,3 +3940,31 @@ odm_dlkm.img                    md5 99b2194fa63cab8c751f71b8fbd4eb5e   4.206.592
 Build Bazel lulus dari workspace clean. Repack membandingkan semua 222 modul
 dengan staging; diff v16/v17 menunjukkan **hanya `mtu3.ko` berubah**, sementara
 DTB, bootconfig, fragmen recovery, dan kedua image DLKM tetap identik.
+
+## 66. Audit v17 (`6230061`) & penyelarasan `mtu3.ko` dengan stock X6871 (v18)
+
+Evaluasi ulang sebelum uji perangkat v17 membuktikan dua hal penting:
+
+1. **Commit `6230061` (v17) adalah no-op dan tidak ada di stock**:
+   - `mtu3.ko` stock tidak mengimpor ataupun memanggil `usb_gadget_connect()`.
+   - Di Linux 6.12 UDC core (`common-6.12/drivers/usb/gadget/udc/core.c`), setiap jalur Android yang mematikan pullup (`mtu3_gadget_pullup(off)`) juga menyetel `mtu->gadget_driver = NULL` + `udc->started = false` (`gadget_unbind_driver()` di `core.c:1666`, `soft_connect_store("disconnect")` di `core.c:1769–1773`) atau `gadget->deactivated = true` (`usb_gadget_deactivate()`), sehingga `usb_gadget_connect()` selalu terlewati (`gadget_bound == 0`) atau langsung `return 0` di `core.c:712`.
+2. **Analisis ulang `dmesg9.txt`/`logcat7.txt` (v16) & `dmesg8.txt`/`logcat6.txt` (v14)**:
+   - Di `dmesg9.txt`, `mtu3_gadget_pullup (off)` pada `65.847` terjadi **52 ms setelah `stop adbd; start adbd`** (untuk ADB Wi-Fi). Karena `/dev/usb-ffs/adb` di-mount `no_disconnect=1` (`init.mt6895.usb.rc:39`), `stop adbd` menaruh `ffs->state = FFS_DEACTIVATED`, lalu `start adbd` yang membuka ulang `ep0` memicu `ffs_data_opened()` → `ffs_data_reset()` → `ffs_closed()` → `unregister_gadget_item()` (`f_fs.c:2137–2140, 4300`) yang meng-unbind UDC, sementara `sys.usb.ffs.ready=1` tidak terpicu lagi. Jadi tes replug `124.94`–`131.33` di v16 dijalankan saat gadget memang sudah unbound.
+   - Di `dmesg8.txt` (v14), `mtu3_gadget_pullup (off)` terjadi di `57.166` (133 ms setelah cabut di `57.033`) tanpa `stop adbd` maupun action `init`, dengan 2 kandidat pelaku: `usb-hal` (`usleep(100000)` lalu tulis `"none"` ke `/config/usb_gadget/g1/UDC`) atau `f_fs.c`.
+   - Baseline `normal2.txt`/`logcat-normal.txt` mencatat `lastConnectDurationMillis=0` (colok pertama setelah boot tanpa kabel, bukan cabut-colok).
+
+**Perbaikan berbasis stock (`mtu3.ko`, commit `f661c15`):**
+- Revert penuh commit `6230061` dari `mtu3_dr.c` (`ssusb_mode_sw_work_v2` kembali `0x2e0` B, identik stock, tanpa impor `usb_gadget_connect`).
+- Tambah `mdelay(4)` pada `mtu3_dev_on_off(is_on=0)` sebelum `mtu3_gadget_u2_lpm_lock_deinit()` — menghasilkan `__const_udelay(0x1062560)` identik stock di `mtu3_dev_on_off` (`0x15c` == `0x15c` B) dan `mtu3_stop` (`0x198` vs `0x1a0` B).
+- Tambah `else if (!mtu->is_gadget_ready && mtu->ssusb->dp_work.func) ssusb_phy_dp_pullup(mtu->ssusb);` di `mtu3_stop()` sesuai stock tanpa memicu `WARN_ON` probe-time sebelum `INIT_WORK(&ssusb->dp_work)`.
+- Pindahkan penghapusan properti DT `cdp-block` dari `mtu3_gadget_pullup()` ke `ssusb_gadget_init()` sesuai stock (`mtu3_gadget_pullup` kembali `0x2a8` == `0x2a8` B; relokasi `of_remove_property` terverifikasi di `ssusb_gadget_init` offset `0x1820`).
+
+### Artefak uji (`mtu3-stock-20261122`)
+
+```text
+x6871-twrp-vendor_boot-v18.img  md5 73b94a9f88ed39a852e8a1343978d37e  67.108.864 B
+vendor_dlkm.img                 md5 72daa1f10eba75d9cd0e3359a27ff76f  24.551.424 B
+odm_dlkm.img                    md5 99b2194fa63cab8c751f71b8fbd4eb5e   4.206.592 B
+```
+
+Repack terverifikasi (`222` modul cocok staging, `dtb`/`bootconfig`/`vendor_ramdisk01` identik, `kernel_commit=f661c15`, `dirty files: 0`). Uji pembeda tetap wajib dilakukan **tanpa** `stop/start adbd` di tengah pengujian.

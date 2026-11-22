@@ -37,11 +37,11 @@ Tujuan: memvalidasi **seluruh boot** (recovery + Android system), bukan hanya sa
    `dtbo.img` tetap milik stock. Ini risiko yang harus diamati di dmesg
    (lihat §5).
 
-## 1. Artefak Uji Terbaru (`mtu3-replug-20261122`)
+## 1. Artefak Uji Terbaru (`mtu3-stock-20261122`)
 
 | Artefak | Sumber | Catatan |
 |---|---|---|
-| `x6871-twrp-vendor_boot-v17.img` | `tools/repack-vendor-boot-latest.sh` | **222** modul source (`md5 68df06607016a34d12bfbe19e2c6df77`), hanya `mtu3.ko` berubah dari v16; dtb/bootconfig/recovery TWRP tetap |
+| `x6871-twrp-vendor_boot-v18.img` | `tools/repack-vendor-boot-latest.sh` | **222** modul source (`md5 73b94a9f88ed39a852e8a1343978d37e`), revert `6230061` + samakan `mtu3.ko` dengan stock (`f661c15`); dtb/bootconfig/recovery TWRP tetap |
 | `vendor_dlkm.img` | EROFS + AVB (`fastbootd`) | **212** modul source (`md5 72daa1f10eba75d9cd0e3359a27ff76f`), identik dengan v16 |
 | `odm_dlkm.img` | EROFS + AVB (`fastbootd`) | **57** modul source (`md5 99b2194fa63cab8c751f71b8fbd4eb5e`), identik dengan v16 |
 | kernel `Image` | `out_bazel/.../mgk_64_k612_kernel_aarch64.user/Image` | opsional, hanya jika `boot.img` ikut diganti |
@@ -72,7 +72,7 @@ bisa hilang. Detail repack: `HANDOFF.md` §Repack dan `PRETEST.md` §44.
 
 ```bash
 # 1. Dari bootloader fastboot (bootloader unlocked; image tidak ditandatangani)
-fastboot flash vendor_boot x6871-twrp-vendor_boot-v17.img
+fastboot flash vendor_boot x6871-twrp-vendor_boot-v18.img
 
 # 2. Lewati blok ini jika DLKM v16 sudah terpasang (isinya identik).
 #    Jika belum, masuk fastbootd untuk partisi logis:
