@@ -285,13 +285,14 @@ kalau memang tidak ada source.
 
 - Workspace: `~/x6871-kernel` (setup mengikuti [README](../README.md#build-dari-source))
 - Manifest: `~/x6871-kernel-manifest`
-- Firmware dump stock X6871 (`X6871-16.3.0.155SP20`): [`https://gitlab.com/rama-firmware-dumps/infinix/Infinix-X6871`](https://gitlab.com/rama-firmware-dumps/infinix/Infinix-X6871)
 - Oracle firmware (237 `.ko`): `~/tmp/x6871/vr/root/lib/modules/`
 - DTBO otoritatif: `~/tmp/x6871/frag0.dts`
 - Konfigurasi kernel device: `~/tmp/bootRE_ikconfig`
-- Source donor Transsion 6.1 ([Infinix Open Source Center](https://opensource.dev.infinixmobility.com/), `android15_kernel_modules_and_devicetree_mt6897.tar.gz`): `~/tmp/ts61-src/kernel/kernel_device_modules-6.1/`
-- Tarball resmi Infinix Open Source (donor **6.1**, hanya referensi porting driver Transsion, **jangan pernah jadi basis build 6.12**):
-  `~/tmp/mt6897-full.tar.gz` — direct URL: [`https://d1wd32b69guoqm.cloudfront.net/opensource/android15_kernel_modules_and_devicetree_mt6897.tar.gz`](https://d1wd32b69guoqm.cloudfront.net/opensource/android15_kernel_modules_and_devicetree_mt6897.tar.gz)
+
+### Unduhan referensi
+
+- **Source donor Transsion 6.1:** [unduh `android15_kernel_modules_and_devicetree_mt6897.tar.gz`](https://d1wd32b69guoqm.cloudfront.net/opensource/android15_kernel_modules_and_devicetree_mt6897.tar.gz) dari [Infinix Open Source Center](https://opensource.dev.infinixmobility.com/). Tarball ini hanya untuk referensi porting driver, bukan basis atau prasyarat build 6.12. Path lokal di catatan audit: `~/tmp/mt6897-full.tar.gz`, diekstrak ke `~/tmp/ts61-src/`.
+- **Firmware stock X6871:** [dump firmware di GitLab](https://gitlab.com/rama-firmware-dumps/infinix/Infinix-X6871), versi referensi `X6871-16.3.0.155SP20`. Dipakai untuk mencari image bawaan serta membandingkan modul dan DTB/DTBO. Untuk rollback, gunakan firmware bawaan yang sesuai dengan perangkat dan versi yang dipakai sebelumnya.
 
 ### Perintah build
 
