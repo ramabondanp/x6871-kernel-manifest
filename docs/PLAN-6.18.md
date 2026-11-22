@@ -7,7 +7,7 @@
 
 ## 1. Tujuan
 
-Memigrasikan seluruh **488 modul runtime** Infinix GT 20 Pro (X6871 / MT6895) — `222 vendor_boot` + `209 vendor_dlkm` + `57 odm_dlkm` (100% C source, 0 objek `.o`/`.a` prebuilt) — ke GKI AOSP murni **`android17-6.18-2026-09_r13`** **tanpa mengedit satu berkas pun di `kernel-6.18`**, agar kompatibel 100% dengan `boot.img` + `system_dlkm.img` rilis resmi Google.
+Memigrasikan seluruh **487 modul runtime** Infinix GT 20 Pro (X6871 / MT6895) — `221 vendor_boot` (tanpa `mkp.ko`) + `209 vendor_dlkm` + `57 odm_dlkm` (100% C source, 0 objek `.o`/`.a` prebuilt) — ke GKI AOSP murni **`android17-6.18-2026-09_r13`** **tanpa mengedit satu berkas pun di `kernel-6.18`**, agar kompatibel 100% dengan `boot.img` + `system_dlkm.img` rilis resmi Google.
 
 | Parameter | Baseline Saat Ini (6.12) | Target (6.18) |
 |---|---|---|
@@ -53,11 +53,11 @@ Audit langsung dilakukan dengan mencocokkan seluruh **488 `.ko` runtime** (`v19-
    - `build/bazel_mgk_rules` → tetap ambil dari `MotorolaMobilityLLC/kernel-build-bazel_mgk_rules` lalu di-patch secara idempotent oleh `setup.sh` memakai `patches/bazel_mgk_rules-6.18.patch` di repo manifest (tidak perlu membuat repo baru).
    - `build/kernel` → gunakan langsung `kernel/build` AOSP `main-kernel-2026` bawaan manifest `common-android17-6.18-2026-09`.
    - Branch 6.12 stabil (`x6871-android16-6.12`) dan workspace `x6871-clean/ws` **tidak disentuh**.
-2. **Penanganan `mkp.ko` (MediaTek Kernel Protection)**:
-   - `mkp.ko` adalah modul proteksi kernel berbasis hypervisor EL2 (mengunci `.text`/`.rodata` S2 page table dan memantau `struct cred` / `selinux_state` anti-exploit/anti-root). Ia memiliki **0 ekspor, 0 dependen**, tidak menyentuh hardware/HAL, dan justru berisiko bentrok dengan perubahan internal SELinux 6.18 serta root (KernelSU).
-   - **Rekomendasi**: keluarkan `mkp.ko` dari profil 6.18 (`221` modul `vendor_boot`), atau (alternatif) nonaktifkan blok `MKP_POLICY_TASK_CRED` di `mkp_demo.c`.
+2. **Hapus `mkp.ko` (MediaTek Kernel Protection) dari profil 6.18 (FINAL)**:
+   - `mkp.ko` adalah modul proteksi kernel berbasis hypervisor EL2 (mengunci `.text`/`.rodata` S2 page table dan memantau `struct cred` / `selinux_state` anti-exploit/anti-root). Ia memiliki **0 ekspor, 0 dependen**, tidak menyentuh hardware/HAL, berisiko bentrok dengan perubahan internal SELinux 6.18 serta root (KernelSU), dan keempat hook `android_rvh_*_creds`-nya dihapus Google di `android17-6.18`.
+   - **Keputusan**: `mkp.ko` **dihapus** dari target build `mgk_64.bzl` cabang 6.18 dan dikecualikan dari daftar modul `vendor_boot` profil 6.18 (`221` modul, `164` `modules.load`, `215` `modules.load.recovery`, total **487** modul runtime). Dengan ini, **0** vendor hook yang hilang tersisa di set 6.18.
 3. **Pemangkasan Target Build (`mgk_64.bzl`)**:
-   - Cabang `x6871-android17-6.18` memangkas daftar modul di `mgk_64.bzl` agar hanya membangun **closure ~430 modul runtime X6871 (+ `ko_deps` transitifnya)**, bukan seluruh 812 modul multi-varian/SoC lain.
+   - Cabang `x6871-android17-6.18` memangkas daftar modul di `mgk_64.bzl` agar hanya membangun **closure ~429 modul runtime X6871 (+ `ko_deps` transitifnya, tanpa `mkp.ko`)**, bukan seluruh 812 modul multi-varian/SoC lain.
 4. **Aturan Keras Tetap Berlaku**:
    - `kernel-6.18` **JANGAN PERNAH diedit** (Aturan Keras #15).
    - Jangan masukkan modul GKI terproteksi ke `vendor_boot`/`vendor_dlkm`/`odm_dlkm` (Aturan Keras #16).
