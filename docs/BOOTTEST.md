@@ -314,18 +314,19 @@ identik stock + AVB hashtree footer yang dipertahankan. Zip TWRP memetakan
 logical partition (`lptools map`) lalu menulis image dengan `dd` tanpa
 menghapus/membuat ulang partisi.
 
-Artefak DLKM terbaru (`venc-fod-dt2w-20261122`, kernel `17a6b66d7927`):
+Artefak DLKM terbaru (`sofod-dt2w-flash-20261122`, kernel `ebca3e1`, raw `.img` untuk `fastbootd`):
 
 ```text
-vendor_dlkm.img                       md5 764c2d3f6fbd14aff802a0614ec7d014  24.551.424 B
-odm_dlkm.img                          md5 af60243be2a87943f78fc7d254bb690a   4.206.592 B
-twrp-dlkm-venc-fod-dt2w-20261122.zip  md5 92ab587de697a955fceba15ecf335d52
+x6871-twrp-vendor_boot-v12.img  md5 f345308a330b4ceb5daf586bcd059607  67.108.864 B
+vendor_dlkm.img                 md5 4cb91f7c318d0960289e86fe764448e5  24.551.424 B
+odm_dlkm.img                    md5 411cc6106caedd526767e9f5cfc5a70d   4.206.592 B
 ```
 
-Ringkasan perbaikan DLKM + `vendor_boot` yang sudah masuk hingga `v10`:
+Ringkasan perbaikan DLKM + `vendor_boot` yang sudah masuk hingga `v12`:
 
 - **Boot system dasar (`dlkm-20261120`..`gpu3`)**: `SCP_IPI_COUNT` 56→59, GPU Mali r54p1-11eac0 donor OPPO + fix padding `gpufreq_shared_status` (`power_count` 0x24..`active_count` 0x34, `temperature` 0x38, `shader_present` 0xe0).
 - **Battery OC & layar (`v2`–`v3`)**: `rfg-mtk-tran-conf-diff`, timing/VFP 144/120/60/40 Hz, C3D dual-pipe SRAM, dan `PQ_VIRTUAL_SET_PROPERTY` 12 B — **layar terverifikasi normal penuh**.
 - **Audio, AOD & kamera (`v4`–`v6`)**: FS1599 PA + `tran_audio_control`, AOD RM69220, 4 sensor kamera X6871 (`s5khm6sx`/`gc32e1`/`gc02m3`/`gc02m3macro`) + `camera_eeprom_v4l2`, `mtk-cam-isp` inline `sink_fmt`, dan flashlight `ocp81375_v4l2`.
-- **VENC, DT2W & FOD (`v7`–`v10`)**: QP ABI 6-field, `VENC_H264 = 1`, `mtk_codec_capability` 24 B + ADAB 4x `U32`, `slbc_request`, enum notifier AOD/HBM DRM, `adaptive-ts` resume khusus `AOD_NOTIFY`, Goodix cmd `0x30` + FOD key `195`, dan `/dev/goodix_fp` + HBM uevent `TRAN_FULL_HBM_EVENT=FULL_HBM_SET`.
-- Fitur dari 25 modul stock tanpa source (`transsion_tranlog`, `thd`, dll.) tidak disertakan. Detail lengkap ada di `HANDOFF.md` dan `PRETEST.md` §45–§59.
+- **VENC, DT2W & FOD (`v7`–`v10`)**: QP ABI 6-field, `VENC_H264 = 1`, `mtk_codec_capability` 24 B + ADAB 4x `U32`, `slbc_request`, enum notifier AOD/HBM DRM, `adaptive-ts` resume khusus `AOD_NOTIFY`, Goodix cmd `0x30` + FOD key `195`, dan `/dev/goodix_fp` + HBM uevent `TRAN_FULL_HBM_EVENT=FULL_HBM_SET` — **rekam video & FOD normal terverifikasi lulus**.
+- **FOD saat AOD, screen-off FOD, DT2W & flashlight (`v11`–`v12`)**: hapus `0x39`/`0x38` idle mode + tabel alpha stock RM69220 (**FOD di AOD terverifikasi lulus**), pertahankan `vddi-gpios` HIGH saat panel power-off (`0d456ba`), `simple_read_from_buffer()` + isolasi `0xcc` dari `"al2"` (`e4ed999`), V4L2 `flash_sgm37864` + nonaktifkan PT throttling di `flashlight-core.h` sesuai stock (`ebca3e1`).
+- Fitur dari 25 modul stock tanpa source (`transsion_tranlog`, `thd`, dll.) tidak disertakan. Detail lengkap ada di `HANDOFF.md` dan `PRETEST.md` §45–§61.

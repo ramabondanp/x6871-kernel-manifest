@@ -3756,8 +3756,42 @@ Status uji user pada `venc-fod-dt2w-20261122` (v10):
 x6871-twrp-vendor_boot-v11.img         md5 f61e734b13b8f95967278f0dd5f61cd6  67.108.864 B
 vendor_dlkm.img                        md5 ffa1ce1106b022a5c9397fe5b5d82ff0  24.551.424 B
 odm_dlkm.img                           md5 88307f5b15ff51b0cce511fb5d1a7427   4.206.592 B
-twrp-dlkm-aod-dt2w-flash-20261122.zip  md5 24b44e305ed52b8bc57ecd35e49a7b50  18.193.690 B
 release                                aod-dt2w-flash-20261122
 ```
 
 Kernel `78a1441` (3 commit: `59ed7e7`, `10396cb`, `78a1441`).
+
+## 61. `dmesg6`/`logcat4`: FOD di AOD lulus; fix screen-off FOD (`vddi-gpios`), DT2W (`al2`), dan flashlight PT throttling
+
+Status uji user pada `aod-dt2w-flash-20261122` (v11):
+- **FOD saat AOD (layar rusak)**: **LULUS** (`59ed7e7` memperbaiki layar rusak saat FOD ditekan di AOD).
+- **Sisa 3 bug** yang dianalisis tuntas dari `dmesg6.txt` + `logcat4.txt` + disassembly `.ko` stock:
+
+1. **Screen-off FOD mati saat AOD padam (`panel-rm69220-vdo-x6871.ko`, `0d456ba`)**:
+   - Di `dmesg6.txt`, setiap kali AOD padam (`panel_ext_lcm_power_set status=0` di `t=54.299`, `63.614`, `70.923`), Goodix GT9916 tidak mengeluarkan satu pun IRQ selama layar mati; lalu ~80 ms setelah `panel_ext_lcm_power_set status=1` (`t=56.975->57.059`, `64.99->65.071`, `79.388->79.471`), `gsx_gesture_ist` mencetak `failed get gesture data (ret=-22)` (IC touch cold-boot). Di `normal2.txt`, `failed get gesture data` tidak pernah muncul.
+   - Disassembly `panel_ext_lcm_power_set` pada stock `rm69220_fhdp_dsi_vdo_dsc_csot_csot_144hz_x6871.ko` membuktikan stock hanya menonaktifkan regulator `vci` dan `dvdd` saat `status == 0` dan **tidak pernah** menarik `vddi-gpios` (GPIO 101) LOW karena rail 1,8 V tersebut juga menyuplai IC touch Goodix GT9916.
+   - Fix: hapus blok `gpiod_set_value(ctx->vddi_gpio, 0)` pada cabang `on == 0` di `panel_ext_lcm_power_set()`.
+2. **DT2W masih tidak aktif (`adaptive-ts.ko`, `e4ed999`)**:
+   - Di `dmesg6.txt` (`t=25.393..25.394`), Android menulis `"cc1"` (aktifkan double-tap → `gesture switch: ON (type=0x03)`) lalu 1 ms kemudian menulis `"al2"` (`code[0xff] enable[0]`, matikan gestur huruf) yang oleh kondisi `code == 0xcc || code == 0xff` di v11 justru mematikan `tran_gesture_enable(0)` (`gesture switch: OFF (type=0x00)`).
+   - Akibatnya pada `t=68.251`, `gsx_gesture_ist` menerima `got valid gesture type 0xcc` dengan `type=0x04` (hanya bit FOD, `GESTURE_DOUBLE_TAP_BIT` = 0) sehingga gestur `0xcc` dibuang diam-diam sebelum sempat mengirim `KEY_F26` (`198`).
+   - Fix: batasi pemanggilan `tran_gesture_enable(en)` di `tran_gesture_data_write()` hanya untuk `code == 0xcc`.
+3. **Flashlight diblokir PT throttling (`flashlight.ko` + `ocp81375_v4l2.ko`, `ebca3e1`)**:
+   - Di `dmesg6.txt`, fix V4L2 `sgm37864` v11 **berhasil**: `/dev/v4l-subdev*` `ocp81375_v4l2-led1` kini terbuka via V4L2 saat tombol senter ditekan (`t=34.902..37.439`, `38.543..39.133`: `ocp81375_open` → `tout:400` → `mode:0` → `ocp81375_close`).
+   - Namun pada `t=16.922` (`soc=13`), `flashlight: pt_trigger: PT trigger(0,1,0) disable flashlight` aktif karena `mgk_64_k612_defconfig` menyalakan `CONFIG_MTK_FLASHLIGHT_PT=y` dan `CONFIG_MTK_FLASHLIGHT_PT_STRICT=y`. Saat baterai <= 15%, `FLASH_IOC_IS_LOW_POWER` mengembalikan `2` sehingga Camera/Torch HAL langsung batal menyalakan LED sebelum mengirim `V4L2_CID_FLASH_TORCH_INTENSITY` / `V4L2_CID_FLASH_LED_MODE`.
+   - `llvm-nm` & disassembly stock `flashlight.ko` dan stock `ocp81375_v4l2.ko` memastikan keduanya dibangun **tanpa** `CONFIG_MTK_FLASHLIGHT_PT` / `PT_STRICT` (0 simbol `pt_trigger`/`flashlight_pt_is_low`/`pt_low_bat`).
+   - Fix: tambahkan `#undef CONFIG_MTK_FLASHLIGHT_PT` dan `#undef CONFIG_MTK_FLASHLIGHT_PT_STRICT` di `drivers/misc/mediatek/flashlight/flashlight-core.h`.
+4. **Verifikasi biner (build inkremental di `/serverhive1/ramabondanp/x6871-clean/ws`)**:
+   - `panel-rm69220-vdo-x6871.ko`: `panel_ext_lcm_power_set` tidak lagi memanggil `gpiod_set_value` setelah `regulator_disable` (cocok byte-per-byte di `x6871-twrp-vendor_boot-v12.img`).
+   - `adaptive-ts.ko`: `tran_gesture_data_write` hanya membandingkan `cmp w8, #0xcc` tanpa `0xff` (cocok byte-per-byte di `vendor_boot` v12 dan `odm_dlkm.img`).
+   - `flashlight.ko` & `ocp81375_v4l2.ko` (`sgm37864_v4l2.ko`, `lm3644.ko`): 0 simbol PT di staging maupun hasil ekstraksi `fsck.erofs` dari `vendor_dlkm.img` final.
+
+### Artefak (`sofod-dt2w-flash-20261122`)
+
+```text
+x6871-twrp-vendor_boot-v12.img         md5 f345308a330b4ceb5daf586bcd059607  67.108.864 B
+vendor_dlkm.img                        md5 4cb91f7c318d0960289e86fe764448e5  24.551.424 B
+odm_dlkm.img                           md5 411cc6106caedd526767e9f5cfc5a70d   4.206.592 B
+release                                sofod-dt2w-flash-20261122 (raw .img untuk fastbootd)
+```
+
+Kernel `ebca3e1` (3 commit: `0d456ba`, `e4ed999`, `ebca3e1`).

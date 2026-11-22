@@ -16,21 +16,34 @@ Ditulis 2026-11-19, diperbarui 2026-11-22 untuk sesi AI berikutnya. Baca ini dul
 | DLKM (`vendor_dlkm` + `odm_dlkm`) | **269**, 100% source, image siap |
 | Build target | `//kernel_device_modules-6.12:mgk_64_k612_customer_modules_install.user` |
 | Build terakhir | sukses (inkremental), 2026-11-22 |
-| Kernel HEAD | `78a1441` (`alps-kernel_device_modules-6.12`, `x6871-android16-6.12`, 93 commit di atas `06079c2`) |
+| Kernel HEAD | `ebca3e1` (`alps-kernel_device_modules-6.12`, `x6871-android16-6.12`, 96 commit di atas `06079c2`) |
 | Vendor MTK modules HEAD | `83b4fa6` (`alps-vendor_mediatek_kernel_modules`, `x6871-android16-6.12`) |
 | Active clean workspace | `/serverhive1/ramabondanp/x6871-clean/ws` (keep old `/serverhive1/ramabondanp/w1vo` untouched) |
-| Runtime | **Boot + layar + audio + AOD + kamera foto + rekam video + FOD normal + Wi-Fi + GPU OK**; rilis `aod-dt2w-flash-20261122` (v11) memperbaiki sisa 3 bug: FOD di AOD (`59ed7e7`), DT2W 1-byte read + `gesture_maps` (`10396cb`), dan V4L2 flashlight (`78a1441`); siap uji device |
+| Runtime | **Boot + layar + audio + AOD + kamera foto + rekam video + FOD normal + FOD saat AOD + Wi-Fi + GPU OK**; rilis `sofod-dt2w-flash-20261122` (v12, raw `.img` untuk `fastbootd`) memperbaiki sisa 3 bug: screen-off FOD (`0d456ba`), DT2W `al2` (`e4ed999`), dan flashlight PT throttling (`ebca3e1`); siap uji device |
 
 ## Status Rilis Terbaru & Ringkasan Riwayat (2026-11-22)
 
-### Rilis aktif: `aod-dt2w-flash-20261122` (kernel `78a1441`, `vendor_boot` v11 + DLKM)
+### Rilis aktif: `sofod-dt2w-flash-20261122` (kernel `ebca3e1`, `vendor_boot` v12 + DLKM)
 
 ```text
-x6871-twrp-vendor_boot-v11.img         md5 f61e734b13b8f95967278f0dd5f61cd6  67.108.864 B
-vendor_dlkm.img                        md5 ffa1ce1106b022a5c9397fe5b5d82ff0  24.551.424 B
-odm_dlkm.img                           md5 88307f5b15ff51b0cce511fb5d1a7427   4.206.592 B
-twrp-dlkm-aod-dt2w-flash-20261122.zip  md5 24b44e305ed52b8bc57ecd35e49a7b50  18.193.690 B
-/srv path                              /serverhive1/ramabondanp/x6871-clean/out/
+x6871-twrp-vendor_boot-v12.img  md5 f345308a330b4ceb5daf586bcd059607  67.108.864 B
+vendor_dlkm.img                 md5 4cb91f7c318d0960289e86fe764448e5  24.551.424 B
+odm_dlkm.img                    md5 411cc6106caedd526767e9f5cfc5a70d   4.206.592 B
+/srv path                       /serverhive1/ramabondanp/x6871-clean/out/
+```
+
+Hasil uji v11 (`dmesg6.txt`/`logcat4.txt`): **FOD saat AOD LULUS** (layar tidak lagi rusak). Sisa 3 bug diperbaiki di v12 (`PRETEST.md` §61):
+1. **Screen-off FOD saat AOD padam (`panel-rm69220-vdo-x6871.ko`, `0d456ba`)**: Hapus `gpiod_set_value(ctx->vddi_gpio, 0)` di `panel_ext_lcm_power_set(on == 0)` agar sesuai stock RM69220; rail `vddi-gpios` (1,8 V) menyuplai Goodix GT9916 sehingga menurunkannya memutus daya IC touch saat AOD mati.
+2. **DT2W (`adaptive-ts.ko`, `e4ed999`)**: Android menulis `"cc1"` lalu `"al2"` (`0xff`) 1 ms kemudian saat boot; batasi toggle `tran_gesture_enable()` hanya pada `code == 0xcc` agar `"al2"` tidak menonaktifkan `GESTURE_DOUBLE_TAP_BIT`.
+3. **Flashlight (`flashlight.ko` + `ocp81375_v4l2.ko`, `ebca3e1`)**: V4L2 subdev kini sudah terbuka saat tombol senter ditekan, tetapi `CONFIG_MTK_FLASHLIGHT_PT` / `PT_STRICT` memicu `pt_trigger` pada SOC <= 15% dan membuat `FLASH_IOC_IS_LOW_POWER` mengembalikan `2`. `#undef` kedua makro di `flashlight-core.h` agar cocok dengan stock `flashlight.ko` & `ocp81375_v4l2.ko` (0 simbol PT).
+
+### Rilis sebelumnya: `aod-dt2w-flash-20261122` (kernel `78a1441`, `vendor_boot` v11 + DLKM)
+
+```text
+x6871-twrp-vendor_boot-v11.img  md5 f61e734b13b8f95967278f0dd5f61cd6  67.108.864 B
+vendor_dlkm.img                 md5 ffa1ce1106b022a5c9397fe5b5d82ff0  24.551.424 B
+odm_dlkm.img                    md5 88307f5b15ff51b0cce511fb5d1a7427   4.206.592 B
+/srv path                       /serverhive1/ramabondanp/x6871-clean/out/
 ```
 
 Hasil uji v10 (`dmesg5.txt`/`logcat3.txt`): rekam video & optical FOD normal **LULUS**. Sisa 3 bug diperbaiki di v11 (`PRETEST.md` §60):
@@ -71,10 +84,11 @@ Boot pembanding `normal2.txt` (GKI `Image` kita + modul stock) berhasil merekam 
 - **Set DLKM (269 modul)**: EROFS identik opsi stock + AVB hashtree footer; zip TWRP menulis langsung ke logical partition tanpa menghapus partisi. 25 modul stock tanpa source (`transsion_tranlog`, `thd`, varian touch alternatif, dll.) tidak disertakan; `tran_zram` diganti `zsmalloc`+`zram`, ditambah `rfkill`, `bluetooth`, `libarc4`, `task_turbo`.
 - **Repack `vendor_boot`**: selalu pakai `tools/repack-vendor-boot-latest.sh` (lihat §Perintah build / Repack). Jangan menyalin `.ko` dari image lama atau memakai `tools/pack-vendor-boot.sh` legacy (`PRETEST.md` §43/§44).
 
-### Ringkasan riwayat rilis (`v1`–`v11`)
+### Ringkasan riwayat rilis (`v1`–`v12`)
 
 | Rilis | `vendor_boot` | Kernel HEAD | Ringkasan perubahan | Referensi |
 |---|---|---|---|---|
+| `sofod-dt2w-flash-20261122` | v12 | `ebca3e1` | Fix screen-off FOD (`vddi-gpios` tetap HIGH), DT2W (`al2` tidak mematikan `0xcc`), flashlight PT throttling (`#undef PT`/`PT_STRICT`) | `PRETEST.md` §61 |
 | `aod-dt2w-flash-20261122` | v11 | `78a1441` | Fix FOD di AOD (hapus `0x39` idle mode + tabel alpha RM69220), DT2W 1-byte `simple_read_from_buffer` + `gesture_maps`, V4L2 flashlight (`flash_sgm37864` + `ocp81375`) | `PRETEST.md` §60 |
 | `venc-fod-dt2w-20261122` | v10 | `17a6b66d7927` | Fix akar masalah VENC (`VENC_H264=1`, ADAB, SLBC), ABI notifier AOD/HBM, DT2W AOD, `/dev/goodix_fp` + FOD key `195` | `PRETEST.md` §59 |
 | `video-touch-20261121` | v9 | `6566cb27da18` | Wake awal IRQ gestur, log VSI VENC, log INFO `tran_fp` | `PRETEST.md` §58 |
@@ -91,17 +105,17 @@ Boot pembanding `normal2.txt` (GKI `Image` kita + modul stock) berhasil merekam 
 
 ### Langkah uji berikutnya
 
-Flash `twrp-vendor_boot-allsrc-display-usb-v10.img` + `twrp-dlkm-venc-fod-dt2w-20261122.zip` (rilis `venc-fod-dt2w-20261122`), lalu uji:
-1. **Rekam video 1080p dan simpan**: dmesg harus menunjukkan `check_codec_id ipi id 1 is correct`, `slbc_request 1, 0xf000000`, dan `mtk_vcodec_enc_clock_on` tanpa `LARB7_PORT24`/`mva=0x0` fault ataupun VCP WDT;
-2. **DT2W saat AOD / layar mati**: saat masuk AOD tidak boleh ada `drm notify tp resume start`; double-tap harus memicu `got valid gesture type 0xcc` dan layar menyala;
-3. **FOD**: `/dev/goodix_fp` harus terdaftar, sentuh ikon FOD memicu `fp key finger pre_buf[0] = 0x88` (key `195`), HBM memicu `mtk_drm_crtc_set_panel_hbm notify fingerprint end` + `TRAN_DISP_BLANK_NOTIFY_FINGERPRINT` (`TRAN_FULL_HBM_EVENT=FULL_HBM_SET`).
+Flash via `fastbootd` ketiga file `.img` rilis `sofod-dt2w-flash-20261122` (`x6871-twrp-vendor_boot-v12.img`, `vendor_dlkm.img`, `odm_dlkm.img`), lalu uji:
+1. **Screen-off FOD (saat AOD sudah padam)**: tunggu AOD mati total, tekan area FOD — Goodix GT9916 harus tetap aktif tanpa `failed get gesture data (ret=-22)` dan langsung unlock;
+2. **DT2W (saat AOD maupun layar mati total)**: double-tap harus memicu `gsx_gesture_ist` `type=0x05`/`0x07` (bit double-tap aktif) → `got valid gesture type 0xcc` → `KEY_F26` → layar menyala;
+3. **Flashlight / Torch (termasuk saat baterai rendah)**: tombol senter QS & flash kamera harus menyala via V4L2 `ocp81375_v4l2` tanpa `pt_trigger`.
 
 ### Catatan kamera, device table & repo
 
-- **Kamera (`PRETEST.md` §26, §51, §53)**: 4 sensor kamera X6871 (`s5khm6sx`, `gc32e1`, `gc02m3`, `gc02m3macro`) + `camera_eeprom_v4l2` sudah diport (`75ca1ac4a1ae`, `scripts/add-camera-x6871.sh`) dan kamera foto sudah berjalan. Yang tidak dipublikasikan vendor hanya 46 fungsi kalibrasi OTP per sensor di `camera_eeprom_v4l2` dan patch Ext-ISP (tidak ada node DT/konsumennya di X6871).
+- **Kamera (`PRETEST.md` §26, §51, §53)**: 4 sensor kamera X6871 (`s5khm6sx`, `gc32e1`, `gc02m3`, `gc02m3macro`) + `camera_eeprom_v4l2` sudah diport (`75ca1ac4a1ae`, `scripts/add-camera-x6871.sh`) dan kamera foto + rekam video sudah berjalan. Yang tidak dipublikasikan vendor hanya 46 fungsi kalibrasi OTP per sensor di `camera_eeprom_v4l2` dan patch Ext-ISP (tidak ada node DT/konsumennya di X6871).
 - **Device table (`DEVICES.md` / `DEVICES-OVERLAY.md`)**: 978 node `okay` (470 modul source, 130 built-in, 371 node platform, 7 tanpa driver; bug `of_match` flash LED `_v4l2` sudah diperbaiki).
 - **Repo**:
-  - `alps-kernel_device_modules-6.12` bersih dan ter-push ke `alps`, default branch `x6871-android16-6.12`, HEAD **`17a6b66d7927`** (**90 commit** di atas `06079c2`).
+  - `alps-kernel_device_modules-6.12` bersih dan ter-push ke `alps`, default branch `x6871-android16-6.12`, HEAD **`ebca3e1`** (**96 commit** di atas `06079c2`).
   - `alps-vendor_mediatek_kernel_modules` (vendoring terpadu 6 repo vendor Motorola `w1vo36` + 13 modul donor OPPO `mt6896` + 4 commit GPU Mali r54p1 & kamera X6871) ter-push ke `origin`, default branch `x6871-android16-6.12`, HEAD **`83b4fa6`** (di atas base `86edba6`).
   - Manifest `ramabondanp/x6871-kernel-manifest` (`main`, direktori lokal server `/serverhive1/ramabondanp/w1vo36-kernel-manifest`) mengarah langsung ke kedua repo `alps-*` di branch `x6871-android16-6.12`.
 
