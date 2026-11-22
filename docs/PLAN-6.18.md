@@ -17,6 +17,7 @@ Memigrasikan seluruh **487 modul runtime** Infinix GT 20 Pro (X6871 / MT6895) â€
 | Page Size | `4KB` (`kernel_aarch64`) | `4KB` (`kernel_aarch64`, bukan `16k`) |
 | Clang / Rust | `r536225` / `1.82.0.p2` | `r584948c` / `1.91.1.p3` |
 | Manifest AOSP | `common-android16-6.12-2026-09` | `common-android17-6.18-2026-09` |
+| OS Runtime Target | Android 16 / 17 `system` + Android 16 `vendor` | **Android 17 `system` + Android 16 `vendor` (4KB)** |
 | Workspace | `/serverhive1/ramabondanp/x6871-clean/ws` (tetap utuh) | `/serverhive1/ramabondanp/x6871-6.18/ws` (terpisah) |
 
 ---
@@ -58,7 +59,12 @@ Audit langsung dilakukan dengan mencocokkan seluruh **488 `.ko` runtime** (`v19-
    - **Keputusan**: `mkp.ko` **dihapus** dari target build `mgk_64.bzl` cabang 6.18 dan dikecualikan dari daftar modul `vendor_boot` profil 6.18 (`221` modul, `164` `modules.load`, `215` `modules.load.recovery`, total **487** modul runtime). Dengan ini, **0** vendor hook yang hilang tersisa di set 6.18.
 3. **Pemangkasan Target Build (`mgk_64.bzl`)**:
    - Cabang `x6871-android17-6.18` memangkas daftar modul di `mgk_64.bzl` agar hanya membangun **closure ~429 modul runtime X6871 (+ `ko_deps` transitifnya, tanpa `mkp.ko`)**, bukan seluruh 812 modul multi-varian/SoC lain.
-4. **Aturan Keras Tetap Berlaku**:
+4. **Target OS Runtime: Android 17 `system` + Android 16 `vendor` (FINAL)**:
+   - Partisi `system` Android 17 sudah native terhadap GKI `android17-6.18` (`init`, `NetBpfLoad`, `lmkd`, `bionic`, cgroup v2, `CONFIG_MSEAL_SYSTEM_MAPPINGS=y`), sehingga risiko blocker di sisi `system` jauh lebih rendah.
+   - Partisi `vendor`/`odm` Android 16 X6871 mewajibkan GKI tetap **4KB (`kernel_aarch64`)** dan mempertahankan 100% ABI vendor HAL (GPU Mali `r54p1-11eac0` `libGLES_mali.so`, `gpufreq_shared_status`, `venc_vcu_config`, `mtk-cam-isp`, DRM/PQ/AOD/FOD, audio FS1599/earpiece, charger Transsion). Fokus verifikasi Gerbang Boot #1 di sisi vendor: `/vendor/etc/bpf/filterPowerSupplyEvents.o`, TWRP 4KB, dan DTB/DTBO stock.
+5. **Kebijakan Pragmatis untuk Fitur Debug/Opsional (FINAL)**:
+   - Fitur debug/profiling/opsional yang terdampak penghapusan API internal 6.18 (`CONFIG_MALI_PAGE_MIGRATION` / `__SetPageMovable`, `ipi_desc_get` di `aee_hangdet`, `tracepoint_srcu` di `ufs-mediatek-dbg`, jalur profiling `crypto_shash` di `met.ko`) **di-disable atau di-stub terlebih dahulu** untuk memprioritaskan boot bersih dan 100% paritas seluruh subsistem hardware inti.
+6. **Aturan Keras Tetap Berlaku**:
    - `kernel-6.18` **JANGAN PERNAH diedit** (Aturan Keras #15).
    - Jangan masukkan modul GKI terproteksi ke `vendor_boot`/`vendor_dlkm`/`odm_dlkm` (Aturan Keras #16).
    - Wajib lulus 8 gerbang `tools/verify-kmi-abi.py --kver 6.18` sebelum flash/rilis (Aturan Keras #17).
