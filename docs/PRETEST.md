@@ -1,18 +1,22 @@
 # PRETEST — Log Analisis Statis, RE Biner & Investigasi Boot X6871
 
-Dibuat 2026-11-19 sebagai catatan kronologis (§1–§68). Kernel
+Catatan kronologis (§1–§68), termasuk reverse engineering modul kernel (`.ko`)
+dari firmware bawaan X6871. HEAD tree modul perangkat
 `x6871-android16-6.12` saat ini berada di **`fa18f7f`** (diperbarui 2026-11-22).
 
 > **Status 2026-11-22:** Rilis terbaru adalah **`gki-kmi6-20261122`**
 > (`x6871-twrp-vendor_boot-v19-kmi6.img` + `vendor_dlkm.img` + `odm_dlkm.img`,
-> **222** modul `vendor_boot` + **209** `vendor_dlkm` + **57** `odm_dlkm`, 100% source,
-> dibangun terhadap GKI AOSP murni `android16-6.12-2026-09_r16` / `6.12.92-android16-6`, **KMI 6**).
+> berisi **488 modul `.ko`**: **222** di `vendor_boot`, **209** di `vendor_dlkm`,
+> dan **57** di `odm_dlkm`). Semua modul itu dibangun dari kode sumber, bukan
+> disalin dari firmware stock, untuk AOSP GKI `android16-6.12-2026-09_r16`
+> (`6.12.92-android16-6`, **KMI 6**) yang tidak dimodifikasi.
 > Angka lama seperti 796/806 `.ko` pada bagian awal adalah snapshot historis sebelum
 > pemangkasan allowlist `x6871_modules.bzl` (`fa18f7f`); angka build sekarang: **553** file /
 > **552** nama unik di staging, **419** flat customer install, `modules.load` 165, `modules.load.recovery` 216.
-> Log KMI 6 di §68 mencatat verifikasi modul dan konfirmasi boot, bukan
-> pengulangan seluruh uji fitur dari KMI 5. Untuk alur flash dan repack
-> yang berlaku, gunakan [BOOTTEST](BOOTTEST.md).
+> §68 mencatat verifikasi modul dan konfirmasi boot KMI 6, bukan log uji
+> rinci tiap fitur. Konfirmasi uji langsung oleh maintainer ada di
+> [GitHub Release](https://github.com/ramabondanp/x6871-kernel-manifest/releases/tag/gki-kmi6-20261122).
+> Untuk alur flash dan repack, gunakan [BOOTTEST](BOOTTEST.md).
 
 Indeks bagian penting:
 - §23–§26: komposisi 222 modul recovery, set DLKM, storage fork, dan audit kamera

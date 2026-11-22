@@ -1,10 +1,13 @@
 # BOOTTEST — Prosedur Uji Boot & Checklist X6871
 
 > **Status 2026-11-22:** Android 16 berhasil boot sampai launcher pada
-> `gki-kmi6-20261122` dengan GKI resmi Google. Hasil uji TWRP dan subsistem
-> di [HANDOFF](HANDOFF.md) berasal dari build KMI 5. Bug USB saat cabut-colok
-> tetap terjadi pada GKI kustom meski modul stock dipasang kembali; uji
-> cabut-colok pada KMI 6 belum tercatat (`PRETEST.md` §67–§68).
+> `gki-kmi6-20261122` dengan GKI resmi Google. Log uji TWRP dan subsistem
+> di [HANDOFF](HANDOFF.md) berasal dari build KMI 5. Dalam
+> [catatan rilis](https://github.com/ramabondanp/x6871-kernel-manifest/releases/tag/gki-kmi6-20261122),
+> maintainer mengonfirmasi bahwa fitur yang didokumentasikan berfungsi
+> pada unit yang ia uji langsung.
+> Bug USB cabut-colok tercatat pada GKI kustom; §67–§68 di `PRETEST.md`
+> tidak memuat log khusus uji cabut-colok pada GKI resmi KMI 6.
 > Gunakan prosedur repack di §2; §9–§10 adalah arsip percobaan repack manual.
 
 Tujuan: memvalidasi **seluruh boot** (recovery + Android system), bukan hanya satu modul.
@@ -32,10 +35,9 @@ Tujuan: memvalidasi **seluruh boot** (recovery + Android system), bukan hanya sa
 
    Hasil itu hanya berlaku untuk pasangan yang diuji. Untuk rilis KMI 6,
    gunakan set image yang cocok di §1; jangan mencampurnya dengan KMI 5.
-3. **Build kita tidak menghasilkan dtb/dtbo.** Target yang dipakai hanya
-   membangun `Image` + modul, jadi `dtb` di dalam `vendor_boot` dan
-   `dtbo.img` tetap milik stock. Ini risiko yang harus diamati di dmesg
-   (lihat §5).
+3. **Build modul tidak menghasilkan DTB/DTBO perangkat.** Repack
+   `vendor_boot` mempertahankan DTB dari image dasar TWRP. `dtbo.img`
+   bawaan perangkat tidak diubah atau di-flash dalam panduan ini.
 
 ## 1. Artefak Uji Terbaru (`gki-kmi6-20261122`)
 
@@ -192,8 +194,9 @@ Ambil `dmesg` penuh setelah boot, lalu periksa:
   Staging mencakup modul di luar `vendor_boot`. Daftar 222 modul untuk
   `vendor_boot` dikunci oleh `tools/recovery-modules.txt`, bukan filter nama
   stock, supaya modul build-only tidak hilang.
-- **dtb/dtbo stock** dipakai apa adanya. Kalau ada driver yang mengeluh
-  properti DT tidak dikenal, itu konsekuensi langsung dari poin ini.
+- **DTB dari image dasar TWRP dan DTBO bawaan perangkat** dipakai apa adanya.
+  Jika driver melaporkan properti Device Tree yang tidak dikenal, cek
+  kecocokan properti itu dengan driver yang dibangun.
 - **API hardware baru** di tiga modul: `clk-common`, `tran_ldo`,
   `tran_usb_ctrl`. Pantau probe-nya.
 

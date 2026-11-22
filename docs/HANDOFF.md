@@ -13,14 +13,19 @@ Ditulis 2026-11-19, diperbarui 2026-11-22 sebagai referensi teknis & panduan kel
 | `.ko` di staging (file / nama unik) | **553 / 552** (`mtk-socinfo` dobel; sebelumnya 813 / 812; action Bazel `4.867 → 919`) |
 | Modul di firmware X6871 | 237 (`vendor_boot`) + 288 (`vendor_dlkm` + `odm_dlkm`) |
 | Nama stock `vendor_boot` tidak ada di build | **20** (6 tidak direncanakan, 14 kandidat) |
-| Modul recovery `vendor_boot` | **222**, 100% source (KMI 6) |
-| DLKM (`vendor_dlkm` + `odm_dlkm`) | **266** (`209` + `57`), 100% source (KMI 6, bebas `CONFIG_MODULE_SIG_PROTECT`), image siap |
+| Modul recovery `vendor_boot` | **222** `.ko` dibangun dari kode sumber (KMI 6) |
+| DLKM (`vendor_dlkm` + `odm_dlkm`) | **266** `.ko` (`209` + `57`) dibangun dari kode sumber (KMI 6, tanpa bentrok `CONFIG_MODULE_SIG_PROTECT`) |
 | Build target | `//kernel_device_modules-6.12:mgk_64_k612_customer_modules_install.user` |
 | Build terakhir | sukses (clean KMI 6 + trimmed X6871 allowlist), 2026-11-22 |
-| Kernel HEAD | `fa18f7f` (`alps-kernel_device_modules-6.12`, `x6871-android16-6.12`, 106 commit di atas `06079c2`) |
+| HEAD tree modul perangkat | `fa18f7f` (`alps-kernel_device_modules-6.12`, `x6871-android16-6.12`, 106 commit di atas `06079c2`) |
 | Vendor MTK modules HEAD | `83b4fa6` (`alps-vendor_mediatek_kernel_modules`, `x6871-android16-6.12`) |
 | Active clean workspace | `~/x6871-kernel` |
-| Runtime | **Lulus boot di GKI KMI 6 (`android16-6.12-2026-09_r16`, `v19-kmi6`)** dengan `boot-lz4.img` + `system_dlkm.erofs.img` resmi Google (0 mismatch CRC vs `abi.stg` `10.630` simbol, 0 kolisi `CONFIG_MODULE_SIG_PROTECT`, 0 unresolved symbol). Hasil uji TWRP dan fitur perangkat di bawah berasal dari beberapa build KMI 5. |
+| Runtime | **Lulus boot di GKI KMI 6 (`android16-6.12-2026-09_r16`, `v19-kmi6`)** dengan `boot-lz4.img` + `system_dlkm.erofs.img` resmi Google (0 mismatch CRC vs `abi.stg` `10.630` simbol, 0 kolisi `CONFIG_MODULE_SIG_PROTECT`, 0 unresolved symbol). Rincian log fitur di bawah berasal dari KMI 5; konfirmasi uji langsung oleh maintainer dicatat di [GitHub Release](https://github.com/ramabondanp/x6871-kernel-manifest/releases/tag/gki-kmi6-20261122). |
+
+Klaim dibangun dari kode sumber berlaku untuk **488 modul `.ko`** dalam tiga
+image rilis X6871, bukan seluruh isi image. Tidak ada `.ko` stock yang disalin
+ke dalamnya. Image GKI Google dipakai tanpa modifikasi; repack `vendor_boot`
+mempertahankan komponen dasar TWRP seperti DTB dan ramdisk recovery.
 
 ## Status Rilis Terbaru & Ringkasan Riwayat (2026-11-22)
 
@@ -217,12 +222,13 @@ Ikuti `BOOTTEST.md` §2–§4 untuk setiap pembaruan GKI atau modul:
   - `alps-vendor_mediatek_kernel_modules` (vendoring terpadu 6 repo vendor Motorola `w1vo36` + 13 modul donor OPPO `mt6896` + 4 commit GPU Mali r54p1 & kamera X6871) ter-push ke `origin`, default branch `x6871-android16-6.12`, HEAD **`83b4fa6`** (di atas base `86edba6`).
   - Manifest `ramabondanp/x6871-kernel-manifest` (`main`, `~/x6871-kernel-manifest`) mengarah langsung ke kedua repo `alps-*` di branch `x6871-android16-6.12`.
 
-## Objective
+## Tujuan port
 
-Bangun modul device untuk X6871 (mt6895, kernel 6.12.38-android16-5) yang
-tidak punya source vendor, mulai dari tree W1VO36.88-36-7 / mt6895 yang sudah
-bisa build. Vendor sumber GPL resmi lebih diutamakan daripada RE; RE dipakai
-kalau memang tidak ada source.
+Source resmi khusus X6871 tidak dipublikasikan. Port ini menggunakan tree
+modul Motorola W1VO36.88-36-7 sebagai basis, mengadaptasi driver dari kode
+sumber donor, dan merekonstruksi bagian yang belum tersedia lewat reverse
+engineering modul kernel (`.ko`) dari firmware bawaan X6871. AOSP GKI adalah
+kernel dasar yang ditargetkan, bukan objek reverse engineering.
 
 ## Aturan keras
 

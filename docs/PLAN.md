@@ -4,11 +4,13 @@ Dokumen ini mengarsipkan rencana porting awal dan temuan teknis (§6.x).
 Untuk build, mulai dari [README](../README.md#build-dari-source). Untuk status
 rilis dan panduan pemeliharaan, lihat [HANDOFF](HANDOFF.md).
 
-> **Status 2026-11-22:** Seluruh modul `vendor_boot` (222) + `vendor_dlkm`
-> (209) + `odm_dlkm` (57) sudah dibangun **100% dari source** terhadap GKI AOSP murni
-> **`android16-6.12-2026-09_r16`** (`6.12.92-android16-6`, **KMI 6**, kernel HEAD
-> `fa18f7f` setelah trim, rilis `gki-kmi6-20261122`). Android 16 terbukti boot
-> sampai launcher dengan `boot-lz4.img` + `system_dlkm.erofs.img` rilis resmi Google.
+> **Status 2026-11-22:** Seluruh **488 modul `.ko`** dalam `vendor_boot` (222),
+> `vendor_dlkm` (209), dan `odm_dlkm` (57) dibangun dari kode sumber port dan GKI;
+> tidak ada `.ko` yang disalin dari firmware stock. Kernel dasar AOSP GKI
+> **`android16-6.12-2026-09_r16`** (`6.12.92-android16-6`, **KMI 6**) tidak diubah.
+> HEAD tree modul perangkat setelah trim: `fa18f7f`. Pada rilis `gki-kmi6-20261122`,
+> Android 16 terbukti boot sampai launcher dengan `boot-lz4.img` dan
+> `system_dlkm.erofs.img` resmi Google.
 > Pengujian TWRP dan fitur perangkat yang dirangkum di §10 berasal dari KMI 5.
 > Angka 688/806 `.ko` di bagian awal dokumen ini adalah snapshot historis; angka build
 > saat ini (setelah trim allowlist `x6871_modules.bzl`) adalah **553** file / **552** nama unik
@@ -19,8 +21,9 @@ rilis dan panduan pemeliharaan, lihat [HANDOFF](HANDOFF.md).
 
 ## 1. Masalah
 
-Mau bikin source kernel untuk device yang source-nya tidak dipublikasikan
-vendor. Target: **Infinix X6871 (GT 20 Pro)**, `X6871-16.3.0.155SP20`.
+Tujuannya membuat port kode sumber kernel tidak resmi untuk **Infinix X6871
+(GT 20 Pro)** karena source resmi khusus perangkat ini tidak dipublikasikan.
+Versi firmware bawaan yang dijadikan referensi: `X6871-16.3.0.155SP20`.
 
 Titik keberangkatan yang menguntungkan:
 
@@ -30,8 +33,10 @@ W1VO   : mt6895                          , kernel 6.12.38-android16-5-g2c4fd33ae
                                                        ^^^^^^^^ KMI generation sama
 ```
 
-Soc sama, versi kernel sama, generasi KMI sama. Jadi **tree w1vo yang sudah bisa
-build dipakai sebagai basis**, bukan diganti. X6871 cuma jadi donor.
+SoC, versi kernel, dan generasi KMI pada titik awal sama, sehingga tree modul
+Motorola W1VO36 dipakai sebagai basis port. Driver yang tersedia diambil dari
+kode sumber donor. Modul kernel (`.ko`) dan Device Tree dari firmware bawaan
+X6871 dipakai sebagai referensi untuk reverse engineering dan verifikasi.
 
 ---
 
