@@ -46,14 +46,16 @@ Tujuan: memvalidasi **seluruh boot** (recovery + Android system), bukan hanya sa
 | `vendor_dlkm.img` | EROFS + AVB (`fastbootd`) | **209** modul source KMI 6 (`md5 5f7b6cecb1c44a1ffc3280dd481fbfcf`, `191` `modules.load`); 3 modul GKI terproteksi dikeluarkan |
 | `odm_dlkm.img` | EROFS + AVB (`fastbootd`) | **57** modul source KMI 6 (`md5 6ee3cadceb5c4750dbbfe3d0056b6ea8`, `57` `modules.load`) |
 | `dtbo.img` | stock, tidak diubah | build tidak menghasilkan dtbo |
-| staging modul | `.../mgk_64_k612_customer_modules_install.user/staging/lib/modules/6.12.92-android16-6-g7cc745542612-4k` | 813 file / 812 nama unik |
+| staging modul | `.../mgk_64_k612_customer_modules_install.user/staging/lib/modules/6.12.92-android16-6-g7cc745542612-4k` | 553 file / 552 nama unik (trimmed via `x6871_modules.bzl`) |
 
-## 2. Membuat image vendor_boot
+## 2. Membuat image vendor_boot & DLKM
 
 ```bash
-cd /serverhive1/ramabondanp/w1vo36-kernel-manifest
+cd ~/x6871-kernel-manifest
 ./tools/repack-vendor-boot-latest.sh \
-  --out /serverhive1/ramabondanp/tmp/x6871/twrp-vendor_boot-$(date -u +%Y%m%d-%H%M%S).img
+  --out ~/tmp/x6871/twrp-vendor_boot-$(date -u +%Y%m%d-%H%M%S).img
+./tools/repack-dlkm-latest.sh --out-dir ~/x6871-out
+./tools/verify-kmi-abi.py
 ```
 
 Skrip menjalankan build Bazel resmi, mengambil staging hasil build itu,
@@ -72,12 +74,13 @@ bisa hilang. Detail repack: `HANDOFF.md` §Repack dan `PRETEST.md` §44.
 
 ```bash
 # 1. Dari bootloader fastboot (bootloader unlocked; image tidak ditandatangani)
-fastboot flash vendor_boot x6871-twrp-vendor_boot-v18.img
+fastboot flash boot boot.img
+fastboot flash vendor_boot x6871-twrp-vendor_boot-v19-kmi6.img
 
-# 2. Lewati blok ini jika DLKM v16 sudah terpasang (isinya identik).
-#    Jika belum, masuk fastbootd untuk partisi logis:
+# 2. Masuk fastbootd untuk partisi logis (system_dlkm resmi Google + vendor_dlkm + odm_dlkm):
 fastboot reboot fastboot
 fastboot getvar is-userspace  # harus yes
+fastboot flash system_dlkm system_dlkm.img
 fastboot flash vendor_dlkm vendor_dlkm.img
 fastboot flash odm_dlkm odm_dlkm.img
 
@@ -85,12 +88,13 @@ fastboot flash odm_dlkm odm_dlkm.img
 fastboot reboot
 ```
 
-Rollback (wajib disiapkan sebelum tes): bila awalnya memakai v16,
-flash kembali `x6871-twrp-vendor_boot-v16.img` saja. Untuk rollback penuh ke stock:
+Rollback (wajib disiapkan sebelum tes): untuk kembali ke KMI 5 (`v18`),
+flash balik `boot.img` + `system_dlkm.img` KMI 5 beserta `x6871-twrp-vendor_boot-v18.img`,
+`vendor_dlkm-v16-kmi5.img`, dan `odm_dlkm-v16-kmi5.img`. Untuk rollback penuh ke stock:
 
 ```bash
-fastboot flash vendor_boot /serverhive1/ramabondanp/tmp/x6871/vendor_boot.img
-# dan flash balik stock vendor_dlkm.img / odm_dlkm.img bila perlu
+fastboot flash vendor_boot ~/tmp/x6871/vendor_boot.img
+# dan flash balik stock boot.img / system_dlkm.img / vendor_dlkm.img / odm_dlkm.img bila perlu
 ```
 
 Kalau kernel juga diganti, simpan `boot.img` stock dan flash balik dengan
@@ -181,22 +185,22 @@ Ambil `dmesg` penuh setelah boot, lalu periksa:
 5. Ambil `pstore`/`ramoops` (`/sys/fs/pstore`) atau UART untuk panic.
 6. Rollback dengan image stock sebelum mencoba varian berikutnya.
 
-## 7. Artefak terbaru (`venc-fod-dt2w-20261122`)
+## 7. Artefak terbaru (`gki-kmi6-20261122`)
 
 ```text
-/serverhive1/ramabondanp/tmp/x6871/twrp-vendor_boot-allsrc-display-usb-v10.img
+x6871-twrp-vendor_boot-v19-kmi6.img
   ukuran : 67108864 (sama dengan partisi stock)
-  md5    : 3409f68913613b38d43052458435558b
-  modul  : 222, semuanya hasil build sendiri (kernel 17a6b66d7927)
+  md5    : 91eb249ff001d250fad855c40476f1b5
+  modul  : 222, semuanya hasil build sendiri (kernel 20a8f5d / fa18f7f)
   dtb / bootconfig / vendor_ramdisk01 : identik dengan base TWRP
   modules.load           : 165 entri
   modules.load.recovery  : 216 entri
   modules.dep            : hasil depmod, 0 referensi menggantung
-  vermagic semua modul   : 6.12.38-android16-5-g2c4fd33ae6d8-4k
+  vermagic semua modul   : 6.12.92-android16-6-g7cc745542612-4k
 ```
 
 Catatan historis: image awal 217 modul (`vendor_boot-new.img`), 240 modul
-campuran stock (`cfig` §9–§10), serta `v1`–`v9` sudah digantikan oleh `v10`.
+campuran stock (`cfig` §9–§10), serta `v1`–`v18` (KMI 5) sudah digantikan oleh `v19-kmi6` (KMI 6).
 
 ## 8. Kalau modul gagal load: cek `modules.dep`
 
@@ -255,7 +259,7 @@ Selain `tools/pack-vendor-boot.sh`, image bisa direpack dengan
 format ramdisk.
 
 ```bash
-cd /serverhive1/ramabondanp/tmp
+cd ~/tmp
 git clone --depth 1 https://github.com/cfig/Android_boot_image_editor.git vbwork
 cd vbwork
 cp /path/stock/vendor_boot.img .          # nama harus vendor_boot.img
@@ -336,25 +340,24 @@ yang tidak kita build, jadi modul itu harus tetap ada agar sentuhan hidup.
 
 ## 11. DLKM 100% Source (2026-11-20 s.d. 2026-11-22)
 
-`vendor_dlkm` (**212** modul, `modules.load` 194) dan `odm_dlkm` (**57** modul,
+`vendor_dlkm` (**209** modul pada KMI 6 setelah mengeluarkan 3 modul GKI terproteksi `rfkill`/`bluetooth`/`libarc4`, `modules.load` 191; sebelumnya 212 modul pada KMI 5) dan `odm_dlkm` (**57** modul,
 `modules.load` 57) dibangun 100% dari source menggunakan EROFS dengan opsi
-identik stock + AVB hashtree footer yang dipertahankan. Zip TWRP memetakan
-logical partition (`lptools map`) lalu menulis image dengan `dd` tanpa
-menghapus/membuat ulang partisi.
+identik stock + AVB hashtree footer yang dipertahankan. Template konfigurasi EROFS (`fs_config`, `file_contexts`, `/etc`, daftar modul) dibundel di `tools/dlkm/` dan direpack otomatis oleh `tools/repack-dlkm-latest.sh`.
 
-Artefak DLKM terbaru (`sofod-dt2w-flash-20261122`, kernel `ebca3e1`, raw `.img` untuk `fastbootd`):
+Artefak DLKM terbaru (`gki-kmi6-20261122`, kernel `20a8f5d` / `fa18f7f`, raw `.img` untuk `fastbootd`):
 
 ```text
-x6871-twrp-vendor_boot-v12.img  md5 f345308a330b4ceb5daf586bcd059607  67.108.864 B
-vendor_dlkm.img                 md5 4cb91f7c318d0960289e86fe764448e5  24.551.424 B
-odm_dlkm.img                    md5 411cc6106caedd526767e9f5cfc5a70d   4.206.592 B
+x6871-twrp-vendor_boot-v19-kmi6.img  md5 91eb249ff001d250fad855c40476f1b5  67.108.864 B
+vendor_dlkm.img                      md5 5f7b6cecb1c44a1ffc3280dd481fbfcf  24.551.424 B
+odm_dlkm.img                         md5 6ee3cadceb5c4750dbbfe3d0056b6ea8   4.206.592 B
 ```
 
-Ringkasan perbaikan DLKM + `vendor_boot` yang sudah masuk hingga `v12`:
+Ringkasan perbaikan DLKM + `vendor_boot` yang sudah masuk hingga `v19-kmi6`:
 
 - **Boot system dasar (`dlkm-20261120`..`gpu3`)**: `SCP_IPI_COUNT` 56→59, GPU Mali r54p1-11eac0 donor OPPO + fix padding `gpufreq_shared_status` (`power_count` 0x24..`active_count` 0x34, `temperature` 0x38, `shader_present` 0xe0).
 - **Battery OC & layar (`v2`–`v3`)**: `rfg-mtk-tran-conf-diff`, timing/VFP 144/120/60/40 Hz, C3D dual-pipe SRAM, dan `PQ_VIRTUAL_SET_PROPERTY` 12 B — **layar terverifikasi normal penuh**.
 - **Audio, AOD & kamera (`v4`–`v6`)**: FS1599 PA + `tran_audio_control`, AOD RM69220, 4 sensor kamera X6871 (`s5khm6sx`/`gc32e1`/`gc02m3`/`gc02m3macro`) + `camera_eeprom_v4l2`, `mtk-cam-isp` inline `sink_fmt`, dan flashlight `ocp81375_v4l2`.
 - **VENC, DT2W & FOD (`v7`–`v10`)**: QP ABI 6-field, `VENC_H264 = 1`, `mtk_codec_capability` 24 B + ADAB 4x `U32`, `slbc_request`, enum notifier AOD/HBM DRM, `adaptive-ts` resume khusus `AOD_NOTIFY`, Goodix cmd `0x30` + FOD key `195`, dan `/dev/goodix_fp` + HBM uevent `TRAN_FULL_HBM_EVENT=FULL_HBM_SET` — **rekam video & FOD normal terverifikasi lulus**.
 - **FOD saat AOD, screen-off FOD, DT2W & flashlight (`v11`–`v12`)**: hapus `0x39`/`0x38` idle mode + tabel alpha stock RM69220 (**FOD di AOD terverifikasi lulus**), pertahankan `vddi-gpios` HIGH saat panel power-off (`0d456ba`), `simple_read_from_buffer()` + isolasi `0xcc` dari `"al2"` (`e4ed999`), V4L2 `flash_sgm37864` + nonaktifkan PT throttling di `flashlight-core.h` sesuai stock (`ebca3e1`).
-- Fitur dari 25 modul stock tanpa source (`transsion_tranlog`, `thd`, dll.) tidak disertakan. Detail lengkap ada di `HANDOFF.md` dan `PRETEST.md` §45–§61.
+- **Fast charging HVDCP20, boot race `mtk_iommu`, earpiece `RCV Mux`, penyelarasan `mtu3`, & GKI KMI 6 (`v13`–`v19-kmi6`)**: 6 entri `alg_name_array` + guard (`0af45b1`), inisialisasi `hw_list` sebelum `iommu_device_register` (`5f569d0`), rute `RCV Select=Playback_R_DAC` (`22efa7e`, `aca5276`), penyelarasan `mtu3.ko` dengan stock (`32a8db7`), serta migrasi bersih ke GKI AOSP `android16-6.12-2026-09_r16` (KMI 6) + safeguard `verify-kmi-abi.py` (`96b299e`, `20a8f5d`, `fa18f7f`).
+- Fitur dari 25 modul stock tanpa source (`transsion_tranlog`, `thd`, dll.) tidak disertakan. Detail lengkap ada di `HANDOFF.md` dan `PRETEST.md` §45–§68.

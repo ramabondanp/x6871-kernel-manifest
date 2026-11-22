@@ -11,13 +11,16 @@
 #
 # Usage:
 #   ./tools/repack-dlkm-latest.sh
-#   ./tools/repack-dlkm-latest.sh --out-dir /serverhive1/ramabondanp/x6871-clean/out --work-dir /serverhive1/ramabondanp/x6871-clean/out/dlkm-latest-work
+#   ./tools/repack-dlkm-latest.sh --out-dir "$HOME/x6871-out" --work-dir "$HOME/x6871-out/dlkm-latest-work"
 set -euo pipefail
 
-KERNEL_ROOT=${KERNEL_ROOT:-/serverhive1/ramabondanp/x6871-clean/ws}
-OUT_DIR=${OUT_DIR:-/serverhive1/ramabondanp/x6871-clean/out}
-BASE_TEMPLATE=${BASE_TEMPLATE:-/serverhive1/ramabondanp/x6871-clean/out/v15-work}
-DLKM_CFG=${DLKM_CFG:-/serverhive1/ramabondanp/x6871-clean/dlkm-work/config}
+ROOT=$(cd "$(dirname "$0")/.." && pwd)
+DEFAULT_WS="$HOME/x6871-kernel"
+[ -d "$DEFAULT_WS" ] || [ ! -d "$HOME/x6871-clean/ws" ] || DEFAULT_WS="$HOME/x6871-clean/ws"
+KERNEL_ROOT=${KERNEL_ROOT:-$DEFAULT_WS}
+OUT_DIR=${OUT_DIR:-$(dirname "$KERNEL_ROOT")/out}
+BASE_TEMPLATE=${BASE_TEMPLATE:-$ROOT/tools/dlkm}
+DLKM_CFG=${DLKM_CFG:-$ROOT/tools/dlkm/config}
 WORK_DIR=""
 STAGING=""
 
@@ -109,18 +112,26 @@ specs = [
 
 for part, part_size, uuid in specs:
     print(f"\n[repack-dlkm] === {part} ===")
+    tpl_part = os.path.join(base_tpl, part)
     dst_root = os.path.join(work_dir, part)
-    shutil.copytree(os.path.join(base_tpl, part), dst_root)
+    os.makedirs(os.path.join(dst_root, "lib/modules"), exist_ok=True)
+    if os.path.isdir(os.path.join(tpl_part, "etc")):
+        shutil.copytree(os.path.join(tpl_part, "etc"), os.path.join(dst_root, "etc"), dirs_exist_ok=True)
     mod_dir = os.path.join(dst_root, "lib/modules")
 
-    old_kos = sorted(f for f in os.listdir(mod_dir) if f.endswith(".ko"))
+    mod_list_file = os.path.join(tpl_part, "modules.txt")
+    tpl_mod_dir = os.path.join(tpl_part, "lib/modules")
+    if os.path.isfile(mod_list_file):
+        old_kos = sorted(l.strip() for l in open(mod_list_file) if l.strip() and not l.startswith("#"))
+    elif os.path.isdir(tpl_mod_dir):
+        old_kos = sorted(f for f in os.listdir(tpl_mod_dir) if f.endswith(".ko"))
+    else:
+        sys.exit(f"ERROR: module list not found in {tpl_part}")
+
     dropped = [f for f in old_kos if f in protected_gki_ko]
     keep_kos = [f for f in old_kos if f not in protected_gki_ko]
     if dropped:
         print(f"[repack-dlkm] excluded protected GKI modules from {part}: {dropped}")
-
-    for f in old_kos:
-        os.remove(os.path.join(mod_dir, f))
 
     for f in keep_kos:
         if f not in stg_kos:
@@ -129,8 +140,11 @@ for part, part_size, uuid in specs:
         shutil.copy2(stg_kos[f], dst_ko)
         subprocess.run(["llvm-strip", "--strip-debug", dst_ko], check=True)
 
+    tpl_load = os.path.join(tpl_part, "modules.load")
+    if not os.path.isfile(tpl_load):
+        tpl_load = os.path.join(tpl_mod_dir, "modules.load")
     load_path = os.path.join(mod_dir, "modules.load")
-    load_lines = [l.strip() for l in open(load_path) if l.strip() and os.path.basename(l.strip()) not in protected_gki_ko]
+    load_lines = [l.strip() for l in open(tpl_load) if l.strip() and os.path.basename(l.strip()) not in protected_gki_ko]
     for l in load_lines:
         assert os.path.exists(os.path.join(mod_dir, os.path.basename(l))), f"Dangling modules.load entry: {l}"
     open(load_path, "w").write("\n".join(load_lines) + "\n")

@@ -1,24 +1,26 @@
 # PRETEST — Log Analisis Statis, RE Biner & Investigasi Boot X6871
 
-Dibuat 2026-11-19 sebagai catatan kronologis (§1–§59). Kernel
-`x6871-android16-6.12` saat ini berada di **`17a6b66d7927`** (diperbarui 2026-11-22).
+Dibuat 2026-11-19 sebagai catatan kronologis (§1–§68). Kernel
+`x6871-android16-6.12` saat ini berada di **`fa18f7f`** (diperbarui 2026-11-22).
 
-> **Status 2026-11-22:** Rilis terbaru adalah **`venc-fod-dt2w-20261122`**
-> (`twrp-vendor_boot-allsrc-display-usb-v10.img` + `twrp-dlkm-venc-fod-dt2w-20261122.zip`,
-> **222** modul `vendor_boot` + **269** modul DLKM, 100% source). Angka lama
-> seperti 796 `.ko` pada bagian awal adalah snapshot historis saat itu; angka
-> build sekarang: **806** file / **805** nama unik di staging, **702** flat
-> customer install, `modules.load` 165, `modules.load.recovery` 216.
+> **Status 2026-11-22:** Rilis terbaru adalah **`gki-kmi6-20261122`**
+> (`x6871-twrp-vendor_boot-v19-kmi6.img` + `vendor_dlkm.img` + `odm_dlkm.img`,
+> **222** modul `vendor_boot` + **209** `vendor_dlkm` + **57** `odm_dlkm`, 100% source,
+> dibangun terhadap GKI AOSP murni `android16-6.12-2026-09_r16` / `6.12.92-android16-6`, **KMI 6**).
+> Angka lama seperti 796/806 `.ko` pada bagian awal adalah snapshot historis sebelum
+> pemangkasan allowlist `x6871_modules.bzl` (`fa18f7f`); angka build sekarang: **553** file /
+> **552** nama unik di staging, **419** flat customer install, `modules.load` 165, `modules.load.recovery` 216.
 
 Indeks bagian penting:
 - §23–§26: komposisi 222 modul recovery, set DLKM, storage fork, dan audit kamera
 - §40–§45: verifikasi layar, USB replug, insiden panel basi, repack otomatis, dan repack DLKM
 - §46–§51: SCP, Mali r54p1-11eac0, `gpufreq_shared_status`, battery OC + mode switch panel, C3D dual-pipe, kamera X6871
-- §52–§59: audio FS1599, AOD, `mtk-cam-isp`, flashlight, touch/DT2W, FOD, dan akar masalah VENC (`VENC_H264=1`)
+- §52–§61: audio FS1599, AOD, `mtk-cam-isp`, flashlight, touch/DT2W, FOD (normal/AOD/screen-off), dan akar masalah VENC (`VENC_H264=1`)
+- §62–§68: fast charging HVDCP20 (`alg_name_array`), race `mtk_iommu`, earpiece `Playback_R_DAC`, penyelarasan `mtu3.ko` stock, dan bringup GKI KMI 6 (`android16-6.12-2026-09_r16`) + trim `x6871_modules.bzl`
 
 Tujuan awal (§1–§39): memastikan modul tidak menggantung/menimpa simbol stock
 dan tidak melakukan operasi berbahaya terhadap hardware **sebelum** boot. Bagian
-§40–§59 mendokumentasikan hasil uji device dan perbaikan berbasis dmesg/RE.
+§40–§68 mendokumentasikan hasil uji device dan perbaikan berbasis dmesg/RE.
 
 ## 1. Metode
 
@@ -222,8 +224,8 @@ selama `modules.dep`/`modules.alias` diregenerasi untuk tree staging.
 
 ```bash
 # build
-cd /serverhive1/ramabondanp/w1vo
-TMPDIR=/serverhive1/ramabondanp/tmp BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1 \
+cd ~/x6871-kernel
+TMPDIR=~/tmp BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1 \
   ./tools/bazel --output_user_root="$PWD/out_bazel" build \
   --config=stamp --repo_manifest="$PWD/kernel_device_modules-6.12/fake_manifest.xml" \
   --experimental_writable_outputs --allow_ddk_unsafe_headers=1 \
@@ -235,13 +237,13 @@ TMPDIR=/serverhive1/ramabondanp/tmp BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1 \
   "//kernel_device_modules-6.12:mgk_64_k612_customer_modules_install.user"
 
 # bandingkan empat modul + seluruh staging tree
-cd /serverhive1/ramabondanp/w1vo36-kernel-manifest
+cd ~/x6871-kernel-manifest
 python3 tools/ko-preflight.py \
   --built <staging-tree-flat-symlinks> \
-  --fw /serverhive1/ramabondanp/tmp/x6871/vr/root/lib/modules \
+  --fw ~/tmp/x6871/vr/root/lib/modules \
   --symvers <build>/mgk_64_k612_kernel_aarch64.user/Module.symvers \
-  --json /serverhive1/ramabondanp/tmp/pretest-final.json \
-  --markdown /serverhive1/ramabondanp/tmp/PRETEST-final.md
+  --json ~/tmp/pretest-final.json \
+  --markdown ~/tmp/PRETEST-final.md
 ```
 
 ## 9. Update `tran_fp` — chip id lewat SPI (`29d21b5d018c`)
@@ -284,7 +286,7 @@ sandbox.
 Dijalankan ulang 2026-11-19 atas staging 795 `.ko` hasil build terakhir
 (`mgk_64_k612_customer_modules_install.user`, mt6895,
 `entry_level_legacy.config`). Sumber angka:
-`/serverhive1/ramabondanp/tmp/pretest-final2.json`.
+`~/tmp/pretest-final2.json`.
 
 ### 10.1 Hasil loader
 
@@ -383,10 +385,10 @@ stock yang digantikan build kita** — satu baris per `.ko` firmware, bukan per
 ```bash
 python3 tools/preboot-audit.py \
   --built <staging>/lib/modules/6.12.38-android16-5-g2c4fd33ae6d8-4k \
-  --fw /serverhive1/ramabondanp/tmp/x6871/vr/root/lib/modules \
+  --fw ~/tmp/x6871/vr/root/lib/modules \
   --symvers <build>/mgk_64_k612_kernel_aarch64.user/Module.symvers \
-  --json /serverhive1/ramabondanp/tmp/preboot-audit.json \
-  --markdown /serverhive1/ramabondanp/tmp/preboot-audit.md
+  --json ~/tmp/preboot-audit.json \
+  --markdown ~/tmp/preboot-audit.md
 ```
 
 ### 11.1 Inventory
@@ -1205,7 +1207,7 @@ isi ramdisk-nya.
 ## 24. Set dlkm 100% source (final)
 
 Selain vendor_boot TWRP, set modul untuk `vendor_dlkm` + `odm_dlkm`
-disiapkan di `/serverhive1/ramabondanp/tmp/dlkm-src`. Isinya **269 modul,
+disiapkan di `~/tmp/dlkm-src`. Isinya **269 modul,
 semuanya dari staging build kita**.
 
 Modul stock yang dikeluarkan (25):
@@ -1316,9 +1318,9 @@ dan ukurannya besar (`tran_block` 1.1 MB, `tran-ufshcd-core` 563 KB,
 `tran_scsi_mod` 434 KB).
 
 Bukti: stock `.ko` di
-`/serverhive1/ramabondanp/tmp/twrp-set2/lib/modules/6.12.38-android16-5-g2c4fd33ae6d8-4k/`,
-`/serverhive1/ramabondanp/dmesg3.txt`, dan config kernel stock
-`/serverhive1/ramabondanp/tmp/bootRE_ikconfig`.
+`~/tmp/twrp-set2/lib/modules/6.12.38-android16-5-g2c4fd33ae6d8-4k/`,
+`~/dmesg3.txt`, dan config kernel stock
+`~/tmp/bootRE_ikconfig`.
 
 ## 26. Audit stack kamera: driver sensor tidak ada di source mana pun
 
@@ -1442,13 +1444,13 @@ Jadi target port jelas: `src-v4l2/common/`.
 Lokasi sama persis dengan tree 6.12 kita:
 
 ```text
-/serverhive1/ramabondanp/tmp/mt6897/vendor/mediatek/kernel_modules/mtkcam/
+~/tmp/mt6897/vendor/mediatek/kernel_modules/mtkcam/
   imgsensor/src-v4l2/common/s5khm6sx_mipi_raw/
   imgsensor/src-v4l2/common/gc32e1_mipi_raw/
   imgsensor/src-v4l2/common/gc02m3macro_mipi_raw/
 ```
 
-(ada juga di `/serverhive1/ramabondanp/tmp/ts61-full/...`)
+(ada juga di `~/tmp/ts61-full/...`)
 
 | Sensor | Isi donor | Ukuran |
 |---|---|---|
@@ -1566,7 +1568,7 @@ dipublikasikan; mulai dari driver `common` dulu.
 
 Baseline pengukuran ulang: pakai `tools/stock-vs-src.py` (lihat §26
 bagian metode). Daftar fungsi per modul kamera tersimpan di
-`/serverhive1/ramabondanp/cmp-out/` (`f-<modul>-stock.txt` vs
+`~/cmp-out/` (`f-<modul>-stock.txt` vs
 `f-<modul>-src.txt`).
 
 ## 27. Layar mati di TWRP: `tran_ldo` tidak dimuat (bukan bug build)
@@ -2859,21 +2861,21 @@ repack karena itu tidak menebak format.
 
 ### Reproduksi
 
-- Stock image + tree hasil ekstrak: `/serverhive1/ramabondanp/tmp/dlkm-img/`
+- Stock image + tree hasil ekstrak: `~/tmp/dlkm-img/`
   (`vendor_dlkm.img`, `odm_dlkm.img`, `vendor_dlkm/`, `odm_dlkm/`,
   `config/`).
-- `mkfs.erofs`/`extract.erofs`: `/serverhive1/ramabondanp/tmp/android_tools/bin/`.
-- AVB: `/serverhive1/ramabondanp/tmp/dlkm-build/avbtool.py` (avbtool
+- `mkfs.erofs`/`extract.erofs`: `~/tmp/android_tools/bin/`.
+- AVB: `~/tmp/dlkm-build/avbtool.py` (avbtool
   1.3.0) + `fec` di `tmp/vbwork-twrp/aosp/plugged/bin`, dengan
   `LD_LIBRARY_PATH=tmp/vbwork-twrp/aosp/plugged/lib`.
-- Builder prototipe yang dipakai: `/serverhive1/ramabondanp/work/build_dlkm_images.py`.
+- Builder prototipe yang dipakai: `~/work/build_dlkm_images.py`.
 
 ### Artefak
 
 ```text
-/serverhive1/ramabondanp/tmp/dlkm-out/vendor_dlkm.img
-/serverhive1/ramabondanp/tmp/dlkm-out/odm_dlkm.img
-/serverhive1/ramabondanp/tmp/dlkm-out/twrp-dlkm-source-20261120.zip
+~/tmp/dlkm-out/vendor_dlkm.img
+~/tmp/dlkm-out/odm_dlkm.img
+~/tmp/dlkm-out/twrp-dlkm-source-20261120.zip
   md5 5ae77a5b98cb99491eccabb635d22370
 release: dlkm-20261120
 ```
@@ -3745,7 +3747,7 @@ Status uji user pada `venc-fod-dt2w-20261122` (v10):
    - Fix:
      - `sgm37864.c`: cari child DT `"flash_sgm37864"` lebih dulu (fallback `"flash"`) dan daftarkan subdev dengan nama stock `"sgm37864_v4l2-led{0,1}{,-f}"` (sesuai `TranFlashConfig.json`).
      - `ocp81375.c`: gunakan `ocp81375_mode_ctrl()` di `V4L2_CID_FLASH_LED_MODE` agar mode `MODE_TORCH` bersih ke `MODE_SHDN` saat mati, dan tambah fallback `FLASH_IOC_SET_DUTY` di `ocp81375_ioctl()`.
-4. **Verifikasi biner (build bersih di `/serverhive1/ramabondanp/x6871-clean/ws`)**:
+4. **Verifikasi biner (build bersih di `~/x6871-kernel`)**:
    - `panel-rm69220-vdo-x6871.ko`: tidak ada simbol `aod_mode_*`, `brightness_mapped_to_alpha_256` & `_low` serta 2-entry `hbm_mode_*` hadir; cocok byte-per-byte di `x6871-twrp-vendor_boot-v11.img`.
    - `adaptive-ts.ko`: `simple_read_from_buffer`, `tran_gesture_data_read`/`write`, `tran_gesture_status_read`, `g_tran_gesture_maps` hadir; cocok byte-per-byte di `vendor_boot` v11 dan `odm_dlkm.img`.
    - `sgm37864_v4l2.ko` & `ocp81375_v4l2.ko`: string `flash_sgm37864`, `sgm37864_v4l2-led{0,1}{,-f}`, `FLASH_IOC_SET_DUTY` hadir; cocok byte-per-byte di `vendor_dlkm.img`.
@@ -3780,7 +3782,7 @@ Status uji user pada `aod-dt2w-flash-20261122` (v11):
    - Namun pada `t=16.922` (`soc=13`), `flashlight: pt_trigger: PT trigger(0,1,0) disable flashlight` aktif karena `mgk_64_k612_defconfig` menyalakan `CONFIG_MTK_FLASHLIGHT_PT=y` dan `CONFIG_MTK_FLASHLIGHT_PT_STRICT=y`. Saat baterai <= 15%, `FLASH_IOC_IS_LOW_POWER` mengembalikan `2` sehingga Camera/Torch HAL langsung batal menyalakan LED sebelum mengirim `V4L2_CID_FLASH_TORCH_INTENSITY` / `V4L2_CID_FLASH_LED_MODE`.
    - `llvm-nm` & disassembly stock `flashlight.ko` dan stock `ocp81375_v4l2.ko` memastikan keduanya dibangun **tanpa** `CONFIG_MTK_FLASHLIGHT_PT` / `PT_STRICT` (0 simbol `pt_trigger`/`flashlight_pt_is_low`/`pt_low_bat`).
    - Fix: tambahkan `#undef CONFIG_MTK_FLASHLIGHT_PT` dan `#undef CONFIG_MTK_FLASHLIGHT_PT_STRICT` di `drivers/misc/mediatek/flashlight/flashlight-core.h`.
-4. **Verifikasi biner (build inkremental di `/serverhive1/ramabondanp/x6871-clean/ws`)**:
+4. **Verifikasi biner (build inkremental di `~/x6871-kernel`)**:
    - `panel-rm69220-vdo-x6871.ko`: `panel_ext_lcm_power_set` tidak lagi memanggil `gpiod_set_value` setelah `regulator_disable` (cocok byte-per-byte di `x6871-twrp-vendor_boot-v12.img`).
    - `adaptive-ts.ko`: `tran_gesture_data_write` hanya membandingkan `cmp w8, #0xcc` tanpa `0xff` (cocok byte-per-byte di `vendor_boot` v12 dan `odm_dlkm.img`).
    - `flashlight.ko` & `ocp81375_v4l2.ko` (`sgm37864_v4l2.ko`, `lm3644.ko`): 0 simbol PT di staging maupun hasil ekstraksi `fsck.erofs` dari `vendor_dlkm.img` final.
@@ -3817,7 +3819,7 @@ Status uji user pada `sofod-dt2w-flash-20261122` (v12):
    - Di `dmesg7.txt` baris 5777 dan `pstore1.txt` baris 296 & 1102, `tc_detect_bc12_run` selalu mencetak `do without check vbus_gd or err:-95` (stock `normal2.txt` baris 11324: `switch ic vbus_gd is ready`) karena `.get_vbus_gd` (`mt6375_get_vbus_gd_stat`) tidak terpasang di `mt6375_chg_ops`.
    - Tanpa `get_vbus_gd`, `tc_detect_bc12_run` langsung keluar dari loop tunggu VBUS good dan melewatkan `msleep(100)` sebelum menyalakan BC1.2 pada saat hot-replug (saat `cdp-block` sudah bebas), sehingga BC1.2 berjalan terlalu dini saat VBUS/D+/D- belum stabil. Selain itu, `tc_bc12_dn` belum di-clear sebelum re-enable BC1.2, dan `wq_psy` di `tran_extcon_usb` berjalan di `system_power_efficient_wq` yang bisa race dengan `tran_usb_extcon_update_role(USB_ROLE_NONE)` di `extcon_wq`.
    - Fix: implementasikan `mt6375_get_vbus_gd_stat()` (membaca `F_ST_PWR_RDY` persis disassembly stock `mt6375-charger.ko`) dan pasang `.get_vbus_gd` di `mt6375_chg_ops`, clear `tc_bc12_dn` sebelum mengaktifkan `F_BC12_EN`, dan antrekan `wq_psy` pada `extcon->extcon_wq` agar serial terhadap transisi `USB_ROLE_NONE`.
-4. **Verifikasi biner (build inkremental di `/serverhive1/ramabondanp/x6871-clean/ws`)**:
+4. **Verifikasi biner (build inkremental di `~/x6871-kernel`)**:
    - `tc_charger_framework.ko`: seluruh 6 nama algoritma (`none`, `pe5`, `tc30`, `pd`, `hvdcp20`, `pe20`) + fallback `unknown` + bounds check `cmp #0x5` hadir, cocok byte-per-byte di `odm_dlkm.img` dan `x6871-twrp-vendor_boot-v13.img`.
    - `mt6895-mt6368.ko`: 4 rute DAPM termasuk `"RCV Mux"` hadir di `.rodata`, cocok byte-per-byte di `vendor_dlkm.img`.
    - `mt6375-charger.ko` & `tran_extcon_usb.ko`: `mt6375_get_vbus_gd_stat` dan `queue_delayed_work_on` pada `extcon_wq` hadir, cocok byte-per-byte di `odm_dlkm.img` dan `x6871-twrp-vendor_boot-v13.img`.
@@ -3888,7 +3890,7 @@ Analisis dari `dmesg8.txt` + `logcat6.txt` + disassembly modul stock:
 x6871-twrp-vendor_boot-v16.img  md5 b6a0fb64f1043314a990b420af0c163b  67.108.864 B
 vendor_dlkm.img                 md5 72daa1f10eba75d9cd0e3359a27ff76f  24.551.424 B
 odm_dlkm.img                    md5 99b2194fa63cab8c751f71b8fbd4eb5e   4.206.592 B
-/srv path                       /serverhive1/ramabondanp/x6871-clean/out/
+/srv path                       ~/x6871-out/
 ```
 
 Kernel `68db913` (2 commit: `aca5276` earpiece, `68db913` extcon; di atas `5f569d0`). Image lama v14 disimpan sebagai `vendor_dlkm-v14.img`/`odm_dlkm-v14.img`.
@@ -4016,6 +4018,6 @@ Target: memindahkan seluruh modul X6871 ke GKI upstream AOSP murni **`android16-
 x6871-twrp-vendor_boot-v19-kmi6.img  md5 91eb249ff001d250fad855c40476f1b5  67.108.864 B
 vendor_dlkm.img                      md5 5f7b6cecb1c44a1ffc3280dd481fbfcf  24.551.424 B
 odm_dlkm.img                         md5 6ee3cadceb5c4750dbbfe3d0056b6ea8   4.206.592 B
-/srv path                            /serverhive1/ramabondanp/x6871-clean/out/
+/srv path                            ~/x6871-out/
 rollback KMI 5                       x6871-twrp-vendor_boot-v18.img, vendor_dlkm-v16-kmi5.img, odm_dlkm-v16-kmi5.img
 ```

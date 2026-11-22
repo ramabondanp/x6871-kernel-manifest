@@ -3,8 +3,8 @@
 Sumber: hasil decompile DT yang dipakai X6871.
 
 ```text
-base DTB : /serverhive1/ramabondanp/tmp/x6871/base.dts
-overlay  : /serverhive1/ramabondanp/tmp/x6871/frag0.dts   (dtbo.img, fragment@0-73)
+base DTB : ~/tmp/x6871/base.dts
+overlay  : ~/tmp/x6871/frag0.dts   (dtbo.img, fragment@0-73)
 ```
 
 Kolom **Asal** dihasilkan otomatis:
@@ -21,7 +21,7 @@ Kolom **Asal** dihasilkan otomatis:
 ## Cara regenerasi
 
 ```sh
-cd /serverhive1/ramabondanp
+cd ~
 M=w1vo36-kernel-manifest/tools
 W=w1vo
 L=tmp

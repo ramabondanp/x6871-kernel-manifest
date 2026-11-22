@@ -2,7 +2,7 @@
 # Repack vendor_boot.img from the module set that was JUST built.
 #
 #   ./tools/repack-vendor-boot-latest.sh
-#   ./tools/repack-vendor-boot-latest.sh --out /serverhive1/ramabondanp/tmp/x6871/twrp-vendor_boot-test.img
+#   ./tools/repack-vendor-boot-latest.sh --out "$HOME/tmp/x6871/twrp-vendor_boot-test.img"
 #
 # The script:
 #   1. runs the documented Bazel build (unless --skip-build is given),
@@ -17,9 +17,11 @@
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-KERNEL_ROOT=${KERNEL_ROOT:-/serverhive1/ramabondanp/x6871-clean/ws}
+DEFAULT_WS="$HOME/x6871-kernel"
+[ -d "$DEFAULT_WS" ] || [ ! -d "$HOME/x6871-clean/ws" ] || DEFAULT_WS="$HOME/x6871-clean/ws"
+KERNEL_ROOT=${KERNEL_ROOT:-$DEFAULT_WS}
 TREE="$KERNEL_ROOT/kernel_device_modules-6.12"
-TMPDIR=${TMPDIR:-/serverhive1/ramabondanp/tmp}
+TMPDIR=${TMPDIR:-$HOME/tmp}
 PACKER=${PACKER:-$TMPDIR/vbwork-twrp}
 BASE_OUT=${BASE_OUT:-$TMPDIR/x6871}
 MODLIST="$ROOT/tools/recovery-modules.txt"

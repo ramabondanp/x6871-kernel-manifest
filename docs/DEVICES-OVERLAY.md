@@ -28,7 +28,7 @@ Kolom **Asal**:
 Cara regenerasi:
 
 ```sh
-cd /serverhive1/ramabondanp
+cd ~
 M=w1vo36-kernel-manifest/tools
 ./$M/dts-devices.py tmp/x6871/frag0.dts > cmp-out/dev-overlay.tsv
 ./$M/dts-devices.py tmp/x6871/base.dts > cmp-out/dev-base.tsv

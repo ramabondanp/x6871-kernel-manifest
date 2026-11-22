@@ -1,0 +1,3 @@
+Filesystem created:        Thu Jan  1 00:00:00 2009
+Filesystem UUID:           f820ef93-ab57-5d56-b86c-5929686dfe08
+mkfs.erofs options:        -zlz4hc -T 1230768000 -U f820ef93-ab57-5d56-b86c-5929686dfe08 --mount-point=/vendor_dlkm --fs-config-file=./config/vendor_dlkm_fs_config --file-contexts=./config/vendor_dlkm_file_contexts vendor_dlkm_repack.img ./vendor_dlkm

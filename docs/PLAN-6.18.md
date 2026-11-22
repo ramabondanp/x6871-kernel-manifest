@@ -1,7 +1,7 @@
 # PLAN 6.18 — Rencana Upstreaming X6871 (MT6895) ke `android17-6.18-2026-09_r13`
 
 > **Status (2026-11-22): PLAN ONLY — belum dieksekusi.**
-> Baseline produksi tetap di `android16-6.12-2026-09_r16` (KMI 6, rilis `gki-kmi6-20261122`, workspace `/serverhive1/ramabondanp/x6871-clean/ws`).
+> Baseline produksi tetap di `android16-6.12-2026-09_r16` (KMI 6, rilis `gki-kmi6-20261122`, workspace `~/x6871-kernel`).
 
 ---
 
@@ -18,7 +18,7 @@ Memigrasikan seluruh **487 modul runtime** Infinix GT 20 Pro (X6871 / MT6895) �
 | Clang / Rust | `r536225` / `1.82.0.p2` | `r584948c` / `1.91.1.p3` |
 | Manifest AOSP | `common-android16-6.12-2026-09` | `common-android17-6.18-2026-09` |
 | OS Runtime Target | Android 16 / 17 `system` + Android 16 `vendor` | **Android 17 `system` + Android 16 `vendor` (4KB)** |
-| Workspace | `/serverhive1/ramabondanp/x6871-clean/ws` (tetap utuh) | `/serverhive1/ramabondanp/x6871-6.18/ws` (terpisah) |
+| Workspace | `~/x6871-kernel` (tetap utuh) | `~/x6871-6.18` (terpisah) |
 
 ---
 
@@ -42,7 +42,7 @@ Audit langsung dilakukan dengan mencocokkan seluruh **488 `.ko` runtime** (`v19-
 ### 2.2 Hambatan Utama (Kenapa Ini Proyek Major)
 
 - **Belum ada donor publik MTK 6.18** (`kernel_device_modules-6.18` / `bazel_mgk_rules` 6.18 di Motorola/OPPO/GitHub). Seluruh adaptasi Kleaf dan API internal Linux **6.12 → 6.18** (6 rilis minor: 6.13–6.18) harus dikerjakan manual.
-- **Ruang disk `/serverhive1`**: tersisa ~200 GB (95% terpakai). Sync workspace 6.18 (~50–75 GB termasuk `out_bazel`) wajib memakai `--depth=1` / `-c --no-tags`.
+- **Ukuran workspace Bazel/Kleaf**: sync penuh workspace AOSP kernel (~50–75 GB termasuk `out_bazel`) disarankan memakai `--depth=1` / `-c --no-tags` serta filter grup DDK untuk menghemat ruang disk.
 
 ---
 
@@ -102,7 +102,7 @@ Fase 5: Repack penuh + verify-kmi-abi.py --kver 6.18 (8 gerbang) + uji boot penu
 - Tambah `local_manifest-6.18.xml` di repo manifest (basis: `common-android17-6.18-2026-09/default.xml`):
   - `repo init -u https://android.googlesource.com/kernel/manifest -b common-android17-6.18-2026-09 --depth=1`
   - **Pin tag GKI eksplisit**: branch `android17-6.18-2026-09` di `default.xml` sudah bergerak melewati `r13` (`r14`+), sehingga wajib `<remove-project name="kernel/common" />` lalu pin `path="kernel-6.18" revision="refs/tags/android17-6.18-2026-09_r13"` (`ecdaacc9...`).
-  - **Hemat disk via `groups="ddk,ddk-external"` / `<remove-project>`**: buang ~24 repo berat non-DDK di `default.xml` (stack GBL `bootable/libbootloader`, `prebuilts/fuchsia_sdk`, `prebuilts/vmm`, `external/rust/android-crates-io`, `u-boot` + GCC 4.9, `devices/google/raviole`, `common-modules/*`, `test/ltp`, `prebuilts/jdk/jdk11`) untuk menghemat puluhan GB di `/serverhive1`.
+  - **Hemat disk via `groups="ddk,ddk-external"` / `<remove-project>`**: buang ~24 repo berat non-DDK di `default.xml` (stack GBL `bootable/libbootloader`, `prebuilts/fuchsia_sdk`, `prebuilts/vmm`, `external/rust/android-crates-io`, `u-boot` + GCC 4.9, `devices/google/raviole`, `common-modules/*`, `test/ltp`, `prebuilts/jdk/jdk11`) untuk menghemat puluhan GB ruang disk.
   - **Perubahan struktur AOSP 6.18**: `WORKSPACE.bzlmod` linkfile dihapus (murni Bzlmod); `prebuilts/rust` → `prebuilts/rust-toolchain/linux-x86`; `prebuilts/ndk-r26` → `prebuilts/ndk-r27`; tambahan dep DDK `external/{dwarves,kmod,zstd,argp-standalone,obstack,bazel-contrib-rules_devicetree,bazel-contrib-supply-chain}`.
   - Buat branch `x6871-android17-6.18` dari HEAD stabil `x6871-android16-6.12` pada `alps-kernel_device_modules-6.12` (`20a8f5d`) dan `alps-vendor_mediatek_kernel_modules` (`83b4fa6`).
 - Parameterisasi `KVER=${KVER:-6.12}` / `--kver 6.18` pada `setup.sh`, `build.sh`, `tools/repack-vendor-boot-latest.sh`, `tools/repack-dlkm-latest.sh`, dan `tools/verify-kmi-abi.py` (default tetap `6.12`):

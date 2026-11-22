@@ -3,9 +3,9 @@
 # Repack vendor_boot.img dengan modul hasil build kita (filter nama stock).
 #
 #   ./tools/pack-vendor-boot.sh \
-#       --stock  /serverhive1/ramabondanp/tmp/x6871/vendor_boot.img \
+#       --stock  "$HOME/tmp/x6871/vendor_boot.img" \
 #       --staging <staging>/lib/modules/6.12.38-android16-5-g2c4fd33ae6d8-4k \
-#       --out    /serverhive1/ramabondanp/tmp/x6871/vendor_boot-new.img
+#       --out    "$HOME/tmp/x6871/vendor_boot-new.img"
 #
 # Yang diganti HANYA isi lib/modules di vendor_ramdisk00 (platform).  dtb,
 # bootconfig, dan vendor_ramdisk01 (recovery) disalin apa adanya dari image
@@ -49,8 +49,8 @@ done
 [ -f "$STOCK" ] || die "image stock tidak ada: $STOCK"
 [ -d "$STAGING" ] || die "staging tidak ada: $STAGING"
 
-KERNEL_ROOT=${KERNEL_ROOT:-/serverhive1/ramabondanp/w1vo}
-TMPDIR=${TMPDIR:-/serverhive1/ramabondanp/tmp}
+KERNEL_ROOT=${KERNEL_ROOT:-$HOME/x6871-kernel}
+TMPDIR=${TMPDIR:-$HOME/tmp}
 MKBOOTIMG=${MKBOOTIMG:-$KERNEL_ROOT/tools/mkbootimg/mkbootimg.py}
 UNPACK=${UNPACK_BOOTIMG:-$(command -v unpack_bootimg || echo "$KERNEL_ROOT/tools/mkbootimg/unpack_bootimg.py")}
 STRIP=${STRIP:-$(command -v llvm-strip || command -v aarch64-linux-gnu-strip || true)}
@@ -218,7 +218,7 @@ for pair in sys.argv[2].split():
     if '=' in pair:
         a, b = pair.split('=', 1)
         ren[a] = b
-stock_dir = '/serverhive1/ramabondanp/tmp/x6871/vr/root/lib/modules'
+stock_dir = os.path.expanduser('~/tmp/x6871/vr/root/lib/modules')
 present = {f for f in os.listdir(moddir) if f.endswith('.ko')}
 for name in ('modules.load', 'modules.load.recovery'):
     src = os.path.join(stock_dir, name)

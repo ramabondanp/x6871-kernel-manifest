@@ -12,7 +12,7 @@
 # (set OVERLAYS="" untuk menonaktifkan). Lihat docs/PLAN.md & docs/HANDOFF.md.
 #
 # Output terverifikasi:
-#   - Port X6871 (x6871-android16-6.12): 806 file staging (805 unik), 702 .ko flat
+#   - Port X6871 (x6871-android16-6.12, KMI 6): 553 file staging (552 unik), 419 .ko flat (413 target OOT X6871)
 #   - Baseline MTK murni (mtk-base-latest, OVERLAYS=""): 1.401 .ko, 0 error
 #
 # Tiga hal yang wajib, semuanya dari build.sh MTK/Samsung asli:

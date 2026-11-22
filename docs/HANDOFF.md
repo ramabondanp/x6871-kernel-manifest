@@ -1,6 +1,6 @@
 # HANDOFF — W1VO36 / X6871 kernel device modules
 
-Ditulis 2026-11-19, diperbarui 2026-11-22 untuk sesi AI berikutnya. Baca ini dulu, lalu `PLAN.md`
+Ditulis 2026-11-19, diperbarui 2026-11-22 sebagai referensi teknis & panduan kelanjutan proyek. Baca ini dulu, lalu `PLAN.md`
 (bagian §6.1b, §6.2k, §6.2m, §6.2n, §6.2o, §6.2p, §6.2q, §6.2r, §6.2s,
 §6.2t, §6.2u) dan `PRETEST.md`.
 
@@ -11,15 +11,15 @@ Ditulis 2026-11-19, diperbarui 2026-11-22 untuk sesi AI berikutnya. Baca ini dul
 | GKI base (`kernel-6.12`) | AOSP murni `android16-6.12-2026-09_r16` (`6.12.92-android16-6-g7cc745542612-4k`, **KMI 6**, tanpa patch) |
 | `.ko` flat customer install | **419** (di-trim via `kernel/kleaf/x6871_modules.bzl` ke **413** target OOT X6871; sebelumnya 679) |
 | `.ko` di staging (file / nama unik) | **553 / 552** (`mtk-socinfo` dobel; sebelumnya 813 / 812; action Bazel `4.867 → 919`) |
-| Modul di firmware X6871 | 237 |
-| Nama stock tidak ada di build | **20** (6 tidak direncanakan, 14 kandidat) |
-| Modul recovery vendor_boot | **222**, 100% source (KMI 6) |
+| Modul di firmware X6871 | 237 (`vendor_boot`) + 288 (`vendor_dlkm` + `odm_dlkm`) |
+| Nama stock `vendor_boot` tidak ada di build | **20** (6 tidak direncanakan, 14 kandidat) |
+| Modul recovery `vendor_boot` | **222**, 100% source (KMI 6) |
 | DLKM (`vendor_dlkm` + `odm_dlkm`) | **266** (`209` + `57`), 100% source (KMI 6, bebas `CONFIG_MODULE_SIG_PROTECT`), image siap |
 | Build target | `//kernel_device_modules-6.12:mgk_64_k612_customer_modules_install.user` |
 | Build terakhir | sukses (clean KMI 6 + trimmed X6871 allowlist), 2026-11-22 |
 | Kernel HEAD | `fa18f7f` (`alps-kernel_device_modules-6.12`, `x6871-android16-6.12`, 106 commit di atas `06079c2`) |
 | Vendor MTK modules HEAD | `83b4fa6` (`alps-vendor_mediatek_kernel_modules`, `x6871-android16-6.12`) |
-| Active clean workspace | `/serverhive1/ramabondanp/x6871-clean/ws` (keep old `/serverhive1/ramabondanp/w1vo` untouched) |
+| Active clean workspace | `~/x6871-kernel` |
 | Runtime | **Lulus boot di GKI KMI 6 (`android16-6.12-2026-09_r16`, `v19-kmi6`)** dengan `boot.img` + `system_dlkm.img` resmi Google (0 mismatch CRC vs `abi.stg` `10.630` simbol, 0 kolisi `CONFIG_MODULE_SIG_PROTECT`, 0 unresolved symbol); seluruh subsistem modul sebelumnya lulus di KMI 5 (`v18`) |
 
 ## Status Rilis Terbaru & Ringkasan Riwayat (2026-11-22)
@@ -30,7 +30,7 @@ Ditulis 2026-11-19, diperbarui 2026-11-22 untuk sesi AI berikutnya. Baca ini dul
 x6871-twrp-vendor_boot-v19-kmi6.img  md5 91eb249ff001d250fad855c40476f1b5  67.108.864 B
 vendor_dlkm.img                      md5 5f7b6cecb1c44a1ffc3280dd481fbfcf  24.551.424 B
 odm_dlkm.img                         md5 6ee3cadceb5c4750dbbfe3d0056b6ea8   4.206.592 B
-/srv path                            /serverhive1/ramabondanp/x6871-clean/out/
+/srv path                            ~/x6871-out/
 rollback KMI 5                       x6871-twrp-vendor_boot-v18.img, vendor_dlkm-v16-kmi5.img, odm_dlkm-v16-kmi5.img
 ```
 
@@ -46,7 +46,7 @@ Migrasi GKI ke tag AOSP murni **`android16-6.12-2026-09_r16`** (`6.12.92-android
 x6871-twrp-vendor_boot-v18.img  md5 73b94a9f88ed39a852e8a1343978d37e  67.108.864 B
 vendor_dlkm.img                 md5 72daa1f10eba75d9cd0e3359a27ff76f  24.551.424 B
 odm_dlkm.img                    md5 99b2194fa63cab8c751f71b8fbd4eb5e   4.206.592 B
-/srv path                       /serverhive1/ramabondanp/x6871-clean/out/
+/srv path                       ~/x6871-out/
 ```
 
 Audit v17 (`6230061`) terhadap `mtu3.ko` stock dan `common-6.12/drivers/usb/gadget/udc/core.c`
@@ -69,7 +69,7 @@ Commit `32a8db7` (hasil squash dari revert `6230061` + `f661c15`) menyamakan `mt
 x6871-twrp-vendor_boot-v17.img  md5 68df06607016a34d12bfbe19e2c6df77  67.108.864 B
 vendor_dlkm.img                 md5 72daa1f10eba75d9cd0e3359a27ff76f  24.551.424 B
 odm_dlkm.img                    md5 99b2194fa63cab8c751f71b8fbd4eb5e   4.206.592 B
-/srv path                       /serverhive1/ramabondanp/x6871-clean/out/
+/srv path                       ~/x6871-out/
 ```
 
 Digantikan oleh v18 (`32a8db7`, di-squash dari `6230061`+`f661c15`) karena `usb_gadget_connect()` terbukti no-op dan non-stock (`PRETEST.md` §65–§67).
@@ -80,7 +80,7 @@ Digantikan oleh v18 (`32a8db7`, di-squash dari `6230061`+`f661c15`) karena `usb_
 x6871-twrp-vendor_boot-v16.img  md5 b6a0fb64f1043314a990b420af0c163b  67.108.864 B
 vendor_dlkm.img                 md5 72daa1f10eba75d9cd0e3359a27ff76f  24.551.424 B
 odm_dlkm.img                    md5 99b2194fa63cab8c751f71b8fbd4eb5e   4.206.592 B
-/srv path                       /serverhive1/ramabondanp/x6871-clean/out/
+/srv path                       ~/x6871-out/
 ```
 
 Hasil uji v14 (`dmesg8.txt`/`logcat6.txt`): **charging HVDCP20/PD LULUS, tidak ada panic**. Dua bug sisa diperbaiki (`PRETEST.md` §64):
@@ -93,7 +93,7 @@ Hasil uji v14 (`dmesg8.txt`/`logcat6.txt`): **charging HVDCP20/PD LULUS, tidak a
 x6871-twrp-vendor_boot-v14.img  md5 c5236194d20621543af6eb14a20e9e7b  67.108.864 B
 vendor_dlkm.img                 md5 378d9adf1de9c5a2d3fa8d8466aefd29  24.551.424 B
 odm_dlkm.img                    md5 d6bb4ed087c9f9f69a96c8687c816b2c   4.206.592 B
-/srv path                       /serverhive1/ramabondanp/x6871-clean/out/
+/srv path                       ~/x6871-out/
 ```
 
 Perbaikan tambahan v14 (`PRETEST.md` §63, dari `pstore2.txt`):
@@ -105,7 +105,7 @@ Perbaikan tambahan v14 (`PRETEST.md` §63, dari `pstore2.txt`):
 x6871-twrp-vendor_boot-v13.img  md5 242333a0cc953a3804c593e388984d24  67.108.864 B
 vendor_dlkm.img                 md5 378d9adf1de9c5a2d3fa8d8466aefd29  24.551.424 B
 odm_dlkm.img                    md5 d6bb4ed087c9f9f69a96c8687c816b2c   4.206.592 B
-/srv path                       /serverhive1/ramabondanp/x6871-clean/out/
+/srv path                       ~/x6871-out/
 ```
 
 Hasil uji v12 (`dmesg7.txt`/`logcat5.txt`/`pstore1.txt`): **screen-off FOD, DT2W, dan flashlight LULUS**. 3 bug baru diperbaiki di v13 (`PRETEST.md` §62):
@@ -119,7 +119,7 @@ Hasil uji v12 (`dmesg7.txt`/`logcat5.txt`/`pstore1.txt`): **screen-off FOD, DT2W
 x6871-twrp-vendor_boot-v12.img  md5 f345308a330b4ceb5daf586bcd059607  67.108.864 B
 vendor_dlkm.img                 md5 4cb91f7c318d0960289e86fe764448e5  24.551.424 B
 odm_dlkm.img                    md5 411cc6106caedd526767e9f5cfc5a70d   4.206.592 B
-/srv path                       /serverhive1/ramabondanp/x6871-clean/out/
+/srv path                       ~/x6871-out/
 ```
 
 Hasil uji v11 (`dmesg6.txt`/`logcat4.txt`): **FOD saat AOD LULUS** (layar tidak lagi rusak). Sisa 3 bug diperbaiki di v12 (`PRETEST.md` §61):
@@ -133,7 +133,7 @@ Hasil uji v11 (`dmesg6.txt`/`logcat4.txt`): **FOD saat AOD LULUS** (layar tidak 
 x6871-twrp-vendor_boot-v11.img  md5 f61e734b13b8f95967278f0dd5f61cd6  67.108.864 B
 vendor_dlkm.img                 md5 ffa1ce1106b022a5c9397fe5b5d82ff0  24.551.424 B
 odm_dlkm.img                    md5 88307f5b15ff51b0cce511fb5d1a7427   4.206.592 B
-/srv path                       /serverhive1/ramabondanp/x6871-clean/out/
+/srv path                       ~/x6871-out/
 ```
 
 Hasil uji v10 (`dmesg5.txt`/`logcat3.txt`): rekam video & optical FOD normal **LULUS**. Sisa 3 bug diperbaiki di v11 (`PRETEST.md` §60):
@@ -148,7 +148,7 @@ twrp-vendor_boot-allsrc-display-usb-v10.img  md5 3409f68913613b38d43052458435558
 vendor_dlkm.img                              md5 764c2d3f6fbd14aff802a0614ec7d014  24.551.424 B
 odm_dlkm.img                                 md5 af60243be2a87943f78fc7d254bb690a   4.206.592 B
 twrp-dlkm-venc-fod-dt2w-20261122.zip         md5 92ab587de697a955fceba15ecf335d52
-/srv path                                    /serverhive1/ramabondanp/tmp/dlkm-out/ (+ tmp/x6871/)
+/srv path                                    ~/tmp/dlkm-out/ (+ tmp/x6871/)
 ```
 
 Boot pembanding `normal2.txt` (GKI `Image` kita + modul stock) berhasil merekam video 1080p, DT2W saat AOD, dan FOD — memastikan seluruh bug ada di modul kita (`PRETEST.md` §59):
@@ -174,11 +174,12 @@ Boot pembanding `normal2.txt` (GKI `Image` kita + modul stock) berhasil merekam 
 - **Set DLKM (269 modul)**: EROFS identik opsi stock + AVB hashtree footer; zip TWRP menulis langsung ke logical partition tanpa menghapus partisi. 25 modul stock tanpa source (`transsion_tranlog`, `thd`, varian touch alternatif, dll.) tidak disertakan; `tran_zram` diganti `zsmalloc`+`zram`, ditambah `rfkill`, `bluetooth`, `libarc4`, `task_turbo`.
 - **Repack `vendor_boot`**: selalu pakai `tools/repack-vendor-boot-latest.sh` (lihat §Perintah build / Repack). Jangan menyalin `.ko` dari image lama atau memakai `tools/pack-vendor-boot.sh` legacy (`PRETEST.md` §43/§44).
 
-### Ringkasan riwayat rilis (`v1`–`v17`)
+### Ringkasan riwayat rilis (`v1`–`v19-kmi6`)
 
 | Rilis | `vendor_boot` | Kernel HEAD | Ringkasan perubahan | Referensi |
 |---|---|---|---|---|
-| `mtu3-stock-20261122` | v18 | `f661c15` | Revert `6230061` (no-op non-stock) + samakan `mtu3.ko` dengan stock (`mdelay(4)` off, `ssusb_phy_dp_pullup` di `mtu3_stop`, hapus `cdp-block` di `ssusb_gadget_init`) | `PRETEST.md` §66 |
+| `gki-kmi6-20261122` | v19-kmi6 | `20a8f5d` (`fa18f7f` trimmed) | Migrasi GKI ke AOSP murni `android16-6.12-2026-09_r16` (`6.12.92`, KMI 6, 0 edit GKI), dedup `pstore_{blk,zone}` (`96b299e`), hapus klon `attach_task` di `eas/balance.c` (`20a8f5d`), keluarkan 3 modul GKI terproteksi dari `vendor_dlkm`, + trim allowlist `x6871_modules.bzl` (`fa18f7f`) | `PRETEST.md` §68 |
+| `mtu3-stock-20261122` | v18 | `32a8db7` | Revert `6230061` (no-op non-stock) + samakan `mtu3.ko` dengan stock (`mdelay(4)` off, `ssusb_phy_dp_pullup` di `mtu3_stop`, hapus `cdp-block` di `ssusb_gadget_init`) | `PRETEST.md` §66–§67 |
 | `mtu3-replug-20261122` | v17 | `6230061` | (Direvert di v18) MTU3 `usb_gadget_connect()` pada NONE → DEVICE | `PRETEST.md` §65 |
 | `rcv-usb-20261122` | v16 | `68db913` | Fix earpiece `Playback_R_DAC` (enum/route/`mt_rcv_event`) dan pullup UDC saat replug (workqueue/urutan role switch stock) | `PRETEST.md` §64 |
 | `iommu-chg-earpiece-usb-20261122` | v14 | `5f569d0` | Fix boot race panic `mtk_iommu` (`hw_list` sebelum `iommu_device_register` + NULL guard `larbdev`) di atas v13 | `PRETEST.md` §63 |
@@ -198,28 +199,22 @@ Boot pembanding `normal2.txt` (GKI `Image` kita + modul stock) berhasil merekam 
 | `dlkm-ocfix-20261121` | v2 | `e6d0ab2fb66a` | Battery OC 65 Hz (`rfg-mtk-tran-conf-diff`) + timing switch 144/120/60/40 Hz | `PRETEST.md` §49 |
 | `dlkm-20261120`..`gpu3` | v1 | `07eb1dab07c2` | Repack DLKM 100% source (269 modul), `SCP_IPI_COUNT=59`, Mali r54p1, `gpufreq_shared_status` | `PRETEST.md` §45–§48 |
 
-### Langkah uji berikutnya
+### Langkah verifikasi & pemeliharaan berikutnya
 
-Ikuti `BOOTTEST.md` §3–§4. Jika sudah memakai v16, cukup flash
-`x6871-twrp-vendor_boot-v18.img`; kedua DLKM tidak berubah.
+Ikuti `BOOTTEST.md` §3–§4 untuk setiap pembaruan GKI atau modul:
 
-1. **USB replug**: minimal tiga kali cabut-colok ke PC **tanpa** menjalankan
-   `stop adbd` / `start adbd` atau mengubah mode USB di tengah pengujian.
-   Role DEVICE harus diikuti `pullup D+`, `gadget RESET`, dan `adb -d shell true`.
-   Uji MTP terpisah. Jika masih muncul `mtu3_gadget_pullup (off)` pasca-cabut,
-   ambil `cat /config/usb_gadget/g1/UDC`, `getprop sys.usb.config sys.usb.state sys.usb.ffs.ready vendor.usb.config`,
-   dan `logcat -d -s UsbDeviceManager UsbPortManager UsbGadget adbd` dari Termux.
-2. **Regresi earpiece**: stereo playback (`mux 1`) dan panggilan (`mux 2`).
-3. **Regresi USB/charging**: OTG, charge-only, dan adapter HVDCP20/PD tanpa panic.
+1. **Verifikasi KMI/ABI sebelum flash**: jalankan `./tools/verify-kmi-abi.py` (wajib lulus seluruh 8 gerbang).
+2. **Flash pasangan GKI KMI 6 yang serasi**: `x6871-twrp-vendor_boot-v19-kmi6.img` + `vendor_dlkm.img` + `odm_dlkm.img` wajib dipasangkan dengan `boot.img` + `system_dlkm.img` GKI resmi Google `android16-6.12-2026-09_r16`.
+3. **Checklist regresi subsistem**: layar 144/120/60/40 Hz & AOD, FOD (layar menyala, AOD, screen-off), DT2W, kamera foto & rekam video 1080p, flashlight, audio speaker & earpiece, Wi-Fi/BT, dan fast charging HVDCP20/PD.
 
 ### Catatan kamera, device table & repo
 
 - **Kamera (`PRETEST.md` §26, §51, §53)**: 4 sensor kamera X6871 (`s5khm6sx`, `gc32e1`, `gc02m3`, `gc02m3macro`) + `camera_eeprom_v4l2` sudah diport (`75ca1ac4a1ae`, `scripts/add-camera-x6871.sh`) dan kamera foto + rekam video sudah berjalan. Yang tidak dipublikasikan vendor hanya 46 fungsi kalibrasi OTP per sensor di `camera_eeprom_v4l2` dan patch Ext-ISP (tidak ada node DT/konsumennya di X6871).
 - **Device table (`DEVICES.md` / `DEVICES-OVERLAY.md`)**: 978 node `okay` (470 modul source, 130 built-in, 371 node platform, 7 tanpa driver; bug `of_match` flash LED `_v4l2` sudah diperbaiki).
 - **Repo**:
-  - `alps-kernel_device_modules-6.12` bersih dan ter-push ke `alps`, default branch `x6871-android16-6.12`, HEAD **`f661c15`** (**104 commit** di atas `06079c2`).
+  - `alps-kernel_device_modules-6.12` bersih dan ter-push ke `alps`, default branch `x6871-android16-6.12`, HEAD **`fa18f7f`** (**106 commit** di atas `06079c2`).
   - `alps-vendor_mediatek_kernel_modules` (vendoring terpadu 6 repo vendor Motorola `w1vo36` + 13 modul donor OPPO `mt6896` + 4 commit GPU Mali r54p1 & kamera X6871) ter-push ke `origin`, default branch `x6871-android16-6.12`, HEAD **`83b4fa6`** (di atas base `86edba6`).
-  - Manifest `ramabondanp/x6871-kernel-manifest` (`main`, direktori lokal server `/serverhive1/ramabondanp/w1vo36-kernel-manifest`) mengarah langsung ke kedua repo `alps-*` di branch `x6871-android16-6.12`.
+  - Manifest `ramabondanp/x6871-kernel-manifest` (`main`, `~/x6871-kernel-manifest`) mengarah langsung ke kedua repo `alps-*` di branch `x6871-android16-6.12`.
 
 ## Objective
 
@@ -230,7 +225,7 @@ kalau memang tidak ada source.
 
 ## Aturan keras
 
-1. **Jangan pakai `/tmp`** — pakai `/serverhive1/ramabondanp/tmp`.
+1. **Jangan pakai `/tmp`** — pakai `~/tmp`.
 2. **Selalu commit + push setelah setiap perubahan, tanpa bertanya.**
    Push ke remote `alps` (branch `x6871-android16-6.12`); remote `local` hanya
    kalau tersedia di workspace.
@@ -287,20 +282,20 @@ kalau memang tidak ada source.
 
 ## Lingkungan
 
-- Workspace: `/serverhive1/ramabondanp/x6871-clean/ws` (tree lama `/serverhive1/ramabondanp/w1vo` jangan dipakai)
-- Manifest: `/serverhive1/ramabondanp/w1vo36-kernel-manifest`
-- Oracle firmware (237 `.ko`): `/serverhive1/ramabondanp/tmp/x6871/vr/root/lib/modules/`
-- DTBO otoritatif: `/serverhive1/ramabondanp/tmp/x6871/frag0.dts`
-- Konfigurasi kernel device: `/serverhive1/ramabondanp/tmp/bootRE_ikconfig`
-- Source donor 6.1 lengkap: `/serverhive1/ramabondanp/tmp/ts61-src/kernel/kernel_device_modules-6.1/`
+- Workspace: `~/x6871-kernel` (tree lama `~/x6871-kernel` jangan dipakai)
+- Manifest: `~/x6871-kernel-manifest`
+- Oracle firmware (237 `.ko`): `~/tmp/x6871/vr/root/lib/modules/`
+- DTBO otoritatif: `~/tmp/x6871/frag0.dts`
+- Konfigurasi kernel device: `~/tmp/bootRE_ikconfig`
+- Source donor 6.1 lengkap: `~/tmp/ts61-src/kernel/kernel_device_modules-6.1/`
 - Tarball resmi (donor, **6.1, jangan pernah jadi basis build**):
-  `/serverhive1/ramabondanp/tmp/mt6897-full.tar.gz`
+  `~/tmp/mt6897-full.tar.gz`
 
 ### Perintah build
 
 ```bash
-cd /serverhive1/ramabondanp/x6871-clean/ws
-TMPDIR=/serverhive1/ramabondanp/tmp BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1 \
+cd ~/x6871-kernel
+TMPDIR=~/tmp BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1 \
 ./tools/bazel --output_user_root="$PWD/out_bazel" build --config=stamp \
   --repo_manifest="$PWD/kernel_device_modules-6.12/fake_manifest.xml" \
   --experimental_writable_outputs --allow_ddk_unsafe_headers=1 \
@@ -318,8 +313,8 @@ Staging hasil build:
 ### Repack vendor_boot (WAJIB dari build terbaru)
 
 ```bash
-cd /serverhive1/ramabondanp/w1vo36-kernel-manifest
-./tools/repack-vendor-boot-latest.sh   --out /serverhive1/ramabondanp/tmp/x6871/twrp-vendor_boot-$(date -u +%Y%m%d-%H%M%S).img
+cd ~/x6871-kernel-manifest
+./tools/repack-vendor-boot-latest.sh   --out ~/tmp/x6871/twrp-vendor_boot-$(date -u +%Y%m%d-%H%M%S).img
 ```
 
 Skrip ini menjalankan build di `### Perintah build`, mengambil staging
@@ -335,13 +330,13 @@ Menambah/mengurangi modul recovery: edit `tools/recovery-modules.txt`,
 ### Repack DLKM & Safeguard Verifikasi KMI/ABI (WAJIB untuk setiap rilis & upgrade GKI)
 
 ```bash
-cd /serverhive1/ramabondanp/w1vo36-kernel-manifest
+cd ~/x6871-kernel-manifest
 
 # 1. Repack vendor_dlkm.img + odm_dlkm.img (otomatis buang modul GKI terproteksi,
 #    pakai AOSP mkfs.erofs/avbtool/fec, dan verifikasi AVB hashtree)
 ./tools/repack-dlkm-latest.sh \
-  --out-dir /serverhive1/ramabondanp/x6871-clean/out \
-  --work-dir /serverhive1/ramabondanp/x6871-clean/out/dlkm-latest-work
+  --out-dir ~/x6871-out \
+  --work-dir ~/x6871-out/dlkm-latest-work
 
 # 2. Jalankan 8 gerbang safeguard KMI/ABI terhadap GKI murni & abi.stg resmi
 ./tools/verify-kmi-abi.py
@@ -631,9 +626,9 @@ diberikan oleh interface, dan peta register/callback dibaca dari immediate
 
 ### Buat ulang generator
 
-`/serverhive1/ramabondanp/tmp/gen-tc30-hvdcp20.py` — menghasilkan
+`~/tmp/gen-tc30-hvdcp20.py` — menghasilkan
 `tc_tc30.*`/`tc_hvdcp20.*` dari `tc_pe20` dengan tukar prefix.
-`/serverhive1/ramabondanp/tmp/forkmatch.py` — mencocokkan himpunan fungsi
+`~/tmp/forkmatch.py` — mencocokkan himpunan fungsi
 `.ko` firmware dengan kandidat source MTK.
 
 ### Skrip porting
@@ -644,7 +639,7 @@ diberikan oleh interface, dan peta register/callback dibaca dari immediate
 ## Resep verifikasi
 
 ```bash
-B=<staging di atas>; F=/serverhive1/ramabondanp/tmp/x6871/vr/root/lib/modules
+B=<staging di atas>; F=~/tmp/x6871/vr/root/lib/modules
 # ekspor
 diff <(readelf -sW $B/<m>.ko | awk '$4=="FUNC"&&$7!="UND"&&$5=="GLOBAL"&&$8!=""{print $8}' | sort -u) \
      <(readelf -sW $F/<m>.ko | awk '$4=="FUNC"&&$7!="UND"&&$5=="GLOBAL"&&$8!=""{print $8}' | sort -u)
@@ -710,7 +705,7 @@ curl -LO "$B?ref_type=heads&path=vendor_dlkm"   # 16 MB
 curl -LO "$B?ref_type=heads&path=odm_dlkm"      # 2.6 MB
 ```
 
-Hasil ekstrak ada di `/serverhive1/ramabondanp/tmp/stock-dlkm/`:
+Hasil ekstrak ada di `~/tmp/stock-dlkm/`:
 
 | Partisi | `.ko` | Ukuran | modules.load |
 |---|---|---|---|
@@ -779,5 +774,5 @@ bukan salah config:
 | `imgsensor` (dua partisi) | 597/568 | 33 | 62 | 22 |
 | `tc_charger_framework` | 221/249 | 29 | 1 | 34 |
 
-Data lengkap diff awal: `/serverhive1/ramabondanp/tmp/dlkm-diff.json`.
+Data lengkap diff awal: `~/tmp/dlkm-diff.json`.
 (Repack EROFS + AVB hashtree footer dan boot Android 16 telah diselesaikan pada 2026-11-20; lihat `PRETEST.md` §45.)

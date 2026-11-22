@@ -14,10 +14,10 @@ Safeguards enforced (exit non-zero on any failure):
 
 Usage:
   ./tools/verify-kmi-abi.py
-  ./tools/verify-kmi-abi.py --ws /serverhive1/ramabondanp/x6871-clean/ws \\
-      --vb-dir /serverhive1/ramabondanp/tmp/vbwork-twrp/build/unzip_boot/root.1/lib/modules \\
-      --vd-dir /serverhive1/ramabondanp/x6871-clean/out/v19-kmi6-work/vendor_dlkm/lib/modules \\
-      --od-dir /serverhive1/ramabondanp/x6871-clean/out/v19-kmi6-work/odm_dlkm/lib/modules
+  ./tools/verify-kmi-abi.py --ws "$HOME/x6871-kernel" \\
+      --vb-dir "$HOME/tmp/vbwork-twrp/build/unzip_boot/root.1/lib/modules" \\
+      --vd-dir "$HOME/x6871-out/dlkm-latest-work/vendor_dlkm/lib/modules" \\
+      --od-dir "$HOME/x6871-out/dlkm-latest-work/odm_dlkm/lib/modules"
 """
 
 import argparse
@@ -153,11 +153,15 @@ def check_load_and_dep(part: str, mod_dir: str, errors: list):
 
 
 def main():
+    home = os.path.expanduser("~")
+    default_ws = os.path.join(home, "x6871-kernel")
+    if not os.path.isdir(default_ws) and os.path.isdir(os.path.join(home, "x6871-clean/ws")):
+        default_ws = os.path.join(home, "x6871-clean/ws")
     ap = argparse.ArgumentParser(description="Verify X6871 modules against pure GKI KMI/ABI.")
-    ap.add_argument("--ws", default="/serverhive1/ramabondanp/x6871-clean/ws")
+    ap.add_argument("--ws", default=os.environ.get("KERNEL_ROOT", default_ws))
     ap.add_argument(
         "--vb-dir",
-        default="/serverhive1/ramabondanp/tmp/vbwork-twrp/build/unzip_boot/root.1/lib/modules",
+        default=os.path.join(os.environ.get("TMPDIR", os.path.join(home, "tmp")), "vbwork-twrp/build/unzip_boot/root.1/lib/modules"),
     )
     ap.add_argument("--vd-dir", default=None, help="vendor_dlkm/lib/modules directory")
     ap.add_argument("--od-dir", default=None, help="odm_dlkm/lib/modules directory")

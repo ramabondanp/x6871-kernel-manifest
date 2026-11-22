@@ -18,7 +18,7 @@ import os
 import re
 import sys
 
-L = os.environ.get("TMPDIR", "/serverhive1/ramabondanp/tmp")
+L = os.environ.get("TMPDIR", os.path.expanduser("~/tmp"))
 KD = os.environ.get("KERNEL_VER", "6.12.38-android16-5-g2c4fd33ae6d8-4k")
 
 SRC_DIRS = [

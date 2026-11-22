@@ -119,7 +119,7 @@ Wajib di-flash bersamaan dengan `boot.img` + `system_dlkm.img` GKI **`android16-
 | `dlkm-ocfix-20261121` | v2 | Fix spam IRQ battery OC 65 Hz + timing switch 144/120/60/40 Hz |
 | `dlkm-20261120`..`gpu3` | v1 | DLKM 100% source (269 modul), `SCP_IPI_COUNT=59`, Mali r54p1-11eac0, `gpufreq_shared_status` |
 
-Detail tiap rilis ada di [`docs/HANDOFF.md`](docs/HANDOFF.md) dan [`docs/PRETEST.md`](docs/PRETEST.md) §40–§67.
+Detail tiap rilis ada di [`docs/HANDOFF.md`](docs/HANDOFF.md) dan [`docs/PRETEST.md`](docs/PRETEST.md) §40–§68.
 
 ---
 
@@ -144,13 +144,14 @@ Detail tiap rilis ada di [`docs/HANDOFF.md`](docs/HANDOFF.md) dan [`docs/PRETEST
 
 ```text
 .
+├── LICENSE                 # Lisensi GPL-2.0
 ├── local_manifest.xml      # Overlay manifest AOSP (6 project: 4 Moto + 2 repo alps X6871)
 ├── setup.sh                # Siapkan MODULE.bazel, symlink workspace, trim label mgk_64.bzl
 ├── build.sh                # Wrapper build Bazel+Kleaf
 ├── docs/                   # Dokumentasi status, panduan uji boot, log investigasi, tabel DT
 ├── scripts/                # Skrip baseline MTK, audit sumber, dan skrip porting historis
 ├── patches/                # Patch & sumber tambahan (ramdisk zstd, mtkcam X6871, tc_misc_intf)
-└── tools/                  # Alat repack vendor_boot, daftar modul recovery, & audit biner .ko
+└── tools/                  # Alat repack vendor_boot/DLKM, template DLKM, safeguard KMI/ABI, & audit .ko
 ```
 
 | Lokasi | Fungsi |
@@ -160,15 +161,16 @@ Detail tiap rilis ada di [`docs/HANDOFF.md`](docs/HANDOFF.md) dan [`docs/PRETEST
 | `build.sh` | Wrapper build Bazel+Kleaf (`OVERLAYS=entry_level_legacy.config ./build.sh user`) |
 | `docs/HANDOFF.md` | Status proyek, aturan keras, perintah build/repack, dan pengetahuan teknis kritis |
 | `docs/BOOTTEST.md` | Prosedur flash, rollback, dan checklist uji boot per subsistem |
-| `docs/PRETEST.md` | Log analisis statis, RE biner, dan investigasi bug (§1–§65) |
-| `docs/PLAN.md` | Rencana porting awal dan catatan investigasi mendalam (§6.x) |
+| `docs/PRETEST.md` | Log analisis statis, RE biner, dan investigasi bug (§1–§68) |
+| `docs/PLAN.md`, `docs/PLAN-6.18.md` | Rencana porting awal (§6.x) dan rencana upstreaming `android17-6.18-2026-09_r13` |
 | `docs/DEVICES.md`, `docs/DEVICES-OVERLAY.md` | Pemetaan seluruh node Device Tree X6871 (base DTB + DTBO) ke driver |
 | `scripts/reproduce-cleanup.sh` | Membuat branch `mtk-base-latest` (base MTK murni + 12 patch MTK) |
 | `scripts/audit-sources.sh` | Mencocokkan `.ko` firmware ke berkas sumber berdasarkan isi simbol (bukan nama file) |
 | `scripts/add-*.sh`, `scripts/patch-tc-misc-6.12.sh`, `scripts/port-tc-module.sh` | Skrip porting historis untuk driver Transsion, Iris, panel RM69220, `tran_ldo`, charger, dan kamera X6871 |
 | `patches/` | Patch pendukung (`abie-zstd-ramdisk.patch`, `mtkcam-x6871-camera.patch`, `tc_misc_intf_6_12_extra.c`) |
 | `tools/repack-vendor-boot-latest.sh` | **Repack utama `vendor_boot`**: build terbaru, stage 222 modul, pack TWRP zstd, dan verifikasi md5 per `.ko` |
-| `tools/repack-dlkm-latest.sh` | **Repack utama DLKM (`vendor_dlkm` + `odm_dlkm`)**: stage + strip modul terbaru, otomatis buang modul GKI terproteksi (`CONFIG_MODULE_SIG_PROTECT`), EROFS + AVB hashtree + `avbtool verify_image` |
+| `tools/repack-dlkm-latest.sh` | **Repack utama DLKM (`vendor_dlkm` + `odm_dlkm`)**: stage + strip modul terbaru menggunakan template `tools/dlkm/`, otomatis buang modul GKI terproteksi (`CONFIG_MODULE_SIG_PROTECT`), EROFS + AVB hashtree + `avbtool verify_image` |
+| `tools/dlkm/` | Template terbundel `vendor_dlkm` & `odm_dlkm` (`modules.txt`, `modules.load`, `/etc`, `fs_config`, dan `file_contexts`) |
 | `tools/verify-kmi-abi.py` | **Safeguard KMI/ABI GKI**: verifikasi 8 gerbang (GKI murni bersih, vermagic, `CONFIG_MODULE_SIG_PROTECT`, closure `vendor_boot` & penuh, 0 mismatch CRC vs `gki/aarch64/abi.stg`, 0 simbol non-KMI, dan `modules.dep`/`modules.load`) |
 | `tools/stage-recovery-modules.py` | Stage + strip modul dari staging Bazel dan regenerasi `modules.dep`/`alias`/`softdep` |
 | `tools/recovery-modules.txt` | Daftar otoritatif 222 modul `vendor_boot` |

@@ -5,14 +5,17 @@ belum selesai, pengetahuan kritis. `README.md` = cara build. `PLAN.md` =
 catatan teknis lengkap per temuan (§6.x), termasuk bukti tiap keputusan.
 
 > **Status 2026-11-22:** Seluruh modul `vendor_boot` (222) + `vendor_dlkm`
-> (212) + `odm_dlkm` (57) sudah dibangun **100% dari source** (kernel
-> `17a6b66d7927`, rilis `venc-fod-dt2w-20261122`). Android 16 sudah terbukti
-> boot sampai launcher (layar 144/120/60/40 Hz + AOD, audio, GPU Mali, Wi-Fi,
-> USB replug, kamera foto, touch normal). Rilis terbaru membawa perbaikan akar
-> masalah rekam video (`VENC_H264=1`), DT2W saat AOD, dan optical FOD. Angka
-> 688 `.ko` / 32 hilang di bagian awal dokumen ini adalah snapshot historis
-> 2026-11-19; angka build saat ini 806 file / 805 nama unik di staging, 702
-> flat customer install. Untuk status terkini, mulai dari `HANDOFF.md`.
+> (209) + `odm_dlkm` (57) sudah dibangun **100% dari source** terhadap GKI AOSP murni
+> **`android16-6.12-2026-09_r16`** (`6.12.92-android16-6`, **KMI 6**, kernel HEAD
+> `fa18f7f`, rilis `gki-kmi6-20261122`). Android 16 terbukti boot sampai launcher
+> dengan `boot.img` + `system_dlkm.img` rilis resmi Google, dan seluruh subsistem
+> (layar 144/120/60/40 Hz + AOD, audio speaker & earpiece, GPU Mali r54p1-11eac0,
+> Wi-Fi, fast charging HVDCP20/PD, kamera foto & rekam video 1080p, flashlight,
+> DT2W, serta optical FOD di layar menyala/AOD/screen-off) telah terverifikasi lulus.
+> Angka 688/806 `.ko` di bagian awal dokumen ini adalah snapshot historis; angka build
+> saat ini (setelah trim allowlist `x6871_modules.bzl`) adalah **553** file / **552** nama unik
+> di staging dan **419** flat customer install (919 action Bazel). Untuk status terkini,
+> mulai dari `HANDOFF.md`.
 
 ---
 
@@ -1893,7 +1896,7 @@ Jawaban itu menentukan semua langkah berikutnya.
 
 ---
 
-## 9. Aset yang sudah diunduh (di `/serverhive1/ramabondanp/tmp/`)
+## 9. Aset yang sudah diunduh (di `~/tmp/`)
 
 | Path | Ukuran | Isi |
 |---|---|---|
@@ -1914,20 +1917,14 @@ bisa dipakai membandingkan `CONFIG_*` kita vs device.
 
 ## 10. Status ringkas (diperbarui 2026-11-22)
 
-Sudah terbukti di device (TWRP & Android 16):
+Sudah terbukti di device (TWRP & Android 16, rilis `gki-kmi6-20261122` / kernel `fa18f7f`):
 
-- `vendor_boot` (222 modul) + `vendor_dlkm` (212 modul) + `odm_dlkm` (57 modul) 100% source, 0 unresolved symbol.
-- Android 16 boot sampai launcher dengan GPU Mali r54p1-11eac0, Wi-Fi, UFS/MTK storage, haptic/richtap, stack charger `tc_*`, USB replug berulang, audio FS1599, layar RM69220 (144/120/60/40 Hz + C3D dual-pipe + AOD), touch normal GT9916, dan kamera foto (4 sensor X6871 + flashlight).
-
-Menunggu verifikasi device pada rilis `venc-fod-dt2w-20261122` (`17a6b66d7927`):
-
-- **Rekam video (save)**: fix `VENC_H264 = 1`, `mtk_codec_capability` 24 B + ADAB 4x `U32`, `slbc_request()`, dan error handling `SET_PARAM_DONE`.
-- **DT2W (termasuk saat AOD)**: fix ABI notifier AOD DRM + `adaptive-ts` resume khusus `TRAN_DISP_BLANK_AOD_NOTIFY`.
-- **Optical FOD**: fix `/dev/goodix_fp`, HBM uevent `TRAN_FULL_HBM_EVENT=FULL_HBM_SET`, Goodix cmd `0x30`, dan FOD key `195`.
+- `vendor_boot` (222 modul) + `vendor_dlkm` (209 modul, bebas kolisi `CONFIG_MODULE_SIG_PROTECT`) + `odm_dlkm` (57 modul) 100% source terhadap GKI AOSP murni `android16-6.12-2026-09_r16` (KMI 6), 0 mismatch CRC vs `abi.stg` (10.630 simbol), 0 unresolved symbol.
+- Android 16 boot sampai launcher dengan GPU Mali r54p1-11eac0, Wi-Fi, UFS/MTK storage, haptic/richtap, stack charger `tc_*` + fast charging HVDCP20/PD, audio FS1599 + earpiece (`Playback_R_DAC`), layar RM69220 (144/120/60/40 Hz + C3D dual-pipe + AOD), touch normal GT9916 + DT2W, optical FOD (layar menyala, AOD, screen-off), flashlight V4L2, serta kamera foto & rekam video 1080p (4 sensor X6871 + VENC `VENC_H264=1`).
 
 Belum / sengaja dilewati:
 
 - Kalibrasi OTP `camera_eeprom_v4l2` (46 fungsi per sensor) dan patch Ext-ISP tidak dipublikasikan vendor.
 - 25 modul stock tanpa source (`transsion_tranlog`, `thd`, dll.) dan 7 modul fork storage `fs/atomic_storage/` (diganti baseline GKI/MTK yang sudah terbukti boot).
-- Tingkat B rename `fpsgo`/`game` belum dikerjakan; `mt6991`/`mt6993` belum pernah dibangun.
-- Target ABI `user_customer_abi` tidak bisa lulus (328 simbol duplikat antar varian driver, gagal di `stg merge`); bukan mismatch KMI. Lihat `HANDOFF.md`.
+- Tingkat B rename `fpsgo`/`game` belum dikerjakan; target build di `mgk_64.bzl` kini sudah di-trim ke allowlist 413 target OOT X6871 (`kernel/kleaf/x6871_modules.bzl`).
+- Target ABI `user_customer_abi` tidak bisa lulus (328 simbol duplikat antar varian driver, gagal di `stg merge`); sebagai gantinya verifikasi KMI/ABI resmi dilakukan oleh `./tools/verify-kmi-abi.py` (8 gerbang). Lihat `HANDOFF.md`.

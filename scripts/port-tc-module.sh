@@ -13,8 +13,8 @@
 # Setelah itu build dan bandingkan ekspor GLOBAL dengan firmware.
 set -euo pipefail
 
-SRC=${SRC:-/serverhive1/ramabondanp/tmp/ts61-full/drivers/power/supply/transsion}
-KDIR=${KDIR:-/serverhive1/ramabondanp/w1vo/kernel_device_modules-6.12}
+SRC=${SRC:-$HOME/tmp/ts61-full/drivers/power/supply/transsion}
+KDIR=${KDIR:-$HOME/x6871-kernel/kernel_device_modules-6.12}
 DST=$KDIR/drivers/power/supply/transsion
 
 [ $# -gt 0 ] || { echo "pemakaian: $0 <modul> [...]"; exit 1; }
