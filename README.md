@@ -1,10 +1,10 @@
 # Manifest Kernel 6.12 — Infinix GT 20 Pro (X6871 / MT6895)
 
-Workspace Bazel+Kleaf untuk membangun modul kernel **Android 16 / kernel 6.12 / MediaTek MT6895** untuk **Infinix GT 20 Pro (X6871)** (berbasis donor MTK 6.12 Motorola `w1vo36.88-36-7` + OPPO `mt6896`).
+Workspace Bazel+Kleaf untuk membangun modul kernel **Android 16 / kernel 6.12 / MediaTek MT6895** untuk **Infinix GT 20 Pro (X6871)** — berbasis tree MTK 6.12 Motorola `w1vo36.88-36-7` + donor modul vendor OPPO `mt6896` + port driver Transsion/Infinix dari [Infinix Open Source Center (`opensource.dev.infinixmobility.com`)](https://opensource.dev.infinixmobility.com/) (donor Transsion kernel 6.1 `mt6897` / `android15_kernel_modules_and_devicetree_mt6897.tar.gz`).
 
 - **GKI base (`kernel-6.12`)**: AOSP murni `android16-6.12-2026-09_r16` (`6.12.92-android16-6-g7cc745542612-4k`, **KMI 6**, tanpa patch)
-- **Device modules (`kernel_device_modules-6.12`)**: [`alps-kernel_device_modules-6.12`](https://github.com/ramabondanp/alps-kernel_device_modules-6.12/tree/x6871-android16-6.12) (`x6871-android16-6.12`, **106 commit** di atas baseline `06079c2`, HEAD `fa18f7f`)
-- **Vendor MTK modules (`vendor/mediatek/kernel_modules`)**: [`alps-vendor_mediatek_kernel_modules`](https://github.com/ramabondanp/alps-vendor_mediatek_kernel_modules/tree/x6871-android16-6.12) (`x6871-android16-6.12`, **4 commit** X6871 di atas base Motorola + 13 donor OPPO `86edba6`, HEAD `83b4fa6`)
+- **Device modules (`kernel_device_modules-6.12`)**: [`alps-kernel_device_modules-6.12`](https://github.com/ramabondanp/alps-kernel_device_modules-6.12/tree/x6871-android16-6.12) (`x6871-android16-6.12`, **106 commit** di atas baseline MTK `06079c2`, HEAD `fa18f7f` — mem-port driver Transsion/X6871 dari rilis GPL resmi [Infinix Open Source (`opensource.dev.infinixmobility.com`)](https://opensource.dev.infinixmobility.com/) kernel 6.1 ke 6.12)
+- **Vendor MTK modules (`vendor/mediatek/kernel_modules`)**: [`alps-vendor_mediatek_kernel_modules`](https://github.com/ramabondanp/alps-vendor_mediatek_kernel_modules/tree/x6871-android16-6.12) (`x6871-android16-6.12`, **4 commit** X6871 di atas base Motorola + 13 donor OPPO `86edba6` + 4 sensor kamera X6871 dari donor Transsion 6.1, HEAD `83b4fa6`)
 - **Output build X6871** (di-trim ke allowlist runtime `kernel/kleaf/x6871_modules.bzl`, **413** target OOT): staging **553 file** (**552** nama unik), flat customer install **419** `.ko` (429/429 nama unik runtime X6871 tercakup penuh; action Bazel turun `4.867 → 919`)
 - **Output baseline MTK murni** (`mtk-base-latest`): **1.401** `.ko`
 - **Panduan cepat dokumen**:
@@ -181,6 +181,19 @@ Detail tiap rilis ada di [`docs/HANDOFF.md`](docs/HANDOFF.md) dan [`docs/PRETEST
 ---
 
 ## Catatan Teknis Build
+
+### Sumber Donor & Kredit Open Source
+
+Karena Infinix belum merilis paket source kernel 6.12 khusus X6871 (Android 16), seluruh modul X6871 di proyek ini dirakit 100% dari sumber GPL resmi berikut:
+
+| Komponen | Sumber Upstream / Donor | Keterangan |
+|---|---|---|
+| **GKI (`kernel-6.12`)** | [AOSP `kernel/common`](https://android.googlesource.com/kernel/common) (`android16-6.12-2026-09_r16`) | Linux `6.12.92-android16-6` (KMI 6), murni tanpa modifikasi |
+| **Base MTK 6.12 (`kernel_device_modules-6.12`)** | [`MotorolaMobilityLLC/kernel-kernel_device_modules-6.12`](https://github.com/MotorolaMobilityLLC/kernel-kernel_device_modules-6.12) (`w1vo36.88-36-7`) | Dibersihkan ke baseline MTK murni (`06079c2`) via `scripts/reproduce-cleanup.sh` |
+| **Driver Transsion / Infinix X6871 (donor 6.1)** | [**Infinix Open Source Center (`opensource.dev.infinixmobility.com`)**](https://opensource.dev.infinixmobility.com/) — [direct tarball `android15_kernel_modules_and_devicetree_mt6897.tar.gz`](https://d1wd32b69guoqm.cloudfront.net/opensource/android15_kernel_modules_and_devicetree_mt6897.tar.gz) | Sumber utama driver Transsion yang diport ke 6.12: stack charger `tc_*`, regulator `tran_ldo` (ET5904), `tran_audio_control` + FS1599 PA, `splitswitch-gpio`, `hiber`, basis panel RM692xx, touch Goodix GT9916 + `adaptive-ts`, haptic `tran_richtap_haptic_hv`, flashlight V4L2 (`ocp81375`/`sgm37864`), `tran_fp`, `nfc_i2c`, `leds-aw22xxx`, serta 4 sensor kamera X6871 (`s5khm6sx`, `gc32e1`, `gc02m3`, `gc02m3macro`) + `camera_eeprom_v4l2` |
+| **Vendor MTK 6.12 & GPU Mali r54p1** | Motorola `w1vo36.88-36-7` (6 repo vendor) + donor OPPO `mt6896` (kernel 6.12) | 13 modul `vendor/mediatek/kernel_modules` (`connectivity/*`, `met_drv_v3`, `afs_common_utils`, `hbt_*`, `sched_cus`) + GPU Mali `r54p1-11eac0` (`mali_avalon/a16w`) |
+| **Pixelworks Iris (`mediatek_drm_v1`)** | Gabungan donor Transsion ([Infinix Open Source Center](https://opensource.dev.infinixmobility.com/)) + donor OPPO `mt6896` | 34 berkas driver Pixelworks Iris (`iris_*.c`/`iris_*.h`) + integrasi DRM/panel Transsion (`pixelworks,iris` / `pixelworks,iris-i2c`) di `mediatek_drm_v1` |
+| **Firmware Dump & Referensi Stock X6871** | [`gitlab.com/rama-firmware-dumps/infinix/Infinix-X6871`](https://gitlab.com/rama-firmware-dumps/infinix/Infinix-X6871) (`X6871-16.3.0.155SP20`) | Dump firmware stock X6871 (DTB/DTBO, `vendor_dlkm`, `odm_dlkm`, dan modul `.ko` referensi untuk audit simbol/ABI) |
 
 ### Kenapa ada `scripts/reproduce-cleanup.sh`
 

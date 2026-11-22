@@ -1898,6 +1898,9 @@ Jawaban itu menentukan semua langkah berikutnya.
 
 ## 9. Aset yang sudah diunduh (di `~/tmp/`)
 
+- **Firmware dump X6871 (`X6871-16.3.0.155SP20`)**: [`https://gitlab.com/rama-firmware-dumps/infinix/Infinix-X6871`](https://gitlab.com/rama-firmware-dumps/infinix/Infinix-X6871)
+- **Tarball donor Transsion 6.1 (`mt6897`)**: [`https://d1wd32b69guoqm.cloudfront.net/opensource/android15_kernel_modules_and_devicetree_mt6897.tar.gz`](https://d1wd32b69guoqm.cloudfront.net/opensource/android15_kernel_modules_and_devicetree_mt6897.tar.gz) (dari [`https://opensource.dev.infinixmobility.com/`](https://opensource.dev.infinixmobility.com/))
+
 | Path | Ukuran | Isi |
 |---|---|---|
 | `mt6897-full.tar.gz` | 1,7 G | donor Transsion/MTK (kernel 6.1, mt6897) |
