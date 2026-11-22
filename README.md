@@ -7,11 +7,11 @@ Workspace Bazel+Kleaf untuk membangun modul kernel **Android 16 / kernel 6.12 / 
 - **Output build X6871**: staging **806 file** (**805** nama unik), flat customer install **702** `.ko`
 - **Output baseline MTK murni** (`mtk-base-latest`): **1.401** `.ko`
 - **Panduan cepat dokumen**:
-  - `HANDOFF.md` — ringkasan status terkini, aturan kerja, perintah build/repack, dan pengetahuan kritis
-  - `BOOTTEST.md` — prosedur flash, rollback, dan checklist uji boot per subsistem
-  - `PRETEST.md` — log teknis kronologis (§1–§59) hasil audit statis, RE biner, dan uji device
-  - `PLAN.md` — rencana porting awal dan bukti investigasi per modul (§6.x)
-  - `DEVICES.md` / `DEVICES-OVERLAY.md` — tabel pemetaan node Device Tree X6871 ke driver
+  - [`docs/HANDOFF.md`](docs/HANDOFF.md) — ringkasan status terkini, aturan kerja, perintah build/repack, dan pengetahuan kritis
+  - [`docs/BOOTTEST.md`](docs/BOOTTEST.md) — prosedur flash, rollback, dan checklist uji boot per subsistem
+  - [`docs/PRETEST.md`](docs/PRETEST.md) — log teknis kronologis (§1–§59) hasil audit statis, RE biner, dan uji device
+  - [`docs/PLAN.md`](docs/PLAN.md) — rencana porting awal dan bukti investigasi per modul (§6.x)
+  - [`docs/DEVICES.md`](docs/DEVICES.md) / [`docs/DEVICES-OVERLAY.md`](docs/DEVICES-OVERLAY.md) — tabel pemetaan node Device Tree X6871 ke driver
 
 ---
 
@@ -45,7 +45,7 @@ Gunakan langkah ini bila hanya ingin memverifikasi tree MTK bersih tanpa kode Mo
 
 ```bash
 cd ~/x6871-kernel-manifest
-./reproduce-cleanup.sh ~/kernel-kernel_device_modules-6.12
+./scripts/reproduce-cleanup.sh ~/kernel-kernel_device_modules-6.12
 
 cd ~/x6871-kernel/kernel_device_modules-6.12
 git remote add local ~/kernel-kernel_device_modules-6.12
@@ -109,7 +109,7 @@ Release GitHub: <https://github.com/ramabondanp/x6871-kernel-manifest/releases/t
 | `dlkm-ocfix-20261121` | v2 | Fix spam IRQ battery OC 65 Hz + timing switch 144/120/60/40 Hz |
 | `dlkm-20261120`..`gpu3` | v1 | DLKM 100% source (269 modul), `SCP_IPI_COUNT=59`, Mali r54p1-11eac0, `gpufreq_shared_status` |
 
-Detail tiap rilis ada di `HANDOFF.md` dan `PRETEST.md` §40–§59.
+Detail tiap rilis ada di [`docs/HANDOFF.md`](docs/HANDOFF.md) dan [`docs/PRETEST.md`](docs/PRETEST.md) §40–§59.
 
 ---
 
@@ -130,33 +130,45 @@ Detail tiap rilis ada di `HANDOFF.md` dan `PRETEST.md` §40–§59.
 
 ---
 
-## Daftar Berkas
+## Struktur Direktori
 
-| Berkas | Fungsi |
+```text
+.
+├── local_manifest.xml      # Overlay manifest AOSP (6 project: 4 Moto + 2 repo alps X6871)
+├── setup.sh                # Siapkan MODULE.bazel, symlink workspace, trim label mgk_64.bzl
+├── build.sh                # Wrapper build Bazel+Kleaf
+├── docs/                   # Dokumentasi status, panduan uji boot, log investigasi, tabel DT
+├── scripts/                # Skrip baseline MTK, audit sumber, dan skrip porting historis
+├── patches/                # Patch & sumber tambahan (ramdisk zstd, mtkcam X6871, tc_misc_intf)
+└── tools/                  # Alat repack vendor_boot, daftar modul recovery, & audit biner .ko
+```
+
+| Lokasi | Fungsi |
 |---|---|
 | `local_manifest.xml` | Overlay manifest AOSP: 6 project (4 repo Motorola w1vo/w2we + `alps-kernel_device_modules-6.12` + `alps-vendor_mediatek_kernel_modules`) |
-| `reproduce-cleanup.sh` | Membuat branch `mtk-base-latest` (base MTK murni + 12 patch MTK) |
 | `setup.sh` | Menyiapkan `MODULE.bazel`, symlink `common-6.12` & `../vendor/mediatek` (+ fallback symlink donor OPPO legacy), dan trim label `mgk_64.bzl` |
 | `build.sh` | Wrapper build Bazel+Kleaf (`OVERLAYS=entry_level_legacy.config ./build.sh user`) |
-| `add-*.sh`, `patch-tc-misc-6.12.sh`, `port-tc-module.sh` | Skrip porting historis untuk driver Transsion, Iris, panel RM69220, `tran_ldo`, charger, dan kamera X6871 |
-| `audit-sources.sh` | Mencocokkan `.ko` firmware ke berkas sumber berdasarkan isi simbol (bukan nama file) |
+| `docs/HANDOFF.md` | Status proyek, aturan keras, perintah build/repack, dan pengetahuan teknis kritis |
+| `docs/BOOTTEST.md` | Prosedur flash, rollback, dan checklist uji boot per subsistem |
+| `docs/PRETEST.md` | Log analisis statis, RE biner, dan investigasi bug (§1–§59) |
+| `docs/PLAN.md` | Rencana porting awal dan catatan investigasi mendalam (§6.x) |
+| `docs/DEVICES.md`, `docs/DEVICES-OVERLAY.md` | Pemetaan seluruh node Device Tree X6871 (base DTB + DTBO) ke driver |
+| `scripts/reproduce-cleanup.sh` | Membuat branch `mtk-base-latest` (base MTK murni + 12 patch MTK) |
+| `scripts/audit-sources.sh` | Mencocokkan `.ko` firmware ke berkas sumber berdasarkan isi simbol (bukan nama file) |
+| `scripts/add-*.sh`, `scripts/patch-tc-misc-6.12.sh`, `scripts/port-tc-module.sh` | Skrip porting historis untuk driver Transsion, Iris, panel RM69220, `tran_ldo`, charger, dan kamera X6871 |
+| `patches/` | Patch pendukung (`abie-zstd-ramdisk.patch`, `mtkcam-x6871-camera.patch`, `tc_misc_intf_6_12_extra.c`) |
 | `tools/repack-vendor-boot-latest.sh` | **Repack utama `vendor_boot`**: build terbaru, stage 222 modul, pack TWRP zstd, dan verifikasi md5 per `.ko` |
 | `tools/stage-recovery-modules.py` | Stage + strip modul dari staging Bazel dan regenerasi `modules.dep`/`alias`/`softdep` |
 | `tools/recovery-modules.txt` | Daftar otoritatif 222 modul `vendor_boot` |
 | `tools/modules.load`, `tools/modules.load.recovery` | Daftar muat init (`165` / `216` entri) |
 | `tools/ko-preflight.py`, `tools/preboot-audit.py`, `tools/stock-vs-src.py` | Alat audit simbol/CRC/relokasi modul hasil build dibanding `.ko` stock |
 | `tools/pack-vendor-boot.sh` | Tool legacy (memfilter nama stock) — **jangan dipakai untuk X6871** |
-| `HANDOFF.md` | Status proyek, aturan keras, perintah build/repack, dan pengetahuan teknis kritis |
-| `BOOTTEST.md` | Prosedur flash, rollback, dan checklist uji boot per subsistem |
-| `PRETEST.md` | Log analisis statis, RE biner, dan investigasi bug (§1–§59) |
-| `PLAN.md` | Rencana porting awal dan catatan investigasi mendalam (§6.x) |
-| `DEVICES.md`, `DEVICES-OVERLAY.md` | Pemetaan seluruh node Device Tree X6871 (base DTB + DTBO) ke driver |
 
 ---
 
 ## Catatan Teknis Build
 
-### Kenapa ada `reproduce-cleanup.sh`
+### Kenapa ada `scripts/reproduce-cleanup.sh`
 
 Repo Motorola `kernel-kernel_device_modules-6.12` berisi 321 commit kode device (bogota/taipei/moto) di atas base MTK. Skrip ini mengambil base MTK murni lalu melakukan cherry-pick 12 patch MTK yang diperlukan:
 
@@ -190,4 +202,4 @@ Kombinasi Motorola + donor OPPO ini sudah terbukti boot dan berjalan di Android 
 ### Batasan
 
 - Target `user_customer_abi` **tidak bisa lulus** di tree ini: `stg merge` gagal karena 328 simbol duplikat antar varian driver yang memang dibangun bersamaan (`fpsgo v3+v8`, `mediatek_v2+v1`, `tee gud 510/600/610/700`, `bt mt66xx+linux_v2`). Ini artefak build multi-varian, bukan mismatch KMI. Build referensi MTK/Samsung juga tidak menjalankan target ini.
-- Untuk daftar jebakan build dan rincian status lengkap, lihat `HANDOFF.md`.
+- Untuk daftar jebakan build dan rincian status lengkap, lihat [`docs/HANDOFF.md`](docs/HANDOFF.md).

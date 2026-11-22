@@ -2,7 +2,7 @@
 # Pasang 8 fungsi tambahan 6.12 ke tc_misc_intf.
 # Dipanggil oleh add-tc-charger-stack.sh; bisa juga dipanggil langsung.
 #
-#   ./patch-tc-misc-6.12.sh kernel_device_modules-6.12/drivers/power/supply/transsion
+#   ./scripts/patch-tc-misc-6.12.sh kernel_device_modules-6.12/drivers/power/supply/transsion
 #
 # Kenapa perlu alat terpisah
 # -------------------------
@@ -24,9 +24,9 @@
 # Idempotent.
 set -e
 
-D=${1:?pakai: ./patch-tc-misc-6.12.sh <dir-transsion>}
+D=${1:?pakai: ./scripts/patch-tc-misc-6.12.sh <dir-transsion>}
 HERE=$(cd "$(dirname "$0")" && pwd)
-EXTRA=$HERE/patches/tc_misc_intf_6_12_extra.c
+EXTRA=$HERE/../patches/tc_misc_intf_6_12_extra.c
 
 [ -f "$EXTRA" ] || { echo "ERROR: $EXTRA tidak ada"; exit 1; }
 [ -f "$D/tc_misc_intf.c" ] || { echo "ERROR: jalankan add-tc-charger-stack.sh dulu"; exit 1; }

@@ -3,12 +3,12 @@
 # vendor/mediatek/kernel_modules/mtkcam dari donor mt6897 6.1.
 # Jalankan dari root workspace w1vo, setelah `setup.sh`.
 #
-#   ./add-camera-x6871.sh /path/ke/mt6897-extract
+#   ./scripts/add-camera-x6871.sh /path/ke/mt6897-extract
 #
 # Idempotent: aman dijalankan berulang.
 set -e
 
-SRC=${1:?pakai: ./add-camera-x6871.sh /path/ke/mt6897-extract}
+SRC=${1:?pakai: ./scripts/add-camera-x6871.sh /path/ke/mt6897-extract}
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 D=$SRC/vendor/mediatek/kernel_modules/mtkcam/imgsensor/src-v4l2/common
 T=vendor/mediatek/kernel_modules/mtkcam
@@ -53,9 +53,9 @@ open(p, "w").write(s)
 EOF
 
 echo "== patch mtkcam (BUILD.bazel, i2c_table_cntinuburst_write, camera_eeprom_v4l2)"
-if ! git -C "$T" apply --check "$SCRIPT_DIR/tools/patches/mtkcam-x6871-camera.patch" 2>/dev/null; then
+if ! git -C "$T" apply --check "$SCRIPT_DIR/../patches/mtkcam-x6871-camera.patch" 2>/dev/null; then
     echo "   (patch sudah terpasang atau dilewati)"
 else
-    git -C "$T" apply "$SCRIPT_DIR/tools/patches/mtkcam-x6871-camera.patch"
+    git -C "$T" apply "$SCRIPT_DIR/../patches/mtkcam-x6871-camera.patch"
 fi
 echo "Selesai."
