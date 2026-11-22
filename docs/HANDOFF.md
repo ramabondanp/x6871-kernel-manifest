@@ -16,14 +16,26 @@ Ditulis 2026-11-19, diperbarui 2026-11-22 untuk sesi AI berikutnya. Baca ini dul
 | DLKM (`vendor_dlkm` + `odm_dlkm`) | **269**, 100% source, image siap |
 | Build target | `//kernel_device_modules-6.12:mgk_64_k612_customer_modules_install.user` |
 | Build terakhir | sukses (inkremental), 2026-11-22 |
-| Kernel HEAD | `8944601` (`alps-kernel_device_modules-6.12`, `x6871-android16-6.12`, 99 commit di atas `06079c2`) |
+| Kernel HEAD | `5f569d0` (`alps-kernel_device_modules-6.12`, `x6871-android16-6.12`, 100 commit di atas `06079c2`) |
 | Vendor MTK modules HEAD | `83b4fa6` (`alps-vendor_mediatek_kernel_modules`, `x6871-android16-6.12`) |
 | Active clean workspace | `/serverhive1/ramabondanp/x6871-clean/ws` (keep old `/serverhive1/ramabondanp/w1vo` untouched) |
-| Runtime | **Boot + layar + AOD + kamera foto + rekam video + FOD normal/AOD/screen-off + DT2W + flashlight + Wi-Fi + GPU OK**; rilis `chg-earpiece-usb-20261122` (v13, raw `.img` untuk `fastbootd`) memperbaiki 3 bug baru: panic charging HVDCP20 (`0af45b1`), earpiece speaker `RCV Mux` (`22efa7e`), dan USB replug `get_vbus_gd` + serialisasi `extcon_wq` (`8944601`); siap uji device |
+| Runtime | **Boot + layar + AOD + kamera foto + rekam video + FOD normal/AOD/screen-off + DT2W + flashlight + Wi-Fi + GPU OK**; rilis `iommu-chg-earpiece-usb-20261122` (v14, raw `.img` untuk `fastbootd`) memuat fix race panic boot `mtk_iommu` (`5f569d0`) di atas v13 (panic charging HVDCP20 `0af45b1`, earpiece `RCV Mux` `22efa7e`, USB replug `get_vbus_gd` `8944601`); siap uji device |
 
 ## Status Rilis Terbaru & Ringkasan Riwayat (2026-11-22)
 
-### Rilis aktif: `chg-earpiece-usb-20261122` (kernel `8944601`, `vendor_boot` v13 + DLKM)
+### Rilis aktif: `iommu-chg-earpiece-usb-20261122` (kernel `5f569d0`, `vendor_boot` v14 + DLKM v13)
+
+```text
+x6871-twrp-vendor_boot-v14.img  md5 c5236194d20621543af6eb14a20e9e7b  67.108.864 B
+vendor_dlkm.img                 md5 378d9adf1de9c5a2d3fa8d8466aefd29  24.551.424 B
+odm_dlkm.img                    md5 d6bb4ed087c9f9f69a96c8687c816b2c   4.206.592 B
+/srv path                       /serverhive1/ramabondanp/x6871-clean/out/
+```
+
+Perbaikan tambahan v14 (`PRETEST.md` §63, dari `pstore2.txt`):
+- **Boot-time race panic di `mtk_iommu.ko` (`5f569d0`)**: `mtk_iommu_probe()` sebelumnya memanggil `iommu_device_register()` sebelum menginisialisasi `data->hw_list` dan `data->tlb_lock`, sehingga probe paralel `1e990000.gce` mendapat `hw_list is NULL` (`-ENODEV`) lalu `mtk_iommu_release_device()` memanggil `device_link_remove(dev, NULL)` (NULL deref di `0xe0`). Kini `hw_list`/`tlb_lock` diinisialisasi sebelum `iommu_device_register()` dan `larbdev` dijaga NULL/bounds. (`vendor_dlkm.img` & `odm_dlkm.img` tidak berubah dari v13.)
+
+### Rilis sebelumnya: `chg-earpiece-usb-20261122` (kernel `8944601`, `vendor_boot` v13 + DLKM)
 
 ```text
 x6871-twrp-vendor_boot-v13.img  md5 242333a0cc953a3804c593e388984d24  67.108.864 B
@@ -98,10 +110,11 @@ Boot pembanding `normal2.txt` (GKI `Image` kita + modul stock) berhasil merekam 
 - **Set DLKM (269 modul)**: EROFS identik opsi stock + AVB hashtree footer; zip TWRP menulis langsung ke logical partition tanpa menghapus partisi. 25 modul stock tanpa source (`transsion_tranlog`, `thd`, varian touch alternatif, dll.) tidak disertakan; `tran_zram` diganti `zsmalloc`+`zram`, ditambah `rfkill`, `bluetooth`, `libarc4`, `task_turbo`.
 - **Repack `vendor_boot`**: selalu pakai `tools/repack-vendor-boot-latest.sh` (lihat §Perintah build / Repack). Jangan menyalin `.ko` dari image lama atau memakai `tools/pack-vendor-boot.sh` legacy (`PRETEST.md` §43/§44).
 
-### Ringkasan riwayat rilis (`v1`–`v13`)
+### Ringkasan riwayat rilis (`v1`–`v14`)
 
 | Rilis | `vendor_boot` | Kernel HEAD | Ringkasan perubahan | Referensi |
 |---|---|---|---|---|
+| `iommu-chg-earpiece-usb-20261122` | v14 | `5f569d0` | Fix boot race panic `mtk_iommu` (`hw_list` sebelum `iommu_device_register` + NULL guard `larbdev`) di atas v13 | `PRETEST.md` §63 |
 | `chg-earpiece-usb-20261122` | v13 | `8944601` | Fix panic charging HVDCP20 (`tc30`/`hvdcp20` `alg_name_array` + guard), earpiece speaker (`RCV Mux`), USB replug (`mt6375_get_vbus_gd_stat` + `extcon_wq`) | `PRETEST.md` §62 |
 | `sofod-dt2w-flash-20261122` | v12 | `ebca3e1` | Fix screen-off FOD (`vddi-gpios` tetap HIGH), DT2W (`al2` tidak mematikan `0xcc`), flashlight PT throttling (`#undef PT`/`PT_STRICT`) | `PRETEST.md` §61 |
 | `aod-dt2w-flash-20261122` | v11 | `78a1441` | Fix FOD di AOD (hapus `0x39` idle mode + tabel alpha RM69220), DT2W 1-byte `simple_read_from_buffer` + `gesture_maps`, V4L2 flashlight (`flash_sgm37864` + `ocp81375`) | `PRETEST.md` §60 |
@@ -130,7 +143,7 @@ Flash via `fastbootd` ketiga file `.img` rilis `chg-earpiece-usb-20261122` (`x68
 - **Kamera (`PRETEST.md` §26, §51, §53)**: 4 sensor kamera X6871 (`s5khm6sx`, `gc32e1`, `gc02m3`, `gc02m3macro`) + `camera_eeprom_v4l2` sudah diport (`75ca1ac4a1ae`, `scripts/add-camera-x6871.sh`) dan kamera foto + rekam video sudah berjalan. Yang tidak dipublikasikan vendor hanya 46 fungsi kalibrasi OTP per sensor di `camera_eeprom_v4l2` dan patch Ext-ISP (tidak ada node DT/konsumennya di X6871).
 - **Device table (`DEVICES.md` / `DEVICES-OVERLAY.md`)**: 978 node `okay` (470 modul source, 130 built-in, 371 node platform, 7 tanpa driver; bug `of_match` flash LED `_v4l2` sudah diperbaiki).
 - **Repo**:
-  - `alps-kernel_device_modules-6.12` bersih dan ter-push ke `alps`, default branch `x6871-android16-6.12`, HEAD **`8944601`** (**99 commit** di atas `06079c2`).
+  - `alps-kernel_device_modules-6.12` bersih dan ter-push ke `alps`, default branch `x6871-android16-6.12`, HEAD **`5f569d0`** (**100 commit** di atas `06079c2`).
   - `alps-vendor_mediatek_kernel_modules` (vendoring terpadu 6 repo vendor Motorola `w1vo36` + 13 modul donor OPPO `mt6896` + 4 commit GPU Mali r54p1 & kamera X6871) ter-push ke `origin`, default branch `x6871-android16-6.12`, HEAD **`83b4fa6`** (di atas base `86edba6`).
   - Manifest `ramabondanp/x6871-kernel-manifest` (`main`, direktori lokal server `/serverhive1/ramabondanp/w1vo36-kernel-manifest`) mengarah langsung ke kedua repo `alps-*` di branch `x6871-android16-6.12`.
 

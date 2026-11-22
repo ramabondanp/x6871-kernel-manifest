@@ -2,14 +2,14 @@
 
 Workspace Bazel+Kleaf untuk membangun modul kernel **Android 16 / kernel 6.12 / MediaTek MT6895** untuk **Infinix GT 20 Pro (X6871)** (berbasis donor MTK 6.12 Motorola `w1vo36.88-36-7` + OPPO `mt6896`).
 
-- **Device modules (`kernel_device_modules-6.12`)**: [`alps-kernel_device_modules-6.12`](https://github.com/ramabondanp/alps-kernel_device_modules-6.12/tree/x6871-android16-6.12) (`x6871-android16-6.12`, **99 commit** di atas baseline `06079c2`, HEAD `8944601`)
+- **Device modules (`kernel_device_modules-6.12`)**: [`alps-kernel_device_modules-6.12`](https://github.com/ramabondanp/alps-kernel_device_modules-6.12/tree/x6871-android16-6.12) (`x6871-android16-6.12`, **100 commit** di atas baseline `06079c2`, HEAD `5f569d0`)
 - **Vendor MTK modules (`vendor/mediatek/kernel_modules`)**: [`alps-vendor_mediatek_kernel_modules`](https://github.com/ramabondanp/alps-vendor_mediatek_kernel_modules/tree/x6871-android16-6.12) (`x6871-android16-6.12`, **4 commit** X6871 di atas base Motorola + 13 donor OPPO `86edba6`, HEAD `83b4fa6`)
 - **Output build X6871**: staging **806 file** (**805** nama unik), flat customer install **702** `.ko`
 - **Output baseline MTK murni** (`mtk-base-latest`): **1.401** `.ko`
 - **Panduan cepat dokumen**:
   - [`docs/HANDOFF.md`](docs/HANDOFF.md) — ringkasan status terkini, aturan kerja, perintah build/repack, dan pengetahuan kritis
   - [`docs/BOOTTEST.md`](docs/BOOTTEST.md) — prosedur flash, rollback, dan checklist uji boot per subsistem
-  - [`docs/PRETEST.md`](docs/PRETEST.md) — log teknis kronologis (§1–§62) hasil audit statis, RE biner, dan uji device
+  - [`docs/PRETEST.md`](docs/PRETEST.md) — log teknis kronologis (§1–§63) hasil audit statis, RE biner, dan uji device
   - [`docs/PLAN.md`](docs/PLAN.md) — rencana porting awal dan bukti investigasi per modul (§6.x)
   - [`docs/DEVICES.md`](docs/DEVICES.md) / [`docs/DEVICES-OVERLAY.md`](docs/DEVICES-OVERLAY.md) — tabel pemetaan node Device Tree X6871 ke driver
 
@@ -83,20 +83,21 @@ Seluruh partisi modul (**222** modul `vendor_boot` + **212** `vendor_dlkm` + **5
 | **Earpiece speaker (`RCV Mux`)** | 🔄 Menunggu uji (`v13`) | Tambah rute DAPM `{EXT_SPK_AMP_W_NAME, NULL, "RCV Mux"}` (`22efa7e`) |
 | **USB replug berulang** | 🔄 Menunggu uji (`v13`) | Implementasi `mt6375_get_vbus_gd_stat` (`F_ST_PWR_RDY`) + serialisasi `extcon_wq` (`8944601`) |
 
-### Rilis terbaru: `chg-earpiece-usb-20261122` (kernel `8944601`)
+### Rilis terbaru: `iommu-chg-earpiece-usb-20261122` (kernel `5f569d0`)
 
 ```text
-x6871-twrp-vendor_boot-v13.img  md5 242333a0cc953a3804c593e388984d24  67.108.864 B
+x6871-twrp-vendor_boot-v14.img  md5 c5236194d20621543af6eb14a20e9e7b  67.108.864 B
 vendor_dlkm.img                 md5 378d9adf1de9c5a2d3fa8d8466aefd29  24.551.424 B
 odm_dlkm.img                    md5 d6bb4ed087c9f9f69a96c8687c816b2c   4.206.592 B
 ```
 
-Release GitHub: <https://github.com/ramabondanp/x6871-kernel-manifest/releases/tag/chg-earpiece-usb-20261122>
+Release GitHub: <https://github.com/ramabondanp/x6871-kernel-manifest/releases/tag/iommu-chg-earpiece-usb-20261122>
 
 ### Ringkasan perjalanan rilis
 
 | Rilis | `vendor_boot` | Sorotan utama |
 |---|---|---|
+| `iommu-chg-earpiece-usb-20261122` | v14 | Fix boot race panic `mtk_iommu` (`hw_list` sebelum `iommu_device_register` + NULL guard `larbdev`) di atas v13 |
 | `chg-earpiece-usb-20261122` | v13 | Fix panic charging HVDCP20 (`tc30`/`hvdcp20` `alg_name_array`), earpiece speaker (`RCV Mux`), USB replug (`mt6375_get_vbus_gd_stat` + `extcon_wq`) |
 | `sofod-dt2w-flash-20261122` | v12 | Fix screen-off FOD (`vddi-gpios` tetap HIGH), DT2W (`al2` tidak mematikan `0xcc`), dan flashlight PT throttling sesuai stock |
 | `aod-dt2w-flash-20261122` | v11 | Fix FOD di AOD (hapus `0x39` idle mode + alpha stock), DT2W 1-byte read + `gesture_maps`, V4L2 flashlight (`flash_sgm37864` + `ocp81375`) |

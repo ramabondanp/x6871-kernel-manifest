@@ -1,12 +1,12 @@
 # BOOTTEST — Prosedur Uji Boot & Checklist X6871
 
-> **Status 2026-11-22:** Rilis terbaru adalah **`chg-earpiece-usb-20261122`**
-> (kernel `8944601`, `vendor_boot` v13 + `vendor_dlkm` + `odm_dlkm`,
+> **Status 2026-11-22:** Rilis terbaru adalah **`iommu-chg-earpiece-usb-20261122`**
+> (kernel `5f569d0`, `vendor_boot` v14 + `vendor_dlkm` + `odm_dlkm`,
 > **100% modul source**, raw `.img` untuk `fastbootd`). Android 16 sudah terbukti
 > boot sampai launcher dengan layar normal (144/120/60/40 Hz + AOD), bottom speaker,
 > GPU Mali, Wi-Fi, touch normal, kamera foto + rekam video, optical FOD
 > (layar menyala, AOD, screen-off), DT2W, dan flashlight/torch.
-> Fokus uji terbaru: **charging dengan adapter (HVDCP20/TC30), earpiece speaker, dan USB replug**. Prosedur
+> Fokus uji terbaru: **boot bebas race `mtk_iommu`, charging dengan adapter (HVDCP20/TC30), earpiece speaker, dan USB replug**. Prosedur
 > repack yang berlaku ada di §2 dan §11; catatan §9–§10 adalah arsip historis.
 
 Tujuan: memvalidasi **seluruh boot** (recovery + Android system), bukan hanya satu modul.
@@ -40,11 +40,11 @@ Tujuan: memvalidasi **seluruh boot** (recovery + Android system), bukan hanya sa
    `dtbo.img` tetap milik stock. Ini risiko yang harus diamati di dmesg
    (lihat §5).
 
-## 1. Artefak Terbaru (`chg-earpiece-usb-20261122`)
+## 1. Artefak Terbaru (`iommu-chg-earpiece-usb-20261122`)
 
 | Artefak | Sumber | Catatan |
 |---|---|---|
-| `x6871-twrp-vendor_boot-v13.img` | `tools/repack-vendor-boot-latest.sh` | **222** modul source (`md5 242333a0cc953a3804c593e388984d24`), dtb/bootconfig/recovery TWRP tetap |
+| `x6871-twrp-vendor_boot-v14.img` | `tools/repack-vendor-boot-latest.sh` | **222** modul source (`md5 c5236194d20621543af6eb14a20e9e7b`, termasuk fix `mtk_iommu.ko`), dtb/bootconfig/recovery TWRP tetap |
 | `vendor_dlkm.img` | EROFS + AVB (`fastbootd`) | **212** modul source (`md5 378d9adf1de9c5a2d3fa8d8466aefd29`), termasuk fix `mt6895-mt6368.ko` |
 | `odm_dlkm.img` | EROFS + AVB (`fastbootd`) | **57** modul source (`md5 d6bb4ed087c9f9f69a96c8687c816b2c`), termasuk fix `tc_charger_framework.ko`, `mt6375-charger.ko`, `tran_extcon_usb.ko` |
 | kernel `Image` | `out_bazel/.../mgk_64_k612_kernel_aarch64.user/Image` | opsional, hanya jika `boot.img` ikut diganti |

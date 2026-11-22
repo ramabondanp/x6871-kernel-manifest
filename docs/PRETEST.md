@@ -3832,3 +3832,27 @@ release                                chg-earpiece-usb-20261122 (raw .img untuk
 ```
 
 Kernel `8944601` (3 commit: `0af45b1`, `22efa7e`, `8944601`).
+
+## 63. `pstore2`: fix panic boot awal (`t=1.66s`) race condition `mtk_iommu` (`hw_list is NULL` + `device_link_remove(dev, NULL)`)
+
+Pada uji boot v13 (`pstore2.txt` baris 2566–2621), kernel mengalami NULL pointer dereference di `device_link_remove+0x34/0xfc` (virtual address `0x00000000000000e0`, `x20=0`) pada `t=1.663s` — sebelum modul v13 dimuat:
+- Thread `T1` sedang menjalankan `mtk_iommu_probe()` untuk `1e810000.iommu` dan memanggil `iommu_device_register()` **sebelum** menginisialisasi `data->tlb_lock` dan `data->hw_list`.
+- Secara bersamaan di CPU 0, `T166` (`deferred_probe_work_func`) mem-probe konsumen `mtk_cmdq_mbox 1e990000.gce` → `mtk_iommu_device_group()` melihat `c_data->hw_list == NULL` → mencetak `hw_list is NULL` dan mengembalikan `-ENODEV` (`-19`).
+- Jalur error `__iommu_probe_device()` memanggil `mtk_iommu_release_device()`, yang memanggil `device_link_remove(dev, larbdev)` tanpa mengecek `larbdev != NULL` (untuk port pseudo GCE, `data->larb_imu[larbid].dev == NULL`) → instant panic pada offset `0xe0`.
+
+Perbaikan (`drivers/iommu/mtk_iommu.c`, commit `5f569d0`):
+1. Pindahkan `spin_lock_init(&data->tlb_lock)` dan inisialisasi `list_add_tail` + `data->hw_list` **sebelum** `iommu_device_register()`, dengan cleanup `list_del(&data->list)` jika `iommu_device_register()` gagal.
+2. Tambahkan guard `!fwspec || !data`, pengecekan batas `larbid >= ARRAY_SIZE(data->larb_imu)`, dan `if (larbdev)` sebelum `device_link_remove()` di `mtk_iommu_release_device()`.
+
+Verifikasi biner: `mtk_iommu.ko` hanya dikemas di `vendor_boot` (tidak ada di `vendor_dlkm`/`odm_dlkm`); `mtk_iommu_release_device` di `x6871-twrp-vendor_boot-v14.img` memiliki guard `cbz x1` tepat sebelum `bl device_link_remove`.
+
+### Artefak (`iommu-chg-earpiece-usb-20261122`)
+
+```text
+x6871-twrp-vendor_boot-v14.img         md5 c5236194d20621543af6eb14a20e9e7b  67.108.864 B
+vendor_dlkm.img (sama dengan v13)      md5 378d9adf1de9c5a2d3fa8d8466aefd29  24.551.424 B
+odm_dlkm.img (sama dengan v13)         md5 d6bb4ed087c9f9f69a96c8687c816b2c   4.206.592 B
+release                                iommu-chg-earpiece-usb-20261122 (raw .img untuk fastbootd)
+```
+
+Kernel `5f569d0` (commit: `5f569d0` di atas `8944601`).
