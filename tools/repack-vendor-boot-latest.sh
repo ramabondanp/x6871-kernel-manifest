@@ -78,10 +78,8 @@ else
 fi
 
 if [ -z "$STAGING" ]; then
-    # Pick the newest staging tree.  The output-root hash is not stable.
-    STAGING=$(find "$KERNEL_ROOT/out_bazel" -type d \
-        -path '*/mgk_64_k612_customer_modules_install.user/staging/lib/modules/6.12.*' \
-        -printf '%T@ %p\n' 2>/dev/null | sort -n | tail -1 | cut -d' ' -f2-)
+    # Pick the newest staging tree via direct glob (avoids walking all of out_bazel).
+    STAGING=$(ls -dt "$KERNEL_ROOT"/out_bazel/*/execroot/_main/bazel-out/*/bin/kernel_device_modules-6.12/mgk_64_k612_customer_modules_install.user/staging/lib/modules/6.12.* 2>/dev/null | head -1 || true)
 fi
 [ -n "$STAGING" ] || die "staging hasil build tidak ditemukan"
 [ -d "$STAGING" ] || die "staging tidak ada: $STAGING"
