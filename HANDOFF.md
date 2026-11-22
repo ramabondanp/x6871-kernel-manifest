@@ -19,297 +19,70 @@ Ditulis 2026-11-19, diperbarui 2026-11-22 untuk sesi AI berikutnya. Baca ini dul
 | Kernel HEAD | `17a6b66d7927` (`w1vo36-6.12-port`) |
 | Runtime | **Android boot + layar + audio + AOD + kamera foto + video preview + Wi-Fi + GPU OK**; rilis `venc-fod-dt2w-20261122` memperbaiki akar masalah VENC (`VENC_H264=1`), ABI notifier AOD/HBM DRM (`mediatek_drm_v1`), DT2W saat AOD (`adaptive-ts`), FOD key/proc (`gt9916_common`), dan `/dev/goodix_fp` + HBM uevent (`tran_fp`); siap uji device |
 
-## Status per 2026-11-20 (TWRP final)
+## Status Rilis Terbaru & Ringkasan Riwayat (2026-11-22)
 
-TWRP memakai **222 modul, semuanya hasil build sendiri**; tidak ada `.ko`
-stock di ramdisk. Image yang sudah diuji di device:
-
-```text
-twrp-vendor_boot-allsrc-display-usb.img
-md5 0ecdaa1edb3d405954331539b24c911b
-222 modul; isi = allsrc-display + tran_extcon_usb.ko perbaikan replug
-```
-
-Detail: `PRETEST.md` §23 (set modul), §40 (layar), §42 (USB), §43
-(insiden panel lama), §44 (repack otomatis).
-
-### Yang sudah terbukti di device
-
-- **Layar mati -> nyala**: panel `panel-rm69220-vdo-x6871.ko` memakai
-  8bpc/1056 Mbps seperti stock; resume memanggil `panel_ext_lcm_power_set`
-  + `lcm_prepare` + `lcm_panel_init`, 0 buffer underrun (`dmesg13`).
-- **Cabut-colok USB**: tiga siklus colok / dua siklus cabut; setiap colok
-  menghasilkan `online=1, type=1` (SDP) -> `ssusb_set_mode device` ->
-  `pullup D+` -> `gadget RESET` + enable endpoint (`dmesg14`/`dmesg15`).
-- **Vibrator/richtap**, **touch gt9916**, **UFS/MTK storage**, dan
-  **stack charger `tc_*`** sudah jalan di recovery.
-- Modul recovery tetap **222**; `modules.load` 165 entri dan
-  `modules.load.recovery` 216 entri; `modules.dep` dari `depmod`
-  (flatten), tidak ada unresolved symbol (hanya weak
-  `mtk_drm_gateic_set_backlight`).
-
-### Set modul: 20 nama stock tidak ada, 5 modul build-only
-
-- 20 nama stock tidak ada di build. Enam memang tidak direncanakan: panel
-  `cl8`/`ili7838e` + alias panel X6871, dan tiga modul MMC/SD
-  (`mtk-mmc-mod`, `sd_tray`, `tran_mmc_block`). Empat belas kandidat:
-  7 storage Transsion, 4 terblokir `transsion_tranlog`, dan 3 fitur
-  mandiri (`tkv_recovery`, `tran_rhi`, `tran_expand_key`). Rincian:
-  `## Yang tersisa` di bawah dan `PRETEST.md` §25.
-- Lima modul build-only menggantikan/menambah: `adaptive-ts`,
-  `gt9916_common`, `mtk-mmc`, `panel-rm69220-vdo-x6871`,
-  `tran_richtap_haptic_hv`.
-- Storage memakai jalur MediaTek: `ufshcd`/SCSI/sd/mmc_block **built-in**
-  di kernel + `ufs-mediatek-mod.ko` + `mtk-mmc.ko`. Fork `tran-*` dorman;
-  alasannya di `PRETEST.md` §25.
-- Panel stock `cl8` tidak cocok dengan DT X6871; driver kita memakai
-  compatible `rm69220,fhdp,dsi,vdo,dsc,csot,csot,144hz,x6871`.
-
-### Repack
-
-Selalu pakai `tools/repack-vendor-boot-latest.sh` (lihat §Perintah build /
-Repack). Jangan menyalin `.ko` dari image lama. Baseline lama
-(`cmp-out/vbverify5`, `cmp-out/xcmp`) sudah dihapus supaya insiden panel
-basi tidak terulang (`PRETEST.md` §43/§44).
-
-### System / dlkm
-
-Set `vendor_dlkm` + `odm_dlkm` 100% source sudah di-repack. 269 modul dari
-staging (212 vendor + 57 odm), `modules.load` 194/57, closure simbol kernel
-+ 222 vendor_boot + 269 dlkm: **0 unresolved** (hanya weak
-`mtk_drm_gateic_set_backlight`). 25 nama stock dikeluarkan karena tidak ada
-source; `tran_zram` diganti `zsmalloc`+`zram`, ditambah `rfkill`,
-`bluetooth`, `libarc4`, `task_turbo`.
-
-**dmesg1**: panic SCP di `mtk_ipi_device_register` karena
-`SCP_IPI_COUNT` 56, sedangkan stock `scp.ko` memakai 59 (DT memakai
-chan_id 56/57). Donor 6.1 tidak punya perubahan X6871 ini; angka 59
-dibaca dari biner stock (`mov w3,#0x3b`). Fix kernel `5ba6fb6559ab`,
-hanya `vendor_dlkm` yang di-repack. Detail: `PRETEST.md` §46.
+### Rilis aktif: `venc-fod-dt2w-20261122` (kernel `17a6b66d7927`, `vendor_boot` v10 + DLKM)
 
 ```text
 twrp-vendor_boot-allsrc-display-usb-v10.img  md5 3409f68913613b38d43052458435558b  67.108.864 B
 vendor_dlkm.img                              md5 764c2d3f6fbd14aff802a0614ec7d014  24.551.424 B
 odm_dlkm.img                                 md5 af60243be2a87943f78fc7d254bb690a   4.206.592 B
 twrp-dlkm-venc-fod-dt2w-20261122.zip         md5 92ab587de697a955fceba15ecf335d52
-release terbaru                              venc-fod-dt2w-20261122 (vendor_boot v10 + vendor_dlkm + odm_dlkm)
 /srv path                                    /serverhive1/ramabondanp/tmp/dlkm-out/ (+ tmp/x6871/)
 ```
 
-**`dmesg4`/`normal2` (akar masalah VENC + DT2W + FOD terbukti 100% dari log stock + disassembly)**:
-Boot `normal2.txt` memakai GKI `Image` kita + modul stock dan sukses merekam video 1080p, DT2W saat AOD, serta FOD — membuktikan ketiga bug 100% ada di modul kita:
-1. **Video gagal simpan (`mtk-vcodec-enc.ko`, `17a6b66d7927`)**: `normal2.txt` mencetak `check_codec_id ipi id 1 is correct` saat init VENC; `dmesg3`/`dmesg4` tidak pernah mencetaknya. Di `mtk_vcodec_drv.h`, `VENC_H264..VENC_H263` menyambung enum setelah `VDEC_AV1 (12)` sehingga `VENC_H264 == 13` alih-alih `1`. VCP mengirim `VCU_IPIMSG_ENC_CHECK_CODEC_ID` (`codec_id=1`), `check_codec_id()` diam-diam menolak (`status=-1`), sehingga VCP tidak pernah mengalokasikan buffer ref/rec/comv HW (`0x74..0x88 == 0` -> IOMMU fault `LARB7_PORT24`/`PORT3 mva=0x0` -> VCP WDT). Fix: reset `VENC_H264 = 1`, perluas `struct mtk_codec_capability` ke 24 B + kontrol `ADAB_CAPABILITY` 4x `U32`, kembalikan `slbc_request()` walau `slbc_register_activate_ops` gagal (seperti `normal2.txt`), cek `msg->status != 0` pada `VCU_IPIMSG_ENC_SET_PARAM_DONE`, dan guard NULL `inst`/`vsi` di `mtk_venc_dvfs_sync_vsi_data`.
-2. **DT2W + AOD (`mediatek_drm_v1.ko` `6b45fdaa1ef1` + `adaptive-ts.ko` `379924bf2586`)**: enum `mtk_disp_notify.h` kehilangan `TRAN_DISP_BLANK_NOTIFY_FINGERPRINT (2)` sehingga `TRAN_DISP_BLANK_AOD_NOTIFY` bergeser ke `2` (stock `3`). `mtk_dsi_encoder_enable()` tidak pernah mengirim `TRAN_DISP_BLANK_AOD_NOTIFY`, dan `adaptive-ts` ikut resume pada `MTK_DISP_BLANK_UNBLANK (0)` sehingga masuk AOD langsung mengeluarkan touch dari mode gestur. Fix: samakan enum stock, kirim `TRAN_DISP_BLANK_AOD_NOTIFY (3)` hanya saat `!mtk_dsi_doze_state(dsi)` (keluar AOD / unblank penuh), dan `adaptive-ts` hanya resume pada `TRAN_DISP_BLANK_AOD_NOTIFY (3)`.
-3. **FOD (`tran_fp.ko` `55aa13232a43` + `mediatek_drm_v1.ko` `6b45fdaa1ef1` + `gt9916_common.ko` `379924bf2586`)**:
-   - `tran_fp`: daftarkan `/dev/goodix_fp` (sebelumnya `"tran_fp"` sehingga HAL Goodix gagal buka device), set SPI 8-bit/4 MHz/mode 0, aktifkan `tran_fp_irq_init()` (pilih pinctrl `pins_irq` dengan guard NULL `irq_init`), dan aktifkan tanpa syarat pengiriman uevent `TRAN_FULL_HBM_EVENT=FULL_HBM_SET` saat `TRAN_DISP_BLANK_NOTIFY_FINGERPRINT (2)`.
+Boot pembanding `normal2.txt` (GKI `Image` kita + modul stock) berhasil merekam video 1080p, DT2W saat AOD, dan FOD — memastikan seluruh bug ada di modul kita (`PRETEST.md` §59):
+
+1. **Rekam video / VENC (`mtk-vcodec-enc.ko`, `17a6b66d7927`)**: `normal2.txt` mencetak `check_codec_id ipi id 1 is correct` saat init VENC, sedangkan `dmesg3`/`dmesg4` tidak pernah mencetaknya. Di `mtk_vcodec_drv.h`, `VENC_H264..VENC_H263` menyambung enum setelah `VDEC_AV1 (12)` sehingga `VENC_H264 == 13` alih-alih `1`. `check_codec_id()` diam-diam membalas `status=-1`, membuat VCP tidak mengalokasikan buffer ref/rec/comv HW (`0x74..0x88 == 0` → fault `LARB7_PORT24`/`PORT3 mva=0x0` → VCP WDT). Fix: reset `VENC_H264 = 1`, perluas `struct mtk_codec_capability` ke 24 B + kontrol `ADAB_CAPABILITY` 4x `U32`, jalankan `slbc_request()` walau `slbc_register_activate_ops` gagal, cek `msg->status != 0` pada `VCU_IPIMSG_ENC_SET_PARAM_DONE`, dan guard NULL `inst`/`vsi` di `mtk_venc_dvfs_sync_vsi_data`.
+2. **DT2W saat AOD (`mediatek_drm_v1.ko` `6b45fdaa1ef1` + `adaptive-ts.ko` `379924bf2586`)**: `mtk_disp_notify.h` kehilangan `TRAN_DISP_BLANK_NOTIFY_FINGERPRINT (2)` sehingga `TRAN_DISP_BLANK_AOD_NOTIFY` bergeser ke `2` (stock `3`). `mtk_dsi_encoder_enable()` belum mengirim `TRAN_DISP_BLANK_AOD_NOTIFY`, dan `adaptive-ts` ikut resume pada `MTK_DISP_BLANK_UNBLANK (0)` sehingga masuk AOD langsung membangunkan touch dari mode gestur. Fix: samakan enum stock, kirim `TRAN_DISP_BLANK_AOD_NOTIFY (3)` hanya saat `!mtk_dsi_doze_state(dsi)` (unblank penuh / keluar AOD), dan `adaptive-ts` hanya resume pada `TRAN_DISP_BLANK_AOD_NOTIFY (3)`.
+3. **Optical FOD (`tran_fp.ko` `55aa13232a43` + `mediatek_drm_v1.ko` `6b45fdaa1ef1` + `gt9916_common.ko` `379924bf2586`)**:
+   - `tran_fp`: daftarkan `/dev/goodix_fp` (sebelumnya `"tran_fp"`), set SPI 8-bit/4 MHz/mode 0, aktifkan `tran_fp_irq_init()` (guard NULL pada `irq_init` agar pinctrl `pins_irq` tetap dipilih), dan aktifkan tanpa syarat pengiriman uevent `TRAN_FULL_HBM_EVENT=FULL_HBM_SET` pada `TRAN_DISP_BLANK_NOTIFY_FINGERPRINT (2)`.
    - `mediatek_drm_v1`: kirim `TRAN_DISP_BLANK_NOTIFY_FINGERPRINT (2)` di akhir `mtk_drm_crtc_set_panel_hbm(crtc, true)`.
-   - `gt9916_common`: `/proc/fingerprint_status` menulis perintah Goodix `0x30` (`len=5`, `data[0]=0`/`1`), `brl_gesture()` zero-init `cmd`, `brl_event_handler()` mendeteksi FOD down (`0x88`) / up (`(pre_buf[0] & 0xf) == 0`) dan melaporkan key `195` (`0xc3`), serta `goodix_ts_resume()` membersihkan `g_fp_flag`. Detail: `PRETEST.md` §59.
+   - `gt9916_common`: `/proc/fingerprint_status` menulis perintah Goodix `0x30` (`len=5`, `data[0]=0`/`1`), `brl_gesture()` zero-init `cmd`, `brl_event_handler()` mendeteksi FOD down (`0x88`) / up (`(pre_buf[0] & 0xf) == 0`) dengan key `195` (`0xc3`), dan `goodix_ts_resume()` membersihkan `g_fp_flag`.
 
-**Rilis sebelumnya (`video-touch-20261121`, kernel `6566cb27da18`)**:
-```text
-twrp-vendor_boot-allsrc-display-usb-v9.img  md5 e6c1d4300ec7237de942444c02574890  67.108.864 B
-vendor_dlkm.img                             md5 af17ac6c8a9ab7769832264309919d06  24.551.424 B
-odm_dlkm.img                                md5 8eedcdc26ed7824fb3c1675fa1b92b09   4.206.592 B
-twrp-dlkm-video-touch-20261121.zip          md5 9de4714014cc820a068dd92b65cc7604
-```
+### Yang sudah terbukti di device (TWRP & Android 16)
 
-**dmesg3 (rilis `touchfix-20261121`, kernel `a453c308cc33`)**:
-1. **Touch normal** (116 `goodix_ts_report_finger`, tidak ada storm 0xcc).
-2. **DT2W**: 2 IRQ gestur, keduanya checksum error (`touch_head 00 24 ...`),
-   karena `pm_wakeup_event` dipindah setelah loop modul sehingga SPI masih
-   suspend saat dibaca. Fix `a92c1df2d2`: wake di awal IRQ (stock), satu
-   `event_handler`, dan clear event di path valid maupun error/invalid.
-3. **SLBC**: `slbc_register_activate_ops fail` tetapi `slbc_request` tetap
-   dipanggil. Fix `587ecdcd3c`: SLBC hanya dipakai bila registrasi sukses.
-4. **VENC**: fault `mva=0x0` masih terjadi. `90d09de3a7` menambah log
-   `VSI venc: input0/input1/bs_addr/bs_dma/...` untuk uji berikutnya.
-5. **FOD**: `6566cb27da` mengaktifkan `TRAN_FP_INFO`; belum ada bukti baru
-   selain `TRAN_FP_READ_FP_ID` + netlink `invalid PID` di dmesg2.
-6. Detail: `PRETEST.md` §58.
+- **Boot & recovery**: TWRP + Android 16 boot sampai launcher dengan **222** modul `vendor_boot` (`modules.load` 165, `modules.load.recovery` 216) + **269** modul DLKM (**212** `vendor_dlkm` + **57** `odm_dlkm`, `modules.load` 194/57), 100% source, closure simbol **0 unresolved** (hanya weak `mtk_drm_gateic_set_backlight`).
+- **Layar & AOD**: `panel-rm69220-vdo-x6871.ko` (4 mode 144/120/60/40 Hz byte-identik stock, 8bpc/1056 Mbps, 0 underrun) + `mediatek_drm_v1.ko` (C3D dual-pipe SRAM + `PQ_VIRTUAL_SET_PROPERTY` 12 B + AOD).
+- **GPU & SCP**: Mali r54p1-11eac0 donor OPPO + fix layout `gpufreq_shared_status` + `SCP_IPI_COUNT=59`.
+- **USB, Charger & Audio**: replug USB berulang normal (`tran_extcon_usb` `af55c9c00426`), spam IRQ battery OC 65 Hz ditutup (`rfg-mtk-tran-conf-diff`), audio FS1599 PA + `tran_audio_control` normal, haptic + Wi-Fi + UFS/MTK storage + touch normal OK.
+- **Kamera foto & preview**: 4 sensor X6871 (`s5khm6sx`, `gc32e1`, `gc02m3`, `gc02m3macro`) + `camera_eeprom_v4l2` + `mtk-cam-isp` inline `sink_fmt` + flashlight `ocp81375_v4l2`.
 
-Kernel `6566cb27da18`. Artefak sebelumnya `touchfix-20261121` (v8) tetap
-tersedia di release GitHub.
+### Komposisi modul & repack
 
-**dmesg2 (rilis `qpabi-fpgest-20261121`, kernel `6b2a88973414`)**:
-1. **Touch mati**: 170 `got valid gesture type 0xcc`, 0 `goodix_ts_report_finger`.
-   Gate `tools_ctrl_sync` selalu false sehingga IRQ screen-on dikonsumsi sebagai
-   gestur; `after_event_handler` tidak jalan karena core early-return pada
-   `EVT_CANCEL_IRQEVT`, jadi event 0xcc tidak pernah dibersihkan.
-2. **Fix `a453c308cc33`**: kembalikan gate `suspended` (stock field `[core+908]`),
-   panggil `after_event_handler()` setelah gestur valid, dan pindahkan
-   `pm_wakeup_event()` ke setelah loop modul eksternal supaya gesture dibaca
-   sebelum display resume mereset IC.
-3. **FOD**: `tran_fp` probe berhasil (tidak ada error chip-id); `tran_netlink_send`
-   gagal dengan `invalid PID` pada t=13.77 karena HAL belum mengirim pesan
-   netlink. HAL lalu set `vendor.fingerprint.init.error` (ditolak SELinux).
-   Ini kandidat utama FOD berikutnya, bukan deteksi chip.
-4. **VENC**: `mtk-vcodec-enc 17800000.venc_gcon` gagal probe `-22` (tidak ada
-   `mediatek,platform`); device utama `17020000.venc` tetap bisa dibuka. Belum
-   ada rekaman video di dmesg2, jadi perbaikan QP belum teruji.
-5. Detail: `PRETEST.md` §57.
+- **Set `vendor_boot` (222 modul)**: 20 nama stock tidak ada di build (6 tidak direncanakan: panel `cl8`/`ili7838e`, alias panel X6871, 3 MMC/SD; 14 kandidat: 7 storage Transsion, 4 terblokir `transsion_tranlog`, 3 fitur mandiri). Lima modul build-only ditambahkan: `adaptive-ts`, `gt9916_common`, `mtk-mmc`, `panel-rm69220-vdo-x6871`, `tran_richtap_haptic_hv`.
+- **Set DLKM (269 modul)**: EROFS identik opsi stock + AVB hashtree footer; zip TWRP menulis langsung ke logical partition tanpa menghapus partisi. 25 modul stock tanpa source (`transsion_tranlog`, `thd`, varian touch alternatif, dll.) tidak disertakan; `tran_zram` diganti `zsmalloc`+`zram`, ditambah `rfkill`, `bluetooth`, `libarc4`, `task_turbo`.
+- **Repack `vendor_boot`**: selalu pakai `tools/repack-vendor-boot-latest.sh` (lihat §Perintah build / Repack). Jangan menyalin `.ko` dari image lama atau memakai `tools/pack-vendor-boot.sh` legacy (`PRETEST.md` §43/§44).
 
-Artefak sebelumnya `qpabi-fpgest-20261121`:
+### Ringkasan riwayat rilis (`v1`–`v10`)
 
-```text
-twrp-vendor_boot-allsrc-display-usb-v7.img  md5 15b501d2c18931cf620bbc9e9422978c  67.108.864 B
-vendor_dlkm.img                             md5 4b4f0bd5fba3d6b68d0b360bf6a905f3  24.551.424 B
-odm_dlkm.img                                md5 843e5b8169131dc1333715dbdc332759   4.206.592 B
-twrp-dlkm-qpabi-fpgest-20261121.zip         md5 bb5981102e3824fa3f44b8fb83ca7b96
-release                                     qpabi-fpgest-20261121 (vendor_boot v7 + vendor_dlkm + odm_dlkm)
-/srv path                                   /serverhive1/ramabondanp/tmp/dlkm-out/ (+ tmp/x6871/)
-```
+| Rilis | `vendor_boot` | Kernel HEAD | Ringkasan perubahan | Referensi |
+|---|---|---|---|---|
+| `venc-fod-dt2w-20261122` | v10 | `17a6b66d7927` | Fix akar masalah VENC (`VENC_H264=1`, ADAB, SLBC), ABI notifier AOD/HBM, DT2W AOD, `/dev/goodix_fp` + FOD key `195` | `PRETEST.md` §59 |
+| `video-touch-20261121` | v9 | `6566cb27da18` | Wake awal IRQ gestur, log VSI VENC, log INFO `tran_fp` | `PRETEST.md` §58 |
+| `touchfix-20261121` | v8 | `a453c308cc33` | Kembalikan gate `suspended` `gsx_gesture_ist` + clear gesture event | `PRETEST.md` §57 |
+| `qpabi-fpgest-20261121` | v7 | `6b2a88973414` | ABI 6-field QP VENC identik stock, fallback `goodix_opt_tee` | `PRETEST.md` §56 |
+| `vid-fl-dt2w5-20261121` | v6 | `3c5e64704b34` | C3D SRAM guard, `ocp81375_v4l2`, DT2W key `198` | `PRETEST.md` §55 |
+| `cam4-fod-dt2w-20261121` | v5 | `831ee7ca4762` | Mode video `s5khm6sx` 4000×2248, `vendor_name=goodix_opt_tee` | `PRETEST.md` §54 |
+| `dlkm-cam3-dt2w-20261121` | v4 | `466e4c1731c1` | `mtk-cam-isp` inline `sink_fmt`, `s5khm6sx` D-PHY 4-lane, flashlight core, touch gesture | `PRETEST.md` §53 |
+| `audio-aod-cam2-20261121` | v4 | `a765870ac11f` | Audio FS1599 PA + AOD/screen-on panel RM69220 | `PRETEST.md` §52 |
+| `dlkm-cam1-20261121` | v3 | `75ca1ac4a1ae` | Port 4 sensor kamera X6871 + `camera_eeprom_v4l2` | `PRETEST.md` §51 |
+| `vendor-boot-c3dfix-20261121` | v3 | `e84137d0e2aa` | C3D dual-pipe SRAM + `PQ_VIRTUAL_SET_PROPERTY` 12 B (layar normal penuh) | `PRETEST.md` §50 |
+| `dlkm-ocfix-20261121` | v2 | `e6d0ab2fb66a` | Battery OC 65 Hz (`rfg-mtk-tran-conf-diff`) + timing switch 144/120/60/40 Hz | `PRETEST.md` §49 |
+| `dlkm-20261120`..`gpu3` | v1 | `07eb1dab07c2` | Repack DLKM 100% source (269 modul), `SCP_IPI_COUNT=59`, Mali r54p1, `gpufreq_shared_status` | `PRETEST.md` §45–§48 |
 
-**dmesg1/logcat1 (rilis `vid-fl-dt2w5-20261121`, kernel `f75c717036ac` + `6b2a88973414`)**:
-1. **Video**: encoder sekarang benar-benar start (`vb2ops_venc_start_streaming`, AFBC 1920x1080) lalu VENC fault di `LARB7_PORT24`, `mva=0x0`, VCP watchdog reset, dan decoder ikut mati (`vdec_vcp_decode` IPI ack fail). Ini bukan lagi `bs_va=0`. Hipotesis utama: ABI QP lama membuat firmware menerima nilai min/max yang tertukar dan memprogram alamat nol. Fix `f75c717036ac`: enam field `i/i/p/p/b/b max/min qp` yang identik stock (`vcp_enc_set_param` sekarang 824 B dan instruction-identik dengan stock), kontrol V4L2 3-elemen, plus guard `dma_addr == 0` supaya VENC tidak pernah fault ke IOVA 0. Bukti akhir butuh uji device.
-2. **DT2W**: hipotesis awal (gate `suspended` dibuang) salah. Gate stock memang
-   `suspended`; masalah sebenarnya `pm_wakeup_event()` dipanggil sebelum event
-   dibaca dan event gestur tidak dibersihkan. Fix final `a453c308cc33`:
-   gate `suspended` dikembalikan, `after_event_handler()` dipanggil setelah
-   gestur valid, wake dilakukan setelah event dikonsumsi. Lihat §57.
-3. **FOD**: `vendor.fingerprint.init.error` tetap muncul di logcat1; probe `tran_fp` tidak terlihat karena dmesg mulai t=83 s. `tran_fp` sekarang menerima chip-id dua endian, retry 5x, dan memakai fallback `goodix_opt_tee` bila deteksi gagal (tetap perlu bukti log probe dari t=0).
-4. **Flashlight** belum diuji ulang di log ini.
+### Langkah uji berikutnya
 
-**dmesg9/logcat2 (`vid-fl-dt2w5-20261121`)**:
-1. **Layar separuh hijau intermiten** (`mediatek_drm_v1`, `vendor_boot` v6): C3D tidak di-un-bypass bila 3DLUT SRAM gagal (`d46c6e7de494`).
-2. **Video tidak tersimpan** (`mtk-vcodec-enc`): `max_qp`/`min_qp` diubah menjadi array `[3]` (`79cacb884584`). **Koreksi**: total ukuran cocok tetapi urutan field salah; stock memakai enam field terpisah `i_max/i_min/p_max/p_min/b_max/b_min`. Digantikan `f75c717036ac`.
-3. **Flashlight** (`ocp81375_v4l2`): nama subdev stock + `IS_CHARGER_READY` (`b2de4bc7507e`).
-4. **DT2W**: gestur double-tap = KEY 198, single-tap = 190, `/proc/gesture_function` mengembalikan karakter gestur (`3c5e64704b34`).
-5. Belum: FOD (`vendor.fingerprint.init.error`), verifikasi flashlight; butuh dmesg penuh dari t=0 dengan siklus suspend/tap. Detail: `PRETEST.md` §55.
-**dmesg8/logcat1 (Kamera foto working; fix Video kamera + FOD + DT2W, `cam4-fod-dt2w-20261121`)**:
-1. **Video kamera (`s5khm6sx`, `vendor_dlkm`)**: ubah `normal_video` `4000x2252` -> `4000x2248` (PDAF `2000x1124`) plus timing `hs_video`/`slim_video`/`custom3` agar cocok dengan tabel register stock.
-2. **FOD (`tran_fp.ko`, `vendor_boot` v5)**: `6432a8d60ee7` — ganti `vendor_name` dari `common_goodix` menjadi `goodix_opt_tee` (untuk `GW9578`/`GW9598`) / `goodix_tee` seperti stock.
-3. **DT2W & FOD touch (`gt9916_common.ko`, `odm_dlkm`)**: `831ee7ca4762` — kirim keycode stock `190` (`0xbe`) untuk double-tap, `195` (`0xc3`) untuk FOD down/up, `198` (`0xc6`) untuk single-tap, plus `pm_wakeup_event` + 5x retry baca SPI. Detail: `PRETEST.md` §54.
-
-**dmesg7 (Audio + AOD fixed; fix Camera + Flashlight + DT2W/FOD touch, `dlkm-cam3-dt2w-20261121`)**:
-hanya me-repack `vendor_dlkm` + `odm_dlkm` (`vendor_boot` v4 tetap):
-1. **Camera ISP ABI** (`mtk-cam-isp.ko`): ganti pointer `sink_fmt` dengan
-   `width`/`height`/`code` inline di `struct mtk_cam_resource_sensor` (identik
-   stock `0x21860`/`0x21bf0`, 0 `copy_from_user on sink_fmt`).
-2. **Rear 108MP `s5khm6sx_mipi_raw`** (`imgsensor.ko`): ganti C-PHY 3-lane ke
-   D-PHY 4-lane (`MIPI_OPHY_NCSI2`, `SENSOR_MIPI_4_LANE`, `mipi_pixel_rate =
-   953600000`) dengan seluruh 32 tabel `*hm6*` hasil ekstrak dari `imgsensor.ko` stock.
-3. **Flashlight** (`flashlight.ko`): port Transsion `flashlight-core.c` +
-   `tran_flash_custom.h` dari donor 6.1 (`1d3f17a21434`) dengan `fl_set_current`
-   (`FLASH_IOC_SET_CURRENT = 21`) & sysfs `torch_level`/`sub_torch_level`/`tele_torch_level`.
-4. **DT2W & FOD touch** (`adaptive-ts.ko` + `gt9916_common.ko`, `odm_dlkm`):
-   tambah proc node `/proc/gesture_function`, `/proc/main_gesture_function`, dll.,
-   serta `goodix_ts_gesture.c` (`KEY_WAKEUP` untuk `0xCC`/`0x4C`, FOD `0x46`/`0x55`,
-   `/proc/fingerprint_status`) (`466e4c1731c1`). Detail: `PRETEST.md` §53.
-
-**dmesg6 (Audio + AOD/screen-on + Camera ISP ABI, `audio-aod-cam2-20261121`)**:
-tiga perbaikan sekaligus, hanya me-repack `vendor_boot` (`v4`) + `vendor_dlkm`:
-1. **Audio**: `tran_audio_control/BUILD.bazel` diberi `CONFIG_SND_SOC_FS1599=1` +
-   `ko_deps` `snd-soc-fs1599` (`7aa967a7ba5a`), dan `mt6895-mt6368.c` dihubungkan
-   ke `tran_audio_add_card_controls()` + `tran_audio_pa_switch()` (`b86a4c8cdca3`).
-2. **AOD / screen-on**: `panel-rm69220-vdo-x6871.c` menghapus kirim `0x39`/`0x38`
-   di `panel_doze_enable`/`panel_doze_disable` dan menyamakan
-   `panel_set_aod_light_mode()` (`{0xFE,0x00}` + tier `0x03e`/`0x057`/`0x158`)
-   dengan stock (`a765870ac11f`).
-3. **Camera ISP ABI**: `struct mtk_cam_resource_sensor` diberi `__u32 reserved`
-   sehingga `cfg_res_ctrl.elem_size == 0x68` identik stock (menghilangkan
-   `copy_from_user on sink_fmt failed (48)`). Catatan sisa: kamera depan `gc32e1`
-   dan `gc02m3*` sudah D-PHY dan siap diuji, sedangkan kamera belakang 108MP
-   `s5khm6sx` masih memakai tabel C-PHY 3-lane dari donor 6.1 padahal stock
-   X6871 adalah D-PHY 4-lane (`SENINF4_PkCnt(0x0)`). Detail: `PRETEST.md` §52.
-
-**Kamera v1 (`dlkm-cam1-20261121`)**: layar sudah normal penuh setelah `v3`.
-Empat sensor X6871 (`s5khm6sx_mipi_raw` 0x1AD6, `gc32e1_mipi_raw` 0x32E1,
-`gc02m3_mipi_raw` 0x0202 dengan mask `0xFFFC == 0x0200` seperti stock,
-`gc02m3macro_mipi_raw` 0x0203) + `i2c_table_cntinuburst_write()` diport ke
-`imgsensor.ko`, plus fix prefix `camera_eeprom` dan `g_camCalList` (`S5KHM6SX`
-0xA0 / `GC32E1` 0xA2 16K) di `camera_eeprom_v4l2.ko`. Kernel `75ca1ac4a1ae`
-(`kd_imgsensor.h`), `mtkcam` direkam lewat `add-camera-x6871.sh` +
-`tools/patches/mtkcam-x6871-camera.patch`. Hanya `vendor_dlkm` yang di-repack.
-Detail: `PRETEST.md` §51.
-
-**dmesg5**: spam battery OC 65 Hz hilang 100% (`battery_oc_level count: 0`,
-`r_fg=50`), dan dmesg bersih dari `t=5 s`. Layar setengah kanan berubah dari
-pink (`dmesg4`) menjadi hijau (`dmesg5`) dengan dua baris kunci di log:
-1. `disp_c3d_flip_3dlut_sram: sram_apb = sram_int = 0, skip flip!`: di
-   `v1/mtk_disp_c3d.c`, `disp_c3d_set_3dlut()` hanya memanggil
-   `disp_c3d_check_sram(comp, true)` pada left pipe (`C3D0`) dan lupa
-   memanggilnya pada right pipe (`C3D1`), sedangkan biner stock memanggilnya
-   untuk kedua pipe. Akibatnya `C3D1` tidak pernah flip dan membaca SRAM
-   power-on acak (separuh kanan pink/hijau). Fix: `1799bf13b78b`.
-2. `mtk_drm_ioctl_pq_proxy cmd 900 usize 12, ksize 128 not match!`:
-   `PQ_VIRTUAL_SET_PROPERTY` di `v1/mtk_disp_pq_helper.c` memakai `32 * u32`
-   (128 B) padahal stock dan userspace memakai `DISP_PQ_PROPERTY_MAX` (`3 * u32`
-   = 12 B). Fix: `e84137d0e2aa`.
-Hanya `vendor_boot` yang di-repack (`twrp-vendor_boot-allsrc-display-usb-v3.img`,
-md5 `c4362d3312ab41356bc6eb2cc6f509b8`, release `vendor-boot-c3dfix-20261121`)
-karena `mediatek_drm_v1.ko` hanya berada di `vendor_boot`. Detail: `PRETEST.md` §50.
-
-**dmesg4**: Android boot sampai launcher, Mali r54p1-11eac0, Wi-Fi, touch,
-haptic, dan charger berjalan. Dua bug teridentifikasi:
-1. Spam log 65 Hz (`battery_oc_level=1 <-> 0`, `md_pt_over_current_cb`,
-   `ocp81375_*` menimpa awal dmesg): `r-fg-value = 50` di DT dikalikan 10
-   menjadi 500 karena tidak membaca `rfg-mtk-tran-conf-diff = 15`. Fix di
-   `mtk_battery_oc_throttling.c` (`8d38cd08a65c`, `vendor_dlkm`) dan
-   `mtk_battery.c` (`0f7ce1ce8f7e`, `odm_dlkm` + `vendor_boot`).
-2. Layar setengah kanan pink: di Android SurfaceFlinger berganti 120/60 Hz
-   (TWRP tetap 144 Hz), mengenai timing 120/60 Hz yang salah (`HFP=24/VFP=40`,
-   `mmclk=88`), `cmd_null_pkt_len=400/700`, dan `0x2F` 144↔120 terbalik
-   tanpa `{0xFE, 0x00}`. Fix panel ke 4 mode stock (`144/120/60/40 Hz`
-   byte-identik) + `change_fps_by_vfp_send_cmd=1` + `dfps_cmd_table`:
-   `e6d0ab2fb66a` (`vendor_boot`). Detail: `PRETEST.md` §49.
-
-**dmesg3**: Mali sudah r54p1-11eac0 tetapi tetap BUG; RE getter
-wrapper menunjukkan struct `gpufreq_shared_status` stock 8 byte lebih
-besar. `974ef93c0c1f` menaruh padding setelah `active_count`, yang
-menyelaraskan temperature (0x38) dan shader_present (0xe0) tetapi
-membiarkan lima counter meleset 8 byte. Koreksi `07eb1dab07c2`
-memindahkan padding ke sebelum `power_count`: power/buck/mtcmos/cg/
-active = 0x24/0x28/0x2c/0x30/0x34, temperature 0x38, shader_present
-0xe0. Seluruh getter shared-status sekarang identik dengan stock;
-detail `PRETEST.md` §48/§48.1.
-
-**dmesg2**: setelah SCP fix, Mali panic di
-`kbase_backend_gpuprops_get()` (`HW 0x130013, SW 0x0`). Stock memakai
-Mali r54p1-11eac0; donor 6.1 tidak punya tree GPU, donor OPPO 6.12
-punya versi yang sama. Seluruh `drivers/gpu/mediatek` dan
-`mali_avalon/a16w` diimpor dari donor OPPO; kernel commit
-`5462a6d118a6`. Detail: `PRETEST.md` §47.
-
-Image memakai EROFS persis opsi stock + AVB hashtree footer; ukurannya
-sama dengan partisi stock. Zip `twrp-dlkm-ocfix-20261121.zip` menulis
-`vendor_dlkm` + `odm_dlkm`; flash bersama
-`twrp-vendor_boot-allsrc-display-usb-v2.img` untuk panel fix. Detail:
-`PRETEST.md` §45–§49.
-
-**Langkah berikutnya**: flash `twrp-vendor_boot-allsrc-display-usb-v10.img`
-+ `twrp-dlkm-venc-fod-dt2w-20261122.zip` (rilis `venc-fod-dt2w-20261122`), lalu uji:
+Flash `twrp-vendor_boot-allsrc-display-usb-v10.img` + `twrp-dlkm-venc-fod-dt2w-20261122.zip` (rilis `venc-fod-dt2w-20261122`), lalu uji:
 1. **Rekam video 1080p dan simpan**: dmesg harus menunjukkan `check_codec_id ipi id 1 is correct`, `slbc_request 1, 0xf000000`, dan `mtk_vcodec_enc_clock_on` tanpa `LARB7_PORT24`/`mva=0x0` fault ataupun VCP WDT;
 2. **DT2W saat AOD / layar mati**: saat masuk AOD tidak boleh ada `drm notify tp resume start`; double-tap harus memicu `got valid gesture type 0xcc` dan layar menyala;
-3. **FOD**: `/dev/goodix_fp` harus terdaftar, sentuh ikon FOD memicu `fp key finger pre_buf[0] = 0x88` (key 195), HBM memicu `mtk_drm_crtc_set_panel_hbm notify fingerprint end` + `TRAN_DISP_BLANK_NOTIFY_FINGERPRINT` (`TRAN_FULL_HBM_EVENT=FULL_HBM_SET`).
-Ambil dmesg segera setelah boot (ring buffer penuh oleh spam kamera/vcodec
-sehingga `dmesg1` baru mulai t=83 s). Fitur dari 25 modul stock tanpa source
-(tranlog, thd, varian touch alternatif, dll) hilang; driver sensor kamera X6871
-sudah ada di source.
+3. **FOD**: `/dev/goodix_fp` harus terdaftar, sentuh ikon FOD memicu `fp key finger pre_buf[0] = 0x88` (key `195`), HBM memicu `mtk_drm_crtc_set_panel_hbm notify fingerprint end` + `TRAN_DISP_BLANK_NOTIFY_FINGERPRINT` (`TRAN_FULL_HBM_EVENT=FULL_HBM_SET`).
 
-### Kamera
+### Catatan kamera, device table & repo
 
-Audit stack kamera: `PRETEST.md` §26. Display/USB/charging identik dengan
-stock (221 modul dibandingkan per section+simbol+relokasi = 0 beda),
-sedangkan kamera satu-satunya stack yang source-nya tidak lengkap. Empat
-driver sensor X6871 (`s5khm6sx`, `gc32e1`, `gc02m3`, `gc02m3macro`) tidak
-ada di tree 6.12; 3 ada di donor 6.1 (`mtkcam/imgsensor/src-v4l2/common/`)
-sehingga bisa di-port, `gc02m3` diturunkan dari versi macro.
-`camera_eeprom_v4l2` (46 fungsi kalibrasi OTP per sensor) dan patch Ext-ISP
-di `mtk-cam-isp` tidak dipublikasikan; eeprom perlu RE atau diterima tanpa
-kalibrasi, Ext-ISP aman dilewati (tidak ada node DT/konsumen). Patch
-`flashlight` (sub/tele torch, thermal) bisa di-port dari donor 6.1. Alat
-pembanding: `tools/stock-vs-src.py` (§26).
-
-### Device table
-
-`DEVICES.md` — 978 node `okay`, 470 sudah punya modul source kita, 130
-built-in, 371 node platform, 7 tanpa driver. Bug nyata yang ditemukan:
-`of_match` flash LED (`ocp81375_v4l2`, `sgm37864_v4l2`) tidak memakai
-sufiks `_v4l2` seperti DT; sudah diperbaiki di `flashlight/v4l2/*.c` dan
-diverifikasi lewat build.
-
-Repo kernel bersih dan ter-push: `alps`, branch `w1vo36-6.12-port`, HEAD
-`e6d0ab2fb66a`. Manifest `main` mengikuti commit dokumentasi terakhir.
+- **Kamera (`PRETEST.md` §26, §51, §53)**: 4 sensor kamera X6871 (`s5khm6sx`, `gc32e1`, `gc02m3`, `gc02m3macro`) + `camera_eeprom_v4l2` sudah diport (`75ca1ac4a1ae`, `add-camera-x6871.sh`) dan kamera foto sudah berjalan. Yang tidak dipublikasikan vendor hanya 46 fungsi kalibrasi OTP per sensor di `camera_eeprom_v4l2` dan patch Ext-ISP (tidak ada node DT/konsumennya di X6871).
+- **Device table (`DEVICES.md` / `DEVICES-OVERLAY.md`)**: 978 node `okay` (470 modul source, 130 built-in, 371 node platform, 7 tanpa driver; bug `of_match` flash LED `_v4l2` sudah diperbaiki).
+- **Repo**: kernel bersih dan ter-push ke `alps`, branch `w1vo36-6.12-port`, HEAD **`17a6b66d7927`** (**90 commit** di atas `06079c2`). Manifest `main` mengikuti commit dokumentasi terakhir.
 
 ## Objective
 
@@ -503,10 +276,16 @@ impor tak terselesaikan, 0 CRC tak terpenuhi, 0 export ambigu**. Detail di
   Power/reset/IRQ/SPI clock/netlink/sysfs tetap ada. Regulator X6871
   `mt6368_vfp` fixed 3,3 V; guard menolak regulator variabel/di luar
   1,5–3,6 V. **Wajib diuji saat boot**.
-  - Sejak `29d21b5d018c` modul mengimpor `spi_sync` dan membaca chip id
-    lewat SPI saat probe (`tran_fp_detect_chip=1`), lalu mengisi `ic_name`
-    + `vendor_name` (`/sys/kernel/tran_fp/vendor_name` → `common_goodix`).
-    Kegagalan deteksi **tidak** menggagalkan probe (stock menggagalkannya).
+  - Sejak `29d21b5d018c`..`55aa13232a43` modul mengimpor `spi_sync`,
+    membaca chip id lewat SPI saat probe (`tran_fp_detect_chip=1`, SPI 8-bit /
+    4 MHz / `SPI_MODE_0`), mengisi `ic_name` + `vendor_name`
+    (`/sys/kernel/tran_fp/vendor_name` → `goodix_opt_tee` untuk `GW9578`/`GW9598`
+    atau fallback DT `goodix`, `goodix_tee` untuk `GF39xx`), mendaftarkan
+    `/dev/goodix_fp` (bukan `/dev/tran_fp`), memilih pinctrl `pins_irq` lewat
+    `tran_fp_irq_init()`, serta mengirim uevent
+    `TRAN_FULL_HBM_EVENT=FULL_HBM_SET` saat menerima
+    `TRAN_DISP_BLANK_NOTIFY_FINGERPRINT (2)`. Kegagalan deteksi chip-id
+    **tidak** menggagalkan probe (stock menggagalkannya).
   - `TRAN_FP_READ_FP_ID` (`_IO('t',3)`) diimplementasikan seperti stock:
     deteksi lalu `tran_netlink_send(6)`/`(7)`; dilewati bila
     `TRAN_FP_OPT_SUPPORT` (`_IO('t',4)`) sudah dipanggil.
@@ -532,11 +311,10 @@ impor tak terselesaikan, 0 CRC tak terpenuhi, 0 export ambigu**. Detail di
   balik ke region.
 
 ### Berikutnya paling siap
-- **System boot (uji ulang dmesg5)**: flash
-  `twrp-vendor_boot-allsrc-display-usb-v2.img` +
-  `twrp-dlkm-ocfix-20261121.zip` (release `dlkm-ocfix-20261121`), lalu ambil
-  dmesg dari `t=0 s` dan cek status separuh kanan layar. Detail di
-  `PRETEST.md` §45–§49.
+- **Uji device `venc-fod-dt2w-20261122` (`v10`)**: flash
+  `twrp-vendor_boot-allsrc-display-usb-v10.img` +
+  `twrp-dlkm-venc-fod-dt2w-20261122.zip`, lalu verifikasi rekam video (save),
+  DT2W (termasuk saat AOD), dan FOD. Detail di `PRETEST.md` §59 & `BOOTTEST.md` §4.
 - `tkv_recovery` — sibling `tkv`, 20 KB, 11 ekspor / 24 impor; kandidat
   berikutnya yang paling kecil.
 - `tran_rhi` — health info storage (ECC/erase/suhu), 47 KB, tanpa source.
@@ -711,13 +489,17 @@ Di TWRP sudah lolos: panel (Iris probe, `tran_ldo` bus i2c 6 /
 `leds-aw22xxx` pada `awinic,aw22xxx_led`. Untuk system boot, pantau jalur
 yang sama plus pemuatan `vendor_dlkm`/`odm_dlkm` dan probe kamera.
 
-## Blocker yang perlu dump image vendor/super
+## Catatan firmware offline (bukan blocker runtime)
 
-`iris5.fw`, `iris5_ccf1.fw`, `iris5_ccf2.fw`,
-`pxlw-rm69220_..._x6871.fw` ada di `/vendor/firmware` dan belum pernah
-di-dump. Hanya ramdisk `vendor_boot` yang ada di disk.
+`iris5.fw`, `iris5_ccf1.fw`, `iris5_ccf2.fw`, dan `pxlw-rm69220_..._x6871.fw`
+sudah tersedia di partisi `/vendor/firmware` pada perangkat (tidak menghambat
+boot). Hanya salinan dump offline lokal yang belum menyertakan image `vendor`.
 
-## Status per 2026-11-19 (historis; status terbaru di atas)
+## Arsip historis 2026-11-19 (snapshot sebelum repack DLKM & boot Android)
+
+> Bagian di bawah dipertahankan hanya sebagai referensi analisis sumber
+> `vendor_dlkm`/`odm_dlkm` stock dan diff fungsi awal. Repack DLKM EROFS +
+> AVB dan boot Android 16 sudah selesai sejak 2026-11-20 (lihat bagian atas).
 
 **TWRP boot normal dan aman dengan modul kita.** Vendor_boot TWRP (ramdisk
 zstd) yang diisi modul build kita memuat 238 modul, tanpa `Unknown symbol`,
@@ -819,9 +601,6 @@ bukan salah config:
 | `imgsensor` (dua partisi) | 597/568 | 33 | 62 | 22 |
 | `tc_charger_framework` | 221/249 | 29 | 1 | 34 |
 
-Data lengkap: `/serverhive1/ramabondanp/tmp/dlkm-diff.json`.
-
-Catatan: karena dump hanya berisi tree, mengganti isi partisi dlkm berarti
-membuat image `erofs`/`ext4` sendiri lalu memasukkannya ke logical partition
-(`super`) + AVB — belum dikerjakan, dan boot ke system belum diuji.
+Data lengkap diff awal: `/serverhive1/ramabondanp/tmp/dlkm-diff.json`.
+(Repack EROFS + AVB hashtree footer dan boot Android 16 telah diselesaikan pada 2026-11-20; lihat `PRETEST.md` §45.)
 

@@ -8,7 +8,7 @@
     repo sync -j16
 
   Mengganti kernel/common dan kernel/build AOSP dengan versi MTK w1vo,
-  lalu menambah 11 repo w1vo + 1 donor OPPO.
+  total 12 project (11 repo Motorola w1vo/w2we + 1 repo donor OPPO mt6896).
 
   Tidak ada tag <default> di sini karena manifest AOSP sudah punya;
   revision/remote ditulis per project.
@@ -36,8 +36,9 @@
            remote="moto" revision="android-16-release-w1vo36.88-36-7" />
 
   <!-- Kernel + device modules.
-       kernel_device_modules-6.12 di-branch ke mtk-base-latest oleh setup.sh
-       (lihat reproduce-cleanup.sh), bukan langsung dipakai apa adanya. -->
+       Untuk baseline MTK murni, jalankan reproduce-cleanup.sh (branch
+       mtk-base-latest). Untuk port Infinix X6871, checkout branch
+       w1vo36-6.12-port dari remote alps (lihat README.md). -->
   <project path="kernel-6.12" name="kernel-mtk"
            remote="moto" revision="android-16-release-w1vo36.88-36-7" />
   <project path="kernel_device_modules-6.12" name="kernel-kernel_device_modules-6.12"

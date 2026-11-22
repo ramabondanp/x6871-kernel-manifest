@@ -4,13 +4,15 @@
 belum selesai, pengetahuan kritis. `README.md` = cara build. `PLAN.md` =
 catatan teknis lengkap per temuan (§6.x), termasuk bukti tiap keputusan.
 
-> **Status 2026-11-20:** TWRP final memakai **222 modul 100% source**,
-> layar mati->nyala dan cabut-colok USB sudah terverifikasi. Image:
-> `twrp-vendor_boot-allsrc-display-usb.img` (md5
-> `0ecdaa1edb3d405954331539b24c911b`). Berikutnya: repack dlkm untuk boot
-> system, lalu kamera. Angka 688 `.ko` / 32 hilang di bawah adalah snapshot
-> 2026-11-19; angka build sekarang 806 file / 805 nama unik, recovery 222.
-> Untuk memulai sesi baru, baca `HANDOFF.md` lebih dulu.
+> **Status 2026-11-22:** Seluruh modul `vendor_boot` (222) + `vendor_dlkm`
+> (212) + `odm_dlkm` (57) sudah dibangun **100% dari source** (kernel
+> `17a6b66d7927`, rilis `venc-fod-dt2w-20261122`). Android 16 sudah terbukti
+> boot sampai launcher (layar 144/120/60/40 Hz + AOD, audio, GPU Mali, Wi-Fi,
+> USB replug, kamera foto, touch normal). Rilis terbaru membawa perbaikan akar
+> masalah rekam video (`VENC_H264=1`), DT2W saat AOD, dan optical FOD. Angka
+> 688 `.ko` / 32 hilang di bagian awal dokumen ini adalah snapshot historis
+> 2026-11-19; angka build saat ini 806 file / 805 nama unik di staging, 702
+> flat customer install. Untuk status terkini, mulai dari `HANDOFF.md`.
 
 ---
 
@@ -1910,28 +1912,22 @@ bisa dipakai membandingkan `CONFIG_*` kita vs device.
 
 ---
 
-## 10. Yang belum terbukti / status terbaru
+## 10. Status ringkas (diperbarui 2026-11-22)
 
-Sudah terbukti di device (2026-11-20):
+Sudah terbukti di device (TWRP & Android 16):
 
-- TWRP boot dengan 222 modul 100% source; tidak ada `.ko` stock di ramdisk.
-- Panel rm69220: layar mati -> nyala memanggil `lcm_prepare` +
-  `lcm_panel_init` seperti stock, 0 buffer underrun (`dmesg13`).
-- USB: cabut -> role NONE, colok -> DEVICE, `online=1, type=1` (SDP),
-  `pullup D+`, `gadget RESET`; berulang 3 siklus (`dmesg14`/`dmesg15`).
-- Vibrator/richtap, touch gt9916, UFS/MTK storage, dan stack charger `tc_*`
-  jalan di recovery.
+- `vendor_boot` (222 modul) + `vendor_dlkm` (212 modul) + `odm_dlkm` (57 modul) 100% source, 0 unresolved symbol.
+- Android 16 boot sampai launcher dengan GPU Mali r54p1-11eac0, Wi-Fi, UFS/MTK storage, haptic/richtap, stack charger `tc_*`, USB replug berulang, audio FS1599, layar RM69220 (144/120/60/40 Hz + C3D dual-pipe + AOD), touch normal GT9916, dan kamera foto (4 sensor X6871 + flashlight).
 
-Belum:
+Menunggu verifikasi device pada rilis `venc-fod-dt2w-20261122` (`17a6b66d7927`):
 
-- **System boot**: partisi dlkm di `super` belum di-repack. Set 269 modul
-  source sudah disiapkan di `/serverhive1/ramabondanp/tmp/dlkm-src` dengan
-  closure 0 unresolved; boot system belum diuji.
-- **Kamera**: 4 driver sensor X6871 belum ada di tree; 3 bisa di-port dari
-  donor 6.1, `gc02m3` diturunkan dari versi macro. `camera_eeprom_v4l2`
-  (OTP) dan patch Ext-ISP tidak dipublikasikan.
-- Tingkat B rename `fpsgo`/`game` belum dikerjakan (tidak menghambat TWRP).
-- `mt6991`/`mt6993` belum pernah dibangun.
-- Target ABI `user_customer_abi` tidak bisa lulus (328 simbol duplikat antar
-  varian driver, gagal di `stg merge`); bukan mismatch KMI. Lihat
-  `HANDOFF.md`.
+- **Rekam video (save)**: fix `VENC_H264 = 1`, `mtk_codec_capability` 24 B + ADAB 4x `U32`, `slbc_request()`, dan error handling `SET_PARAM_DONE`.
+- **DT2W (termasuk saat AOD)**: fix ABI notifier AOD DRM + `adaptive-ts` resume khusus `TRAN_DISP_BLANK_AOD_NOTIFY`.
+- **Optical FOD**: fix `/dev/goodix_fp`, HBM uevent `TRAN_FULL_HBM_EVENT=FULL_HBM_SET`, Goodix cmd `0x30`, dan FOD key `195`.
+
+Belum / sengaja dilewati:
+
+- Kalibrasi OTP `camera_eeprom_v4l2` (46 fungsi per sensor) dan patch Ext-ISP tidak dipublikasikan vendor.
+- 25 modul stock tanpa source (`transsion_tranlog`, `thd`, dll.) dan 7 modul fork storage `fs/atomic_storage/` (diganti baseline GKI/MTK yang sudah terbukti boot).
+- Tingkat B rename `fpsgo`/`game` belum dikerjakan; `mt6991`/`mt6993` belum pernah dibangun.
+- Target ABI `user_customer_abi` tidak bisa lulus (328 simbol duplikat antar varian driver, gagal di `stg merge`); bukan mismatch KMI. Lihat `HANDOFF.md`.

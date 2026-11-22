@@ -1,24 +1,24 @@
-# PRETEST — simulasi & perbandingan sebelum boot X6871
+# PRETEST — Log Analisis Statis, RE Biner & Investigasi Boot X6871
 
-Dibuat 2026-11-19 sebagai catatan kronologis. Kernel
-`w1vo36-6.12-port` sekarang di **`af55c9c00426`**.
+Dibuat 2026-11-19 sebagai catatan kronologis (§1–§59). Kernel
+`w1vo36-6.12-port` saat ini berada di **`17a6b66d7927`** (diperbarui 2026-11-22).
 
-> **Status 2026-11-20:** TWRP final memakai **222 modul 100% source**;
-> image `twrp-vendor_boot-allsrc-display-usb.img` (md5
-> `0ecdaa1edb3d405954331539b24c911b`). Layar mati->nyala (§40), cabut-colok
-> USB (§42), insiden panel basi (§43), dan workflow repack otomatis (§44)
-> sudah selesai. Angka 796 `.ko` / `modules.load` lama di bagian awal adalah
-> snapshot saat itu; angka final: 806 file / 805 nama unik di staging,
-> 222 modul recovery, `modules.load` 165, `modules.load.recovery` 216.
-> Berikutnya: repack dlkm untuk boot system, lalu kamera.
+> **Status 2026-11-22:** Rilis terbaru adalah **`venc-fod-dt2w-20261122`**
+> (`twrp-vendor_boot-allsrc-display-usb-v10.img` + `twrp-dlkm-venc-fod-dt2w-20261122.zip`,
+> **222** modul `vendor_boot` + **269** modul DLKM, 100% source). Angka lama
+> seperti 796 `.ko` pada bagian awal adalah snapshot historis saat itu; angka
+> build sekarang: **806** file / **805** nama unik di staging, **702** flat
+> customer install, `modules.load` 165, `modules.load.recovery` 216.
 
-Bagian penting: §23 (set 222 modul), §24 (set dlkm), §25 (storage fork),
-§26 (audit kamera), §40 (layar), §42 (USB), §43 (insiden panel basi),
-§44 (repack otomatis), §45 (repack dlkm).
+Indeks bagian penting:
+- §23–§26: komposisi 222 modul recovery, set DLKM, storage fork, dan audit kamera
+- §40–§45: verifikasi layar, USB replug, insiden panel basi, repack otomatis, dan repack DLKM
+- §46–§51: SCP, Mali r54p1-11eac0, `gpufreq_shared_status`, battery OC + mode switch panel, C3D dual-pipe, kamera X6871
+- §52–§59: audio FS1599, AOD, `mtk-cam-isp`, flashlight, touch/DT2W, FOD, dan akar masalah VENC (`VENC_H264=1`)
 
-Tujuan: memastikan modul tidak menggantung/menimpa simbol stock dan tidak
-melakukan operasi yang bisa merusak hardware **sebelum** image di-boot.
-Ini analisis statis, bukan pengganti boot test.
+Tujuan awal (§1–§39): memastikan modul tidak menggantung/menimpa simbol stock
+dan tidak melakukan operasi berbahaya terhadap hardware **sebelum** boot. Bagian
+§40–§59 mendokumentasikan hasil uji device dan perbaikan berbasis dmesg/RE.
 
 ## 1. Metode
 

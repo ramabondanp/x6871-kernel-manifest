@@ -1,214 +1,200 @@
-# Manifest W1VO36.88-36-7
+# Manifest W1VO36.88-36-7 — Port Kernel Infinix GT 20 Pro (X6871)
 
-Workspace kernel Motorola W1VO36.88-36-7 (Android 16 / kernel 6.12.38 /
-MediaTek mt6895), dibangun dengan Bazel+Kleaf.
+Workspace Bazel+Kleaf untuk membangun modul kernel **Android 16 / kernel 6.12 / MediaTek MT6895**, berbasis tree Motorola W1VO36.88-36-7 dan diport penuh untuk **Infinix GT 20 Pro (X6871)**.
+
+- **Branch port X6871**: [`w1vo36-6.12-port`](https://github.com/ramabondanp/alps-kernel_device_modules-6.12/tree/w1vo36-6.12-port) (`alps`, **90 commit** di atas baseline `06079c2`, HEAD `17a6b66d7927`)
+- **Output build X6871**: staging **806 file** (**805** nama unik), flat customer install **702** `.ko`
+- **Output baseline MTK murni** (`mtk-base-latest`): **1.401** `.ko`
+- **Panduan cepat dokumen**:
+  - `HANDOFF.md` — ringkasan status terkini, aturan kerja, perintah build/repack, dan pengetahuan kritis
+  - `BOOTTEST.md` — prosedur flash, rollback, dan checklist uji boot per subsistem
+  - `PRETEST.md` — log teknis kronologis (§1–§59) hasil audit statis, RE biner, dan uji device
+  - `PLAN.md` — rencana porting awal dan bukti investigasi per modul (§6.x)
+  - `DEVICES.md` / `DEVICES-OVERLAY.md` — tabel pemetaan node Device Tree X6871 ke driver
+
+---
 
 ## Quickstart
+
+### A. Build port Infinix X6871 (disarankan)
+
+Branch `w1vo36-6.12-port` sudah memuat seluruh driver X6871 (panel RM69220, Pixelworks Iris, `tran_ldo`, stack charger Transsion, audio FS1599, 4 sensor kamera + EEPROM, flashlight, haptic, touch Goodix GT9916, optical fingerprint `tran_fp`, dan fix VENC/GPU/SCP).
 
 ```bash
 git clone https://github.com/ramabondanp/w1vo36-kernel-manifest
 cd w1vo36-kernel-manifest
 
-# 1. Buat branch kernel_device_modules yang sudah dibersihkan dari kode Moto
-./reproduce-cleanup.sh ~/kernel-kernel_device_modules-6.12
-
-# 2. Sync workspace AOSP + overlay
+# 1. Sync workspace AOSP + overlay manifest
 mkdir -p ~/w1vo && cd ~/w1vo
 repo init -u https://android.googlesource.com/kernel/manifest \
           -b common-android16-6.12-2025-09
 cp ~/w1vo36-kernel-manifest/local_manifest.xml .repo/local_manifests/w1vo.xml
 repo sync -j16
 
-# 3. Pasang branch hasil cleanup
+# 2. Checkout branch port X6871
 cd kernel_device_modules-6.12
+git remote add alps https://github.com/ramabondanp/alps-kernel_device_modules-6.12
+git fetch alps w1vo36-6.12-port
+git checkout -B w1vo36-6.12-port FETCH_HEAD
+cd ..
+
+# 3. Siapkan workspace, lalu build (overlay entry_level_legacy.config wajib untuk X6871)
+~/w1vo36-kernel-manifest/setup.sh
+OVERLAYS=entry_level_legacy.config ~/w1vo36-kernel-manifest/build.sh user
+```
+
+Hasil build berada di:
+`out_bazel/*/execroot/_main/bazel-out/k8-fastbuild/bin/kernel_device_modules-6.12/mgk_64_k612_customer_modules_install.user/`
+
+### B. Build baseline MTK murni (tanpa driver X6871)
+
+Gunakan langkah ini bila hanya ingin memverifikasi tree MTK bersih tanpa kode Motorola maupun Transsion:
+
+```bash
+cd ~/w1vo36-kernel-manifest
+./reproduce-cleanup.sh ~/kernel-kernel_device_modules-6.12
+
+cd ~/w1vo/kernel_device_modules-6.12
 git remote add local ~/kernel-kernel_device_modules-6.12
 git fetch local mtk-base-latest
 git checkout -B mtk-base-latest FETCH_HEAD
 cd ..
 
-# 4. Siapkan workspace, lalu build
 ~/w1vo36-kernel-manifest/setup.sh
 ~/w1vo36-kernel-manifest/build.sh user
 ```
 
-Hasil baseline MTK murni: `1.401 .ko` di
-`out_bazel/*/execroot/_main/bazel-out/k8-fastbuild/bin/kernel_device_modules-6.12/mgk_64_k612_customer_modules_install.user/`.
-Branch port di bawah menghasilkan staging 806 file / 805 nama unik dan flat
-customer install 702 `.ko`.
+Untuk SoC lain: `PLATFORM=mt6991 ~/w1vo36-kernel-manifest/build.sh user` (default: `mt6895`).
 
-Soc lain: `PLATFORM=mt6991 ./build.sh user` (default `mt6895`).
+> **Catatan branch**: `w1vo36-6.12-port` dibangun di atas baseline `06079c2` (yang merupakan keturunan langsung `android16` `30a0466a`) agar riwayat `android16` tidak berubah. Daftar lengkap commit: `git log --oneline 06079c2..HEAD`.
 
-### Branch port (sudah termasuk semua driver X6871)
+---
 
-`mtk-base-latest` di langkah 3 hanya MTK murni. Semua pekerjaan port
-(Iris, panel rm69220, `tran_ldo`, fondasi charger Transsion) ada di branch
-terpisah, ter-push ke remote `alps`:
+## Status Runtime & Rilis Terbaru (2026-11-22)
 
-```bash
-cd kernel_device_modules-6.12
-git remote add alps https://github.com/ramabondanp/alps-kernel_device_modules-6.12
-git fetch alps w1vo36-6.12-port
-git checkout -B w1vo36-6.12-port FETCH_HEAD
+Seluruh partisi modul (**222** modul `vendor_boot` + **212** `vendor_dlkm` + **57** `odm_dlkm`) dibangun **100% dari source**.
 
-cd ..
-~/w1vo36-kernel-manifest/setup.sh
-~/w1vo36-kernel-manifest/build.sh user
-# staging: 806 .ko (805 nama unik), flat customer install: 702 .ko
-```
+### Status per subsistem
 
-Branch: <https://github.com/ramabondanp/alps-kernel_device_modules-6.12/tree/w1vo36-6.12-port>
+| Subsistem | Status | Catatan |
+|---|---|---|
+| Boot Android 16 & TWRP | ✅ Terbukti | Boot sampai launcher, 0 unresolved symbol |
+| Layar RM69220 (144/120/60/40 Hz) & AOD | ✅ Terbukti | C3D dual-pipe + PQ ABI fixed, 0 underrun |
+| GPU Mali r54p1-11eac0 & gpufreq | ✅ Terbukti | Donor OPPO + fix layout `gpufreq_shared_status` |
+| Audio (MT6368 + FS1599 PA) | ✅ Terbukti | Kontrol `tran_audio_control` + PA switch aktif |
+| Wi-Fi, USB replug, Charger, Haptic, Touch normal | ✅ Terbukti | Tidak ada spam IRQ battery OC |
+| Kamera foto & preview video (4 sensor) | ✅ Terbukti | `s5khm6sx`, `gc32e1`, `gc02m3`, `gc02m3macro` + flashlight |
+| **Rekam video (save)** | 🔄 Menunggu uji (`v10`) | Akar masalah ditemukan: `VENC_H264` salah = 13 (harus 1) + ADAB/SLBC ABI (`17a6b66d7927`) |
+| **DT2W (termasuk saat AOD)** | 🔄 Menunggu uji (`v10`) | Fix enum notifier AOD (`6b45fdaa1ef1`) + `adaptive-ts` hanya resume di `AOD_NOTIFY` (`379924bf2586`) |
+| **Optical FOD (fingerprint)** | 🔄 Menunggu uji (`v10`) | Fix `/dev/goodix_fp` + HBM uevent (`55aa13232a43`) + Goodix cmd `0x30` & key `195` (`379924bf2586`) |
 
-Branch ini dibuat baru (bukan di atas `android16`) supaya riwayat `android16`
-tidak tersentuh. `android16` (`30a0466a`) memang ancestor dari baseline
-w1vo36.88-36-7 (`06079c2`), jadi branch ini juga fast-forward-able ke sana.
-
-Branch berisi **90 commit** di atas `06079c2`, satu commit per fitur.
-Ringkasan commit awal dan commit final yang penting:
-
-| commit | isi |
-|---|---|
-| `33d0005` | `tran_audio_control`, `splitswitch-gpio`, `hiber` |
-| `2b880e6` | Iris (34 file, Pixelworks) |
-| `cfb098c` | `tran_ldo` (ET5904) |
-| `381f45e` | panel rm69220 X6871 (versi awal) |
-| `fdc1174` | `tc_common_class` (fondasi `tran_device`) |
-| `618a8c5` | `tc_charger_class`/`adapter`/`algorithm`/`misc_intf` |
-| `91640cd`..`28f5237` | panel final: init table, DSC, rails, 8bpc/1056 Mbps |
-| `af55c9c` | `tran_extcon_usb`: role DEVICE/NONE/HOST saat cabut-colok |
-| `6b45fda`..`17a6b66` | DRM AOD/HBM notifier ABI, DT2W+FOD touch, `/dev/goodix_fp`, VENC `VENC_H264=1` + ADAB + SLBC |
-
-Daftar lengkap: `git log --oneline 06079c2..HEAD`.
-
-## Status runtime (2026-11-21)
-
-TWRP memakai **222 modul, 100% hasil build sendiri**. Image final yang
-sudah diuji:
+### Rilis terbaru: `venc-fod-dt2w-20261122` (kernel `17a6b66d7927`)
 
 ```text
-twrp-vendor_boot-allsrc-display-usb.img
-md5 0ecdaa1edb3d405954331539b24c911b
+twrp-vendor_boot-allsrc-display-usb-v10.img  md5 3409f68913613b38d43052458435558b  67.108.864 B
+twrp-dlkm-venc-fod-dt2w-20261122.zip         md5 92ab587de697a955fceba15ecf335d52
+  ├─ vendor_dlkm.img                         md5 764c2d3f6fbd14aff802a0614ec7d014  24.551.424 B
+  └─ odm_dlkm.img                            md5 af60243be2a87943f78fc7d254bb690a   4.206.592 B
 ```
 
-Yang sudah terverifikasi: layar mati -> nyala (0 buffer underrun) dan
-cabut-colok USB berulang (setiap colok kembali `online=1, type=1` SDP,
-`pullup D+`, `gadget RESET`). Image dlkm 100% source juga sudah siap
-(release `dlkm-20261120`, 269 modul; detail `PRETEST.md` §45).
-Percobaan boot system berhenti berurutan di SCP, Mali, lalu
-shared-status gpufreq: `SCP_IPI_COUNT` 59 (`5ba6fb6559ab`), GPU donor
-OPPO r54p1-11eac0 (`5462a6d118a6`), dan padding gpufreq sebelum
-`power_count` (`07eb1dab07c2`), hingga akhirnya **boot sampai launcher +
-Wi-Fi + Mali GPU** (`dmesg4`). Fix berikutnya menutup spam IRQ battery OC
-65 Hz (`8d38cd08a65c`), skala gauge `r-fg-value` (`0f7ce1ce8f7e`), timing/VFP
-mode switch 144/120/60/40 Hz panel (`e6d0ab2fb66a`, release `dlkm-ocfix-20261121`),
-serta bug layar setengah kanan pink/hijau akibat `disp_c3d_check_sram` right pipe
-(`1799bf13b78b`) dan ukuran `PQ_VIRTUAL_SET_PROPERTY` (`e84137d0e2aa`) di
-`mediatek_drm_v1.ko` (release `vendor-boot-c3dfix-20261121`, **layar normal
-penuh**). Driver kamera X6871 (4 sensor `s5khm6sx`/`gc32e1`/`gc02m3`/`gc02m3macro`
-+ `camera_eeprom_v4l2`, `75ca1ac4a1ae` + `add-camera-x6871.sh`) di-repack di
-`dlkm-cam1-20261121`; fix audio FS1599 (`7aa967a7ba5a`, `b86a4c8cdca3`) dan
-AOD/screen-on panel (`a765870ac11f`) **terkonfirmasi normal** di `audio-aod-cam2-20261121`;
-fix lanjutan `mtk-cam-isp` inline `sink_fmt`, `s5khm6sx` D-PHY 4-lane,
-Transsion `flashlight-core` (`1d3f17a21434`), dan DT2W/FOD touch
-`adaptive-ts`+`gt9916_common` (`466e4c1731c1`) menghidupkan kamera foto;
-release `vid-fl-dt2w5-20261121` (`vendor_boot` v6) memperbaiki layar hijau
-intermiten (C3D, `d46c6e7de494`), flashlight `ocp81375_v4l2` (`b2de4bc7507e`),
-dan DT2W KEY 198 (`3c5e64704b34`). Rilis `qpabi-fpgest-20261121`
-(`vendor_boot` v7) mengganti `max_qp[3]` dengan enam field QP per frame yang
-identik stock (`f75c717036ac`; `vcp_enc_set_param` instruction-identik dengan
-stock), menolak buffer encode dengan DMA address 0 sebelum VENC fault ke
-IOVA 0, dan menambah fallback `tran_fp` `goodix_opt_tee` + retry chip-id.
-Rilis `touchfix-20261121` (`vendor_boot` v8, `a453c308cc33`) mengembalikan
-gate `suspended` pada `gsx_gesture_ist` dan membersihkan event gestur. Rilis
-terbaru `video-touch-20261121` (`vendor_boot` v9 + `vendor_dlkm` + `odm_dlkm`,
-`6566cb27da`) memindahkan wake ke awal IRQ seperti stock, memakai satu
-pembacaan gestur, membersihkan event pada path valid maupun error, menolak
-SLBC saat `slbc_register_activate_ops()` gagal, menambah log alamat VSI VENC,
-dan mengaktifkan `TRAN_FP_INFO` untuk diagnosis FOD (`PRETEST.md` §58).
-Rilis sebelumnya `cam4-fod-dt2w-20261121` memperbaiki mode video
-`s5khm6sx`, `vendor_name` `goodix_opt_tee`, dan retry bangun tidur. Detail:
-`HANDOFF.md`, `PRETEST.md` §40-§58.
+Release GitHub: <https://github.com/ramabondanp/w1vo36-kernel-manifest/releases/tag/venc-fod-dt2w-20261122>
 
-Verifikasi device untuk `video-touch-20261121` belum dilakukan: video, DT2W,
-dan FOD masih harus diuji ulang dengan dmesg baru.
+### Ringkasan perjalanan rilis
 
-Catatan: hasil port di-push ke branch `w1vo36-6.12-port` di remote `alps`
-(bukan ke `mtk-base-latest`, yang sedang checked-out di working tree lokal).
+| Rilis | `vendor_boot` | Sorotan utama |
+|---|---|---|
+| `venc-fod-dt2w-20261122` | v10 | Fix akar masalah VENC (`VENC_H264=1`), ABI notifier AOD/HBM, DT2W AOD, `/dev/goodix_fp` + FOD key `195` |
+| `video-touch-20261121` | v9 | Wake awal IRQ gestur, log diagnostik VSI VENC & `tran_fp` |
+| `touchfix-20261121` | v8 | Kembalikan gate `suspended` di `gsx_gesture_ist` + bersihkan event gestur |
+| `qpabi-fpgest-20261121` | v7 | Perbaiki 6 field QP per-frame VENC + fallback `goodix_opt_tee` |
+| `vid-fl-dt2w5-20261121` | v6 | C3D SRAM guard, flashlight `ocp81375_v4l2`, DT2W key `198` |
+| `cam4-fod-dt2w-20261121` | v5 | Mode video `s5khm6sx`, `vendor_name` `goodix_opt_tee` |
+| `dlkm-cam3-dt2w-20261121` | v4 | `mtk-cam-isp` inline `sink_fmt`, `s5khm6sx` D-PHY 4-lane, flashlight core, touch gesture |
+| `audio-aod-cam2-20261121` | v4 | Audio FS1599 PA + AOD/screen-on panel RM69220 terverifikasi |
+| `dlkm-cam1-20261121` | v3 | Port 4 sensor kamera X6871 + `camera_eeprom_v4l2` |
+| `vendor-boot-c3dfix-20261121` | v3 | C3D right pipe SRAM + `PQ_VIRTUAL_SET_PROPERTY` 12 B (layar normal penuh) |
+| `dlkm-ocfix-20261121` | v2 | Fix spam IRQ battery OC 65 Hz + timing switch 144/120/60/40 Hz |
+| `dlkm-20261120`..`gpu3` | v1 | DLKM 100% source (269 modul), `SCP_IPI_COUNT=59`, Mali r54p1-11eac0, `gpufreq_shared_status` |
 
+Detail tiap rilis ada di `HANDOFF.md` dan `PRETEST.md` §40–§59.
 
-## File
+---
 
-| File | Isi |
+## Ringkasan Commit Penting (`w1vo36-6.12-port`)
+
+| Commit | Ringkasan |
 |---|---|
-| `local_manifest.xml` | 13 project w1vo + donor OPPO, overlay ke manifest AOSP |
-| `reproduce-cleanup.sh` | buat branch `mtk-base-latest` (MTK murni + 12 patch) |
-| `setup.sh` | MODULE.bazel, symlink donor + `../vendor/mediatek`, trim label |
-| `build.sh` | build module (`./build.sh user`) |
-| `add-transsion.sh` | tambah 3 modul Transsion mandiri dari donor mt6897 |
-| `add-iris.sh` | pasang Pixelworks Iris ke `mediatek_drm_v1` + patch 6.12 |
-| `add-panel-rm69220.sh` | panel X6871: init table + timing hasil ekstrak firmware |
-| `add-tran-ldo.sh` | regulator `tran_ldo` (ET5904) — sumber `TRANLDO26` untuk panel |
-| `add-tc-common-class.sh` | fondasi `tran_device` API — dipakai 19 modul firmware |
-| `add-tc-charger-stack.sh` | fondasi charger Transsion: `tc_charger_class` + `tc_adapter_class` + `tc_algorithm_class` + `tc_misc_intf` |
-| `patch-tc-misc-6.12.sh` | 8 fungsi `tc_misc_intf` tambahan 6.12, rekonstruksi dari `.ko` |
-| `audit-sources.sh` | cocokkan modul firmware -> file source **tanpa** peduli nama file |
-| `tools/ko-preflight.py` | bandingkan 4 modul fitur dengan `.ko` stock (export/impor/CRC/call graph) |
-| `tools/preboot-audit.py` | audit **seluruh** modul stock yang digantikan build: 1 baris per `.ko` firmware, plus simulasi loader pada set itu |
-| `tools/stock-vs-src.py` | bandingkan source vs `.ko` stock (dipakai audit kamera, `PRETEST.md` §26) |
-| `tools/repack-vendor-boot-latest.sh` | **repack utama X6871**: build source terbaru, stage 222 modul dari Bazel, pack, lalu verifikasi tiap `.ko` di image sama dengan staging |
-| `tools/stage-recovery-modules.py` | stage + strip modul dari staging, regenerasi `modules.dep`/`alias`/`softdep` |
-| `tools/recovery-modules.txt` | daftar 222 modul recovery (sumber kebenaran komposisi vendor_boot) |
-| `tools/modules.load`, `tools/modules.load.recovery` | daftar muat init, 165 / 216 entri |
-| `tools/pack-vendor-boot.sh` | legacy: repack dari image stock + filter nama stock; jangan dipakai untuk X6871 (lihat `HANDOFF.md`) |
-| `BOOTTEST.md` | prosedur uji boot utuh: artefak, flash, rollback, checklist per subsistem, delta yang wajar |
-| `PLAN.md` | rencana port driver device lain (X6871) — Tingkat A sudah selesai |
+| `33d0005` | `tran_audio_control`, `splitswitch-gpio`, `hiber` |
+| `2b880e6` | Pixelworks Iris (34 file) di `mediatek_drm_v1` |
+| `cfb098c` | Regulator `tran_ldo` (ET5904) |
+| `381f45e`, `91640cd`..`28f5237`, `e6d0ab2` | Panel RM69220 X6871 (init table, DSC, rails, 4 mode 144/120/60/40 Hz) |
+| `fdc1174`, `618a8c5` | `tc_common_class` + stack charger Transsion (`tc_*`) |
+| `af55c9c` | `tran_extcon_usb`: role DEVICE/NONE/HOST saat cabut-colok |
+| `5ba6fb6`, `5462a6d`, `07eb1da` | `SCP_IPI_COUNT=59`, GPU Mali r54p1-11eac0, layout `gpufreq_shared_status` |
+| `1799bf1`, `e84137d`, `a765870` | C3D dual-pipe SRAM, PQ property 12 B, AOD panel |
+| `75ca1ac`, `7aa967a`, `b86a4c8` | 4 sensor kamera X6871 + EEPROM, audio FS1599 |
+| `6b45fda`..`17a6b66` | DRM AOD/HBM notifier ABI, DT2W+FOD touch, `/dev/goodix_fp`, VENC `VENC_H264=1` + ADAB + SLBC |
 
-## Kenapa ada `reproduce-cleanup.sh`
+---
 
-Repo Motorola `kernel-kernel_device_modules-6.12` berisi 321 commit kode
-device (bogota/taipei/moto) di atas base MTK. Script ini checkout base MTK
-murni lalu cherry-pick 12 patch MTK yang diperlukan.
+## Daftar Berkas
 
-Hasil terverifikasi identik dengan branch referensi:
+| Berkas | Fungsi |
+|---|---|
+| `local_manifest.xml` | Overlay manifest AOSP: 12 project (11 repo Motorola w1vo/w2we + 1 donor OPPO mt6896) |
+| `reproduce-cleanup.sh` | Membuat branch `mtk-base-latest` (base MTK murni + 12 patch MTK) |
+| `setup.sh` | Menyiapkan `MODULE.bazel`, symlink donor OPPO & `../vendor/mediatek`, dan trim label `mgk_64.bzl` |
+| `build.sh` | Wrapper build Bazel+Kleaf (`OVERLAYS=entry_level_legacy.config ./build.sh user`) |
+| `add-*.sh`, `patch-tc-misc-6.12.sh`, `port-tc-module.sh` | Skrip porting historis untuk driver Transsion, Iris, panel RM69220, `tran_ldo`, charger, dan kamera X6871 |
+| `audit-sources.sh` | Mencocokkan `.ko` firmware ke berkas sumber berdasarkan isi simbol (bukan nama file) |
+| `tools/repack-vendor-boot-latest.sh` | **Repack utama `vendor_boot`**: build terbaru, stage 222 modul, pack TWRP zstd, dan verifikasi md5 per `.ko` |
+| `tools/stage-recovery-modules.py` | Stage + strip modul dari staging Bazel dan regenerasi `modules.dep`/`alias`/`softdep` |
+| `tools/recovery-modules.txt` | Daftar otoritatif 222 modul `vendor_boot` |
+| `tools/modules.load`, `tools/modules.load.recovery` | Daftar muat init (`165` / `216` entri) |
+| `tools/ko-preflight.py`, `tools/preboot-audit.py`, `tools/stock-vs-src.py` | Alat audit simbol/CRC/relokasi modul hasil build dibanding `.ko` stock |
+| `tools/pack-vendor-boot.sh` | Tool legacy (memfilter nama stock) — **jangan dipakai untuk X6871** |
+| `HANDOFF.md` | Status proyek, aturan keras, perintah build/repack, dan pengetahuan teknis kritis |
+| `BOOTTEST.md` | Prosedur flash, rollback, dan checklist uji boot per subsistem |
+| `PRETEST.md` | Log analisis statis, RE biner, dan investigasi bug (§1–§59) |
+| `PLAN.md` | Rencana porting awal dan catatan investigasi mendalam (§6.x) |
+| `DEVICES.md`, `DEVICES-OVERLAY.md` | Pemetaan seluruh node Device Tree X6871 (base DTB + DTBO) ke driver |
 
-```
+---
+
+## Catatan Teknis Build
+
+### Kenapa ada `reproduce-cleanup.sh`
+
+Repo Motorola `kernel-kernel_device_modules-6.12` berisi 321 commit kode device (bogota/taipei/moto) di atas base MTK. Skrip ini mengambil base MTK murni lalu melakukan cherry-pick 12 patch MTK yang diperlukan:
+
+```text
 tree mtk-base-latest : fab94f37a9ee8a1d43828bdda55bc669e3138de6
 ```
 
-## Kenapa ada donor OPPO
+### Kenapa ada donor OPPO
 
-20 grup module tidak dipublikasikan Motorola. 13 di antaranya ada di donor
-OPPO mt6896 dan di-symlink oleh `setup.sh`. Sisanya (49 label) dihapus dari
-`mgk_64.bzl` oleh `setup.sh`:
+20 grup modul tidak dipublikasikan Motorola. 13 grup di antaranya tersedia di donor OPPO `mt6896` (Android 16 / kernel 6.12) dan di-symlink oleh `setup.sh` (`afs_common_utils`, `hbt_*`, `met_drv_v3`, `sched_cus`, `connectivity/*`, serta tree GPU Mali r54p1-11eac0). Sisanya (49 label di 20 grup internal/customer) dihapus dari `mgk_64.bzl` oleh `setup.sh`:
 
-```
+```text
 afs_core_cus/int  cpufreq_cus/int  fpsgo_cus/int  game_cus/int
 gpio_sap_ctrl     met_drv_secure_v3  msync2_frd_cus/int  mtk_input
 perf_common_cus/int  sched_int  task_turbo_cus/int
 thinmd_exception  wwan
 ```
 
-Module donor **ikut ter-build** dan masuk output (afs_common_utils, hbt_*,
-met_drv_v3, sched_cus, connectivity/*). Campuran Moto+OPPO ini belum diuji
-runtime.
+Kombinasi Motorola + donor OPPO ini sudah terbukti boot dan berjalan di Android 16 pada X6871 (Wi-Fi, GPU, audio, display, kamera foto).
 
-## Tiga flag yang wajib
+### Tiga flag Bazel yang wajib
 
-Kalau salah satu hilang, build gagal:
-
-| Flag | Tanpa ini |
+| Flag | Dampak jika hilang |
 |---|---|
-| `--user_ddk_unsafe_headers=//kernel_device_modules-6.12:mtk_use_gki_unsafe_headers` | `fatal error: '<header>' file not found` di puluhan module |
-| `--repo_env=SUPPORT_PLATFORM=<soc>` | semua 14 platform ikut dibangun, gagal di module platform lain |
-| `--repo_env=KERNEL_VERSION=...` | `key "KERNEL_VERSION" not found` |
+| `--user_ddk_unsafe_headers=//kernel_device_modules-6.12:mtk_use_gki_unsafe_headers` | `fatal error: '<header>' file not found` di puluhan modul |
+| `--repo_env=SUPPORT_PLATFORM=<soc>` | Semua 14 platform ikut dibangun dan gagal di modul platform lain |
+| `--repo_env=KERNEL_VERSION=kernel-6.12` | Error `key "KERNEL_VERSION" not found` |
 
-`--allow_ddk_unsafe_headers` saja tidak cukup — itu hanya mengaktifkan daftar
-bawaan AOSP yang tidak memuat header MTK.
+`--allow_ddk_unsafe_headers=1` saja tidak cukup karena daftar bawaan AOSP tidak memuat header privat MTK.
 
-## Batasan
+### Batasan
 
-- `user_customer_abi` **tidak bisa lulus** di tree ini: `stg merge` gagal
-  karena 328 simbol duplikat antar varian driver yang memang dibangun
-  bersamaan (fpsgo v3+v8, mediatek_v2+v1, tee gud 510/600/610/700,
-  bt mt66xx+linux_v2). Ini artefak build multi-varian, bukan mismatch KMI.
-  Build referensi MTK/Samsung juga tidak menjalankan target ABI.
-- Detail status dan jebakan: lihat `HANDOFF.md`.
+- Target `user_customer_abi` **tidak bisa lulus** di tree ini: `stg merge` gagal karena 328 simbol duplikat antar varian driver yang memang dibangun bersamaan (`fpsgo v3+v8`, `mediatek_v2+v1`, `tee gud 510/600/610/700`, `bt mt66xx+linux_v2`). Ini artefak build multi-varian, bukan mismatch KMI. Build referensi MTK/Samsung juga tidak menjalankan target ini.
+- Untuk daftar jebakan build dan rincian status lengkap, lihat `HANDOFF.md`.

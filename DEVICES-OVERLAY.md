@@ -49,8 +49,9 @@ module=50, builtin=6, dt=2, tidak ada=4     (tanpa MISMATCH)
 - 4 node tanpa driver (`tc_adapter_control`, `tc_trancare`, `tc_pe5`,
   `md1_sim1_hot_plug_eint-eint`) dibahas di `DEVICES.md` §Temuan 2;
   hanya `tc,trancare` yang benar-benar kehilangan fitur.
-- `frag@45/pixelworks@22` dan `@26`: chip Pixelworks iris (display
-  processing) — drivernya built-in di `mediatek_drm_v1`, tidak ada `.ko`.
+- `frag@45/pixelworks@22` dan `@26`: chip Pixelworks Iris (display
+  processing) — dikompilasi ke dalam modul `mediatek_drm_v1.ko` (bukan `.ko`
+  terpisah).
 
 ## Tabel
 

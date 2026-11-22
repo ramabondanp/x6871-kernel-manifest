@@ -1,22 +1,20 @@
-# BOOTTEST — uji boot utuh X6871
+# BOOTTEST — Prosedur Uji Boot & Checklist X6871
 
-> **Status 2026-11-20:** TWRP final sudah memakai 222 modul 100% source
-> (`twrp-vendor_boot-allsrc-display-usb.img`, md5
-> `0ecdaa1edb3d405954331539b24c911b`); layar dan USB replug sudah lolos.
-> Dokumen ini tetap dipakai untuk checklist system boot. Prosedur repack
-> yang berlaku ada di §2; angka 217/240 di §9-§10 (dan catatan historis
-> di §7) adalah artefak lama.
+> **Status 2026-11-22:** Rilis terbaru adalah **`venc-fod-dt2w-20261122`**
+> (kernel `17a6b66d7927`, `vendor_boot` v10 + `vendor_dlkm` + `odm_dlkm`,
+> **100% modul source**). Android 16 sudah terbukti boot sampai launcher dengan
+> layar normal (144/120/60/40 Hz + AOD), audio, GPU Mali, Wi-Fi, USB replug,
+> touch normal, dan kamera foto. Fokus uji terbaru: **rekam video (save), DT2W
+> saat AOD, dan FOD**. Prosedur repack yang berlaku ada di §2 dan §11; catatan
+> §9–§10 adalah arsip historis.
 
-Tujuan: memvalidasi **seluruh boot**, bukan hanya satu modul. Empat modul
-fitur (`tran_fp`, `tnek`, `tkv`, `tran_extcon_usb`) hanya bagian kecil dari
-222 modul yang menggantikan modul stock.
+Tujuan: memvalidasi **seluruh boot** (recovery + Android system), bukan hanya satu modul.
 
 ## 0. Tiga kenyataan yang menentukan prosedur
 
-1. **Modul ada di dalam `vendor_boot`.** Di image stock, 237 `.ko` berada di
-   `vendor_ramdisk00/lib/modules/` (flat, tanpa direktori versi), bersama
-   `modules.dep`, `modules.alias`, `modules.softdep`, `modules.load`,
-   `modules.load.recovery`. Tidak ada partisi modul terpisah.
+1. **Pembagian partisi modul di X6871:**
+   - **`vendor_boot`** (`vendor_ramdisk00/lib/modules/`, flat tanpa subdirektori versi): memuat **222 modul** first-stage/recovery bersama `modules.dep`, `modules.alias`, `modules.softdep`, `modules.load` (165 entri), dan `modules.load.recovery` (216 entri).
+   - **`vendor_dlkm` + `odm_dlkm`** (partisi logis di `super`, format EROFS + AVB hashtree footer): memuat **269 modul** Android system (**212** `vendor_dlkm` + **57** `odm_dlkm`, `modules.load` 194/57).
 2. **Kernel dan modul terikat oleh simbol + CRC, bukan release string.**
    Build ini memakai `CONFIG_MODVERSIONS`, dan `same_magic()` di
    `kernel/module/version.c` melewati token pertama vermagic saat modul punya
@@ -41,14 +39,15 @@ fitur (`tran_fp`, `tnek`, `tkv`, `tran_extcon_usb`) hanya bagian kecil dari
    `dtbo.img` tetap milik stock. Ini risiko yang harus diamati di dmesg
    (lihat §5).
 
-## 1. Artefak
+## 1. Artefak Terbaru (`venc-fod-dt2w-20261122`)
 
 | Artefak | Sumber | Catatan |
 |---|---|---|
-| `twrp-vendor_boot-allsrc-display-usb.img` | `tools/repack-vendor-boot-latest.sh` | **final**: 222 modul source, dtb/bootconfig/recovery TWRP tetap |
-| kernel `Image` | `out_bazel/.../mgk_64_k612_kernel_aarch64.user/Image` | hanya jika boot.img ikut diganti |
+| `twrp-vendor_boot-allsrc-display-usb-v10.img` | `tools/repack-vendor-boot-latest.sh` | **222** modul source (`md5 3409f68913613b38d43052458435558b`), dtb/bootconfig/recovery TWRP tetap |
+| `twrp-dlkm-venc-fod-dt2w-20261122.zip` | `build_dlkm_images.py` + zip TWRP | Mem-flash `vendor_dlkm.img` (**212** modul) + `odm_dlkm.img` (**57** modul), `md5 92ab587de697a955fceba15ecf335d52` |
+| kernel `Image` | `out_bazel/.../mgk_64_k612_kernel_aarch64.user/Image` | opsional, hanya jika `boot.img` ikut diganti |
 | `dtbo.img` | stock, tidak diubah | build tidak menghasilkan dtbo |
-| modul | `.../mgk_64_k612_customer_modules_install.user/staging/lib/modules/6.12.38-android16-5-g2c4fd33ae6d8-4k` | 806 file / 805 nama unik; 222 dipakai di vendor_boot |
+| staging modul | `.../mgk_64_k612_customer_modules_install.user/staging/lib/modules/6.12.38-android16-5-g2c4fd33ae6d8-4k` | 806 file / 805 nama unik |
 
 ## 2. Membuat image vendor_boot
 
@@ -73,9 +72,14 @@ bisa hilang. Detail repack: `HANDOFF.md` §Repack dan `PRETEST.md` §44.
 ## 3. Flash dan rollback
 
 ```bash
-# bootloader harus unlocked; image tidak ditandatangani (AVB akan menolak
-# kalau verifikasi aktif)
-fastboot flash vendor_boot vendor_boot-new.img
+# 1. Flash vendor_boot (bootloader unlocked; image tidak ditandatangani)
+fastboot flash vendor_boot twrp-vendor_boot-allsrc-display-usb-v10.img
+
+# 2. Flash vendor_dlkm + odm_dlkm lewat TWRP (Install zip):
+#    twrp-dlkm-venc-fod-dt2w-20261122.zip
+#    atau lewat fastbootd:
+fastboot flash vendor_dlkm vendor_dlkm.img
+fastboot flash odm_dlkm odm_dlkm.img
 fastboot reboot
 ```
 
@@ -83,6 +87,7 @@ Rollback (wajib disiapkan sebelum tes):
 
 ```bash
 fastboot flash vendor_boot /serverhive1/ramabondanp/tmp/x6871/vendor_boot.img
+# dan flash balik stock vendor_dlkm.img / odm_dlkm.img bila perlu
 ```
 
 Kalau kernel juga diganti, simpan `boot.img` stock dan flash balik dengan
@@ -96,16 +101,16 @@ Ambil `dmesg` penuh setelah boot, lalu periksa:
 |---|---|---|
 | Loader modul | `dmesg \| grep -E 'Unknown symbol\|disagrees about version\|version magic'` | kosong |
 | Storage/UFS | `dmesg \| grep -iE 'ufs\|scsi'`; `ls /dev/block/by-name`; mount `/data` | UFS probe, semua partisi ada, `/data` ter-mount |
-| Display/panel | matikan lalu nyalakan layar; `dmesg \| grep -iE 'lcm_prepare\|panel_ext_lcm_power_set\|underrun'` | resume memanggil `panel_ext_lcm_power_set(1)` + `lcm_prepare` + `lcm_panel_init`, 0 underrun |
-| Touch | `dmesg \| grep -i goodix`; `/dev/input/event*` | tidak ada gagal probe |
-| Charger/USB | cabut-colok kabel; `dmesg \| grep -iE 'tran_extcon\|ssusb_set_mode\|online=.*type='` | cabut -> role NONE, colok -> `online=1, type=1` (SDP), `pullup D+`, `gadget RESET` |
-| Audio | `dmesg \| grep -iE 'mt6895-afe\|snd'`; `tinymix`/`aplay` | card terdaftar, tidak ada timeout IPI |
-| Kamera | `dmesg \| grep -iE 'mtk-cam\|imgsensor'` | ISP probe, tidak ada error regulator |
-| Connectivity | `dmesg \| grep -iE 'wlan\|wmt\|bt'`; `ip link` | wlan0 ada |
+| Display/panel & AOD | matikan lalu nyalakan layar + uji AOD; `dmesg \| grep -iE 'lcm_prepare\|panel_doze\|underrun'` | resume normal, mode 144/120/60/40 Hz & AOD bersih, 0 underrun |
+| Touch & DT2W | `dmesg \| grep -iE 'goodix\|tran_touch'` | touch normal (`goodix_ts_report_finger`); masuk AOD tidak memicu `drm notify tp resume start`; double-tap memicu `got valid gesture type 0xcc` |
+| Charger/USB | cabut-colok kabel; `dmesg \| grep -iE 'tran_extcon\|ssusb_set_mode\|online=.*type='` | cabut -> role NONE, colok -> `online=1, type=1` (SDP), `pullup D+`, `gadget RESET`; tidak ada spam battery OC |
+| Audio | `dmesg \| grep -iE 'mt6895-afe\|fs15xx\|snd'`; uji speaker | card terdaftar, PA aktif, tidak ada timeout IPI |
+| Kamera & Video | foto + rekam video 1080p lalu simpan; `dmesg \| grep -iE 'check_codec_id\|venc\|LARB7'` | `check_codec_id ipi id 1 is correct`, `slbc_request 1`, `mtk_vcodec_enc_clock_on`, **0** fault `LARB7_PORT24`/`mva=0x0` |
+| Connectivity | `dmesg \| grep -iE 'wlan\|wmt\|bt'`; `ip link` | `wlan0` ada dan tersambung |
 | Sensor/thermal | `dmesg \| grep -iE 'thermal\|lvts\|sensorhub'` | tidak ada trip panic |
 | RTC/PMIC | `dmesg \| grep -iE 'mt6685\|rtc\|spmi'` | RTC jalan, tidak ada error SPMI |
 | Key/PMIC keys | `getevent` | volume/power berfungsi |
-| Fingerprint | `dmesg \| grep -i tran_fp`; `/sys/kernel/tran_fp/vendor_name` | `goodix chip id 0x...`, `vendor_name` terisi |
+| Fingerprint (FOD) | `ls -l /dev/goodix_fp`; `cat /sys/kernel/tran_fp/vendor_name`; `dmesg \| grep -iE 'tran_fp\|fp key finger\|notify fingerprint'` | `/dev/goodix_fp` ada, `vendor_name=goodix_opt_tee`, sentuh ikon FOD memicu `fp key finger` (key `195`) + HBM uevent `TRAN_FULL_HBM_EVENT=FULL_HBM_SET` |
 | tkv | `/proc/tkv` | ada, atau log `refusing to map` (aman) |
 | tnek | `/dev/tnek` | ada |
 | LED | `/sys/class/leds/aw22xxx*` | node ada |
@@ -148,13 +153,13 @@ Ambil `dmesg` penuh setelah boot, lalu periksa:
 5. Ambil `pstore`/`ramoops` (`/sys/fs/pstore`) atau UART untuk panic.
 6. Rollback dengan image stock sebelum mencoba varian berikutnya.
 
-## 7. Artefak final
+## 7. Artefak terbaru (`venc-fod-dt2w-20261122`)
 
 ```text
-/serverhive1/ramabondanp/tmp/x6871/twrp-vendor_boot-allsrc-display-usb.img
+/serverhive1/ramabondanp/tmp/x6871/twrp-vendor_boot-allsrc-display-usb-v10.img
   ukuran : 67108864 (sama dengan partisi stock)
-  md5    : 0ecdaa1edb3d405954331539b24c911b
-  modul  : 222, semuanya hasil build sendiri
+  md5    : 3409f68913613b38d43052458435558b
+  modul  : 222, semuanya hasil build sendiri (kernel 17a6b66d7927)
   dtb / bootconfig / vendor_ramdisk01 : identik dengan base TWRP
   modules.load           : 165 entri
   modules.load.recovery  : 216 entri
@@ -162,9 +167,8 @@ Ambil `dmesg` penuh setelah boot, lalu periksa:
   vermagic semua modul   : 6.12.38-android16-5-g2c4fd33ae6d8-4k
 ```
 
-Catatan historis: image 217 modul (`vendor_boot-new.img`) dan 240 modul
-campuran stock (`cfig` §9-§10) sudah tidak dipakai. Yang berlaku adalah
-222 modul source di atas.
+Catatan historis: image awal 217 modul (`vendor_boot-new.img`), 240 modul
+campuran stock (`cfig` §9–§10), serta `v1`–`v9` sudah digantikan oleh `v10`.
 
 ## 8. Kalau modul gagal load: cek `modules.dep`
 
@@ -302,45 +306,26 @@ kita (termasuk panel `panel-rm69220-vdo-x6871.ko` menggantikan
 TWRP/stock — `adaptive-ts` butuh `cloudengine_*` dari `transsion_tranlog`
 yang tidak kita build, jadi modul itu harus tetap ada agar sentuhan hidup.
 
-## 11. DLKM source (2026-11-20)
+## 11. DLKM 100% Source (2026-11-20 s.d. 2026-11-22)
 
-`vendor_dlkm` dan `odm_dlkm` sudah di-repack 100% source:
+`vendor_dlkm` (**212** modul, `modules.load` 194) dan `odm_dlkm` (**57** modul,
+`modules.load` 57) dibangun 100% dari source menggunakan EROFS dengan opsi
+identik stock + AVB hashtree footer yang dipertahankan. Zip TWRP memetakan
+logical partition (`lptools map`) lalu menulis image dengan `dd` tanpa
+menghapus/membuat ulang partisi.
+
+Artefak DLKM terbaru (`venc-fod-dt2w-20261122`, kernel `17a6b66d7927`):
 
 ```text
-vendor_dlkm.img  md5 c329bbb8a465e32dc5bfd4cdcaede45f  24.551.424 B
-odm_dlkm.img     md5 0ffbb42985d445f7c12808df3b50960e   4.206.592 B
-twrp-dlkm-source-20261120.zip  (release dlkm-20261120)
+vendor_dlkm.img                       md5 764c2d3f6fbd14aff802a0614ec7d014  24.551.424 B
+odm_dlkm.img                          md5 af60243be2a87943f78fc7d254bb690a   4.206.592 B
+twrp-dlkm-venc-fod-dt2w-20261122.zip  md5 92ab587de697a955fceba15ecf335d52
 ```
 
-- 212 modul vendor + 57 modul odm, `modules.load` 194/57.
-- EROFS memakai opsi stock persis, AVB hashtree footer dipertahankan.
-- Zip TWRP memetakan logical partition (`lptools map`) lalu `dd`; tidak
-  delete/create partition.
-- Setelah flash: reboot, ambil dmesg/pstore, cek
-  `dmesg | grep -iE 'Unknown symbol|module|verity'` dan pastikan sistem
-  mencapai launcher. Kalau gagal, rollback dengan stock
-  `vendor_dlkm`/`odm_dlkm`.
-- Fix SCP: `SCP_IPI_COUNT` 56 -> 59.
-- Fix GPU: Mali donor OPPO r54p1-11eac0 + gpufreq/ged/gpueb donor;
-  shared-status layout stock (padding sebelum `power_count`: `power_count`
-  0x24..`active_count` 0x34, `temperature` 0x38, `shader_present` 0xe0).
-- Fix dmesg4 (spam OC 65 Hz + mode switch panel 120/60 Hz):
-  `rfg-mtk-tran-conf-diff` di `mtk_battery_oc_throttling` (`vendor_dlkm`)
-  dan `mt6375-battery` (`odm_dlkm` + `vendor_boot`), plus timing & VFP cmd
-  switch stock di `panel-rm69220-vdo-x6871` (`vendor_boot`):
-  `twrp-vendor_boot-allsrc-display-usb-v2.img` md5 `e3a1fbe803361749d7fd28f1049d1ffa`,
-  `vendor_dlkm.img` md5 `ec627a474d09bb3303408e52211b6437`,
-  `odm_dlkm.img` md5 `c2c312b3374ebdb0e835db396663e924`,
-  zip `twrp-dlkm-ocfix-20261121.zip` (release `dlkm-ocfix-20261121`).
-- Fix dmesg5 (layar setengah kanan pink/hijau — C3D dual-pipe SRAM +
-  `PQ_VIRTUAL_SET_PROPERTY` 12 B di `mediatek_drm_v1.ko`): hanya `vendor_boot`
-  di-repack: `twrp-vendor_boot-allsrc-display-usb-v3.img` md5
-  `c4362d3312ab41356bc6eb2cc6f509b8` (release `vendor-boot-c3dfix-20261121`) —
-  **terverifikasi normal**.
-- Port kamera X6871 (`s5khm6sx`/`gc32e1`/`gc02m3`/`gc02m3macro` di
-  `imgsensor.ko` + prefix `camera_eeprom` & `g_camCalList` di
-  `camera_eeprom_v4l2.ko`): hanya `vendor_dlkm` di-repack: `vendor_dlkm.img`
-  md5 `bfd96feb71d3f53fcc0c045b896809e6`, zip `twrp-dlkm-cam1-20261121.zip`
-  (release `dlkm-cam1-20261121`).
-- Fitur dari 25 modul stock tanpa source (`transsion_tranlog`,
-  `thd`, dll) tidak akan ada.
+Ringkasan perbaikan DLKM + `vendor_boot` yang sudah masuk hingga `v10`:
+
+- **Boot system dasar (`dlkm-20261120`..`gpu3`)**: `SCP_IPI_COUNT` 56→59, GPU Mali r54p1-11eac0 donor OPPO + fix padding `gpufreq_shared_status` (`power_count` 0x24..`active_count` 0x34, `temperature` 0x38, `shader_present` 0xe0).
+- **Battery OC & layar (`v2`–`v3`)**: `rfg-mtk-tran-conf-diff`, timing/VFP 144/120/60/40 Hz, C3D dual-pipe SRAM, dan `PQ_VIRTUAL_SET_PROPERTY` 12 B — **layar terverifikasi normal penuh**.
+- **Audio, AOD & kamera (`v4`–`v6`)**: FS1599 PA + `tran_audio_control`, AOD RM69220, 4 sensor kamera X6871 (`s5khm6sx`/`gc32e1`/`gc02m3`/`gc02m3macro`) + `camera_eeprom_v4l2`, `mtk-cam-isp` inline `sink_fmt`, dan flashlight `ocp81375_v4l2`.
+- **VENC, DT2W & FOD (`v7`–`v10`)**: QP ABI 6-field, `VENC_H264 = 1`, `mtk_codec_capability` 24 B + ADAB 4x `U32`, `slbc_request`, enum notifier AOD/HBM DRM, `adaptive-ts` resume khusus `AOD_NOTIFY`, Goodix cmd `0x30` + FOD key `195`, dan `/dev/goodix_fp` + HBM uevent `TRAN_FULL_HBM_EVENT=FULL_HBM_SET`.
+- Fitur dari 25 modul stock tanpa source (`transsion_tranlog`, `thd`, dll.) tidak disertakan. Detail lengkap ada di `HANDOFF.md` dan `PRETEST.md` §45–§59.
