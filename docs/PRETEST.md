@@ -3718,3 +3718,46 @@ release                                      venc-fod-dt2w-20261122
 ```
 
 Kernel `17a6b66d7927`.
+
+## 60. `dmesg5`/`logcat3`: rekam video & FOD normal lulus; fix FOD saat AOD, DT2W 1-byte read, dan V4L2 flashlight
+
+Status uji user pada `venc-fod-dt2w-20261122` (v10):
+- **Rekam video & simpan**: **LULUS** (tidak ada lagi `LARB7_PORT24`/`mva=0x0` maupun VCP WDT).
+- **Optical FOD (layar menyala)**: **LULUS** (`/dev/goodix_fp` terdaftar, key `195` + HBM uevent berjalan).
+- **Sisa 3 bug** yang ditemukan di `dmesg5.txt` + `logcat3.txt` (cross-check dengan `normal2.txt`, disassembly `.ko` stock, dan APK/DTBO firmware dump X6871):
+
+1. **Layar rusak saat FOD ditekan di AOD (`panel-rm69220-vdo-x6871.ko`, `59ed7e7`)**:
+   - Di `dmesg5.txt` (`t=89.146..91.271`), `panel_doze_enable` mengaktifkan software 3AOD (`g_aod_enable=1`, tanpa DCS `0x39`), lalu HBM ON (`en=1, aod=1`) diikuti HBM OFF (`en=0, aod=1`), lalu `panel_doze_disable` (`g_aod_enable=0`, tanpa DCS `0x38`).
+   - `panel_hbm_set_cmdq()` warisan donor RM692J0 masih mengirim `aod_mode_enter_setting` (`{0xFE, 0x00}`, `{0x39}` = hardware 8-color Idle Mode ON) pada saat HBM OFF di AOD. Karena `panel_doze_disable()` tidak pernah mengirim `0x38`, panel terkunci permanen di hardware Idle Mode setelah unlock FOD dari AOD.
+   - Fix mengikuti disassembly stock `rm69220_fhdp_dsi_vdo_dsc_csot_csot_144hz_x6871.ko`:
+     - Hapus `aod_mode_enter_setting` (`0x39`) dan `aod_mode_exit_setting` (`0x38`/`0x51`).
+     - Pakai tabel 2-entry `hbm_mode_enter_setting` (`0xFE`, `0x83`) dan `hbm_mode_exit_setting`.
+     - Kirim `{0xFE, 0x00}` + `{0x53, 0x20}` (dimming off) sebelum transisi HBM, dan `{0x53, 0x28}` hanya saat exit HBM di AOD dengan `last_mapped_level >= 0x16B`.
+     - Ganti tabel alpha RM692J0 dengan dua tabel alpha asli RM69220 (`brightness_mapped_to_alpha_256[256][2]` + `brightness_mapped_to_alpha_low[248][2]`) dan alpha AOD `{0x2E, 0x19}`; simpan `last_mapped_level` di `panel_set_aod_light_mode()`.
+2. **DT2W tidak membangunkan layar (`adaptive-ts.ko`, `10396cb`)**:
+   - Di `dmesg5.txt` (`t=89.363..90.493`), `gsx_gesture_ist` menerima `0xcc` dan mengirim key `198` (`KEY_F26`), dan di `logcat3.txt` (`12:04:06.075`) `system_server` benar-benar menjalankan `KeyguardGestureService`.
+   - Inspeksi bytecode `MicroIntelligence.apk` (`Lh4/m;->i`, `KeyguardGestureManager.dispatchTPGesture`) membuktikan OS membaca `/proc/gesture_function` dengan `FileInputStream.read()` (tanpa argumen → `read(fd, &b, 1)` dengan `count == 1`).
+   - `tran_gesture_data_read()` sebelumnya memeriksa `if (count < len) return -EINVAL;` dengan `len == 2` (`"f\n"`), sehingga setiap pembacaan melempar `IOException` dan gestur diabaikan.
+   - Fix: ganti semua pembacaan proc ke `simple_read_from_buffer()`, tambahkan log `CTP gesture` seperti stock, dan implementasikan tabel 17-entri `g_tran_gesture_maps` (`cc1`/`cc2` untuk `/proc/gesture_function` write dan format `%c%c : %d` untuk `/proc/gesture_state` read).
+3. **Flashlight tidak menyala (`sgm37864_v4l2.ko` + `ocp81375_v4l2.ko`, `78a1441`)**:
+   - Di `normal2.txt`, torch memakai V4L2 subdev (`ocp81375_v4l2_open` → `V4L2_CID_FLASH_TORCH_INTENSITY` + `V4L2_CID_FLASH_LED_MODE=2`). Di `dmesg5.txt`, V4L2 subdev tidak pernah dibuka sehingga HAL fallback ke `/dev/flashlight` ioctl (`FLASH_IOC_SET_DUTY` = 110 → `-ENOTTY`, mode tetap `MODE_SHDN`).
+   - Di DTBO X6871 (`frag0.dts` `fragment@53` + `fragment@56`), `mtk_composite` menunggu 2 subdev async: `port@0` → `ocp81375_v4l2/flash@0` dan `port@1` → `sgm37864_v4l2/flash_sgm37864@0`. Tanpa `CONFIG_MTK_FLASHLIGHT_TWO_SUPPLY`, `sgm37864.c` mencari child `"flash"` (bukan `"flash_sgm37864"`), sehingga `port@1` tidak pernah terikat, `v4l2_async_nf` `mtk_composite` tidak pernah complete, dan `/dev/v4l-subdev*` tidak pernah dibuat untuk keduanya.
+   - Fix:
+     - `sgm37864.c`: cari child DT `"flash_sgm37864"` lebih dulu (fallback `"flash"`) dan daftarkan subdev dengan nama stock `"sgm37864_v4l2-led{0,1}{,-f}"` (sesuai `TranFlashConfig.json`).
+     - `ocp81375.c`: gunakan `ocp81375_mode_ctrl()` di `V4L2_CID_FLASH_LED_MODE` agar mode `MODE_TORCH` bersih ke `MODE_SHDN` saat mati, dan tambah fallback `FLASH_IOC_SET_DUTY` di `ocp81375_ioctl()`.
+4. **Verifikasi biner (build bersih di `/serverhive1/ramabondanp/x6871-clean/ws`)**:
+   - `panel-rm69220-vdo-x6871.ko`: tidak ada simbol `aod_mode_*`, `brightness_mapped_to_alpha_256` & `_low` serta 2-entry `hbm_mode_*` hadir; cocok byte-per-byte di `x6871-twrp-vendor_boot-v11.img`.
+   - `adaptive-ts.ko`: `simple_read_from_buffer`, `tran_gesture_data_read`/`write`, `tran_gesture_status_read`, `g_tran_gesture_maps` hadir; cocok byte-per-byte di `vendor_boot` v11 dan `odm_dlkm.img`.
+   - `sgm37864_v4l2.ko` & `ocp81375_v4l2.ko`: string `flash_sgm37864`, `sgm37864_v4l2-led{0,1}{,-f}`, `FLASH_IOC_SET_DUTY` hadir; cocok byte-per-byte di `vendor_dlkm.img`.
+
+### Artefak (`aod-dt2w-flash-20261122`)
+
+```text
+x6871-twrp-vendor_boot-v11.img         md5 f61e734b13b8f95967278f0dd5f61cd6  67.108.864 B
+vendor_dlkm.img                        md5 ffa1ce1106b022a5c9397fe5b5d82ff0  24.551.424 B
+odm_dlkm.img                           md5 88307f5b15ff51b0cce511fb5d1a7427   4.206.592 B
+twrp-dlkm-aod-dt2w-flash-20261122.zip  md5 24b44e305ed52b8bc57ecd35e49a7b50  18.193.690 B
+release                                aod-dt2w-flash-20261122
+```
+
+Kernel `78a1441` (3 commit: `59ed7e7`, `10396cb`, `78a1441`).

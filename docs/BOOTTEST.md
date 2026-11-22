@@ -1,12 +1,12 @@
 # BOOTTEST — Prosedur Uji Boot & Checklist X6871
 
-> **Status 2026-11-22:** Rilis terbaru adalah **`venc-fod-dt2w-20261122`**
-> (kernel `17a6b66d7927`, `vendor_boot` v10 + `vendor_dlkm` + `odm_dlkm`,
+> **Status 2026-11-22:** Rilis terbaru adalah **`aod-dt2w-flash-20261122`**
+> (kernel `78a1441`, `vendor_boot` v11 + `vendor_dlkm` + `odm_dlkm`,
 > **100% modul source**). Android 16 sudah terbukti boot sampai launcher dengan
 > layar normal (144/120/60/40 Hz + AOD), audio, GPU Mali, Wi-Fi, USB replug,
-> touch normal, dan kamera foto. Fokus uji terbaru: **rekam video (save), DT2W
-> saat AOD, dan FOD**. Prosedur repack yang berlaku ada di §2 dan §11; catatan
-> §9–§10 adalah arsip historis.
+> touch normal, kamera foto + rekam video, dan optical FOD (layar menyala).
+> Fokus uji terbaru: **FOD saat AOD, DT2W, dan flashlight/torch**. Prosedur
+> repack yang berlaku ada di §2 dan §11; catatan §9–§10 adalah arsip historis.
 
 Tujuan: memvalidasi **seluruh boot** (recovery + Android system), bukan hanya satu modul.
 
@@ -39,12 +39,12 @@ Tujuan: memvalidasi **seluruh boot** (recovery + Android system), bukan hanya sa
    `dtbo.img` tetap milik stock. Ini risiko yang harus diamati di dmesg
    (lihat §5).
 
-## 1. Artefak Terbaru (`venc-fod-dt2w-20261122`)
+## 1. Artefak Terbaru (`aod-dt2w-flash-20261122`)
 
 | Artefak | Sumber | Catatan |
 |---|---|---|
-| `twrp-vendor_boot-allsrc-display-usb-v10.img` | `tools/repack-vendor-boot-latest.sh` | **222** modul source (`md5 3409f68913613b38d43052458435558b`), dtb/bootconfig/recovery TWRP tetap |
-| `twrp-dlkm-venc-fod-dt2w-20261122.zip` | `build_dlkm_images.py` + zip TWRP | Mem-flash `vendor_dlkm.img` (**212** modul) + `odm_dlkm.img` (**57** modul), `md5 92ab587de697a955fceba15ecf335d52` |
+| `x6871-twrp-vendor_boot-v11.img` | `tools/repack-vendor-boot-latest.sh` | **222** modul source (`md5 f61e734b13b8f95967278f0dd5f61cd6`), dtb/bootconfig/recovery TWRP tetap |
+| `twrp-dlkm-aod-dt2w-flash-20261122.zip` | EROFS + AVB + zip TWRP | Mem-flash `vendor_dlkm.img` (**212** modul, `md5 ffa1ce1106b022a5c9397fe5b5d82ff0`) + `odm_dlkm.img` (**57** modul, `md5 88307f5b15ff51b0cce511fb5d1a7427`), zip `md5 24b44e305ed52b8bc57ecd35e49a7b50` |
 | kernel `Image` | `out_bazel/.../mgk_64_k612_kernel_aarch64.user/Image` | opsional, hanya jika `boot.img` ikut diganti |
 | `dtbo.img` | stock, tidak diubah | build tidak menghasilkan dtbo |
 | staging modul | `.../mgk_64_k612_customer_modules_install.user/staging/lib/modules/6.12.38-android16-5-g2c4fd33ae6d8-4k` | 806 file / 805 nama unik |

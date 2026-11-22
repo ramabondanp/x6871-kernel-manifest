@@ -2,14 +2,14 @@
 
 Workspace Bazel+Kleaf untuk membangun modul kernel **Android 16 / kernel 6.12 / MediaTek MT6895** untuk **Infinix GT 20 Pro (X6871)** (berbasis donor MTK 6.12 Motorola `w1vo36.88-36-7` + OPPO `mt6896`).
 
-- **Device modules (`kernel_device_modules-6.12`)**: [`alps-kernel_device_modules-6.12`](https://github.com/ramabondanp/alps-kernel_device_modules-6.12/tree/x6871-android16-6.12) (`x6871-android16-6.12`, **90 commit** di atas baseline `06079c2`, HEAD `17a6b66d7927`)
+- **Device modules (`kernel_device_modules-6.12`)**: [`alps-kernel_device_modules-6.12`](https://github.com/ramabondanp/alps-kernel_device_modules-6.12/tree/x6871-android16-6.12) (`x6871-android16-6.12`, **93 commit** di atas baseline `06079c2`, HEAD `78a1441`)
 - **Vendor MTK modules (`vendor/mediatek/kernel_modules`)**: [`alps-vendor_mediatek_kernel_modules`](https://github.com/ramabondanp/alps-vendor_mediatek_kernel_modules/tree/x6871-android16-6.12) (`x6871-android16-6.12`, **4 commit** X6871 di atas base Motorola + 13 donor OPPO `86edba6`, HEAD `83b4fa6`)
 - **Output build X6871**: staging **806 file** (**805** nama unik), flat customer install **702** `.ko`
 - **Output baseline MTK murni** (`mtk-base-latest`): **1.401** `.ko`
 - **Panduan cepat dokumen**:
   - [`docs/HANDOFF.md`](docs/HANDOFF.md) — ringkasan status terkini, aturan kerja, perintah build/repack, dan pengetahuan kritis
   - [`docs/BOOTTEST.md`](docs/BOOTTEST.md) — prosedur flash, rollback, dan checklist uji boot per subsistem
-  - [`docs/PRETEST.md`](docs/PRETEST.md) — log teknis kronologis (§1–§59) hasil audit statis, RE biner, dan uji device
+  - [`docs/PRETEST.md`](docs/PRETEST.md) — log teknis kronologis (§1–§60) hasil audit statis, RE biner, dan uji device
   - [`docs/PLAN.md`](docs/PLAN.md) — rencana porting awal dan bukti investigasi per modul (§6.x)
   - [`docs/DEVICES.md`](docs/DEVICES.md) / [`docs/DEVICES-OVERLAY.md`](docs/DEVICES-OVERLAY.md) — tabel pemetaan node Device Tree X6871 ke driver
 
@@ -76,26 +76,28 @@ Seluruh partisi modul (**222** modul `vendor_boot` + **212** `vendor_dlkm` + **5
 | GPU Mali r54p1-11eac0 & gpufreq | ✅ Terbukti | Donor OPPO + fix layout `gpufreq_shared_status` |
 | Audio (MT6368 + FS1599 PA) | ✅ Terbukti | Kontrol `tran_audio_control` + PA switch aktif |
 | Wi-Fi, USB replug, Charger, Haptic, Touch normal | ✅ Terbukti | Tidak ada spam IRQ battery OC |
-| Kamera foto & preview video (4 sensor) | ✅ Terbukti | `s5khm6sx`, `gc32e1`, `gc02m3`, `gc02m3macro` + flashlight |
-| **Rekam video (save)** | 🔄 Menunggu uji (`v10`) | Akar masalah ditemukan: `VENC_H264` salah = 13 (harus 1) + ADAB/SLBC ABI (`17a6b66d7927`) |
-| **DT2W (termasuk saat AOD)** | 🔄 Menunggu uji (`v10`) | Fix enum notifier AOD (`6b45fdaa1ef1`) + `adaptive-ts` hanya resume di `AOD_NOTIFY` (`379924bf2586`) |
-| **Optical FOD (fingerprint)** | 🔄 Menunggu uji (`v10`) | Fix `/dev/goodix_fp` + HBM uevent (`55aa13232a43`) + Goodix cmd `0x30` & key `195` (`379924bf2586`) |
+| Kamera foto & rekam video (save) | ✅ Terbukti | 4 sensor + EEPROM + VENC H264/ADAB/SLBC (`17a6b66d7927`) |
+| Optical FOD (layar menyala) | ✅ Terbukti | `/dev/goodix_fp` + HBM uevent + Goodix cmd `0x30` & key `195` |
+| **FOD saat AOD** | 🔄 Menunggu uji (`v11`) | Hapus `0x39`/`0x38` idle mode di `panel-rm69220-vdo-x6871` + tabel alpha stock (`59ed7e7`) |
+| **DT2W (saat AOD / layar mati)** | 🔄 Menunggu uji (`v11`) | `simple_read_from_buffer()` untuk 1-byte `FileInputStream.read()` + `gesture_maps` (`10396cb`) |
+| **Flashlight / Torch** | 🔄 Menunggu uji (`v11`) | Fix child DT `flash_sgm37864` + nama subdev V4L2 + `ocp81375` mode/duty (`78a1441`) |
 
-### Rilis terbaru: `venc-fod-dt2w-20261122` (kernel `17a6b66d7927`)
+### Rilis terbaru: `aod-dt2w-flash-20261122` (kernel `78a1441`)
 
 ```text
-twrp-vendor_boot-allsrc-display-usb-v10.img  md5 3409f68913613b38d43052458435558b  67.108.864 B
-twrp-dlkm-venc-fod-dt2w-20261122.zip         md5 92ab587de697a955fceba15ecf335d52
-  ├─ vendor_dlkm.img                         md5 764c2d3f6fbd14aff802a0614ec7d014  24.551.424 B
-  └─ odm_dlkm.img                            md5 af60243be2a87943f78fc7d254bb690a   4.206.592 B
+x6871-twrp-vendor_boot-v11.img         md5 f61e734b13b8f95967278f0dd5f61cd6  67.108.864 B
+twrp-dlkm-aod-dt2w-flash-20261122.zip  md5 24b44e305ed52b8bc57ecd35e49a7b50  18.193.690 B
+  ├─ vendor_dlkm.img                   md5 ffa1ce1106b022a5c9397fe5b5d82ff0  24.551.424 B
+  └─ odm_dlkm.img                      md5 88307f5b15ff51b0cce511fb5d1a7427   4.206.592 B
 ```
 
-Release GitHub: <https://github.com/ramabondanp/x6871-kernel-manifest/releases/tag/venc-fod-dt2w-20261122>
+Release GitHub: <https://github.com/ramabondanp/x6871-kernel-manifest/releases/tag/aod-dt2w-flash-20261122>
 
 ### Ringkasan perjalanan rilis
 
 | Rilis | `vendor_boot` | Sorotan utama |
 |---|---|---|
+| `aod-dt2w-flash-20261122` | v11 | Fix FOD di AOD (hapus `0x39` idle mode + alpha stock), DT2W 1-byte read + `gesture_maps`, V4L2 flashlight (`flash_sgm37864` + `ocp81375`) |
 | `venc-fod-dt2w-20261122` | v10 | Fix akar masalah VENC (`VENC_H264=1`), ABI notifier AOD/HBM, DT2W AOD, `/dev/goodix_fp` + FOD key `195` |
 | `video-touch-20261121` | v9 | Wake awal IRQ gestur, log diagnostik VSI VENC & `tran_fp` |
 | `touchfix-20261121` | v8 | Kembalikan gate `suspended` di `gsx_gesture_ist` + bersihkan event gestur |

@@ -16,13 +16,29 @@ Ditulis 2026-11-19, diperbarui 2026-11-22 untuk sesi AI berikutnya. Baca ini dul
 | DLKM (`vendor_dlkm` + `odm_dlkm`) | **269**, 100% source, image siap |
 | Build target | `//kernel_device_modules-6.12:mgk_64_k612_customer_modules_install.user` |
 | Build terakhir | sukses (inkremental), 2026-11-22 |
-| Kernel HEAD | `17a6b66d7927` (`alps-kernel_device_modules-6.12`, `x6871-android16-6.12`) |
+| Kernel HEAD | `78a1441` (`alps-kernel_device_modules-6.12`, `x6871-android16-6.12`, 93 commit di atas `06079c2`) |
 | Vendor MTK modules HEAD | `83b4fa6` (`alps-vendor_mediatek_kernel_modules`, `x6871-android16-6.12`) |
-| Runtime | **Android boot + layar + audio + AOD + kamera foto + video preview + Wi-Fi + GPU OK**; rilis `venc-fod-dt2w-20261122` memperbaiki akar masalah VENC (`VENC_H264=1`), ABI notifier AOD/HBM DRM (`mediatek_drm_v1`), DT2W saat AOD (`adaptive-ts`), FOD key/proc (`gt9916_common`), dan `/dev/goodix_fp` + HBM uevent (`tran_fp`); siap uji device |
+| Active clean workspace | `/serverhive1/ramabondanp/x6871-clean/ws` (keep old `/serverhive1/ramabondanp/w1vo` untouched) |
+| Runtime | **Boot + layar + audio + AOD + kamera foto + rekam video + FOD normal + Wi-Fi + GPU OK**; rilis `aod-dt2w-flash-20261122` (v11) memperbaiki sisa 3 bug: FOD di AOD (`59ed7e7`), DT2W 1-byte read + `gesture_maps` (`10396cb`), dan V4L2 flashlight (`78a1441`); siap uji device |
 
 ## Status Rilis Terbaru & Ringkasan Riwayat (2026-11-22)
 
-### Rilis aktif: `venc-fod-dt2w-20261122` (kernel `17a6b66d7927`, `vendor_boot` v10 + DLKM)
+### Rilis aktif: `aod-dt2w-flash-20261122` (kernel `78a1441`, `vendor_boot` v11 + DLKM)
+
+```text
+x6871-twrp-vendor_boot-v11.img         md5 f61e734b13b8f95967278f0dd5f61cd6  67.108.864 B
+vendor_dlkm.img                        md5 ffa1ce1106b022a5c9397fe5b5d82ff0  24.551.424 B
+odm_dlkm.img                           md5 88307f5b15ff51b0cce511fb5d1a7427   4.206.592 B
+twrp-dlkm-aod-dt2w-flash-20261122.zip  md5 24b44e305ed52b8bc57ecd35e49a7b50  18.193.690 B
+/srv path                              /serverhive1/ramabondanp/x6871-clean/out/
+```
+
+Hasil uji v10 (`dmesg5.txt`/`logcat3.txt`): rekam video & optical FOD normal **LULUS**. Sisa 3 bug diperbaiki di v11 (`PRETEST.md` §60):
+1. **FOD saat AOD layar rusak (`panel-rm69220-vdo-x6871.ko`, `59ed7e7`)**: Hapus `aod_mode_enter_setting` (`0x39` hardware 8-color Idle Mode) dan `aod_mode_exit_setting` (`0x38`/`0x51`) dari `panel_hbm_set_cmdq()`, samakan dengan stock RM69220 (2-entry HBM table, dimming `{0x53, 0x20}`/`{0x53, 0x28}`, alpha AOD `{0x2E, 0x19}`, dua tabel alpha stock 256 & 248 entry).
+2. **DT2W (`adaptive-ts.ko`, `10396cb`)**: `KeyguardGestureManager` (`MicroIntelligence.apk`) membaca `/proc/gesture_function` lewat `FileInputStream.read()` (`count == 1`). `tran_gesture_data_read()` kini memakai `simple_read_from_buffer()` (tidak lagi `-EINVAL` pada `count < 2`) + dukungan 17-entri `gesture_maps` (`cc1`/`cc2` dan `/proc/gesture_state`).
+3. **Flashlight (`sgm37864_v4l2.ko` + `ocp81375_v4l2.ko`, `78a1441`)**: `mtk_composite` menunggu kedua endpoint (`ocp81375_v4l2/flash@0` dan `sgm37864_v4l2/flash_sgm37864@0`) sebelum mendaftarkan `/dev/v4l-subdev*`. `sgm37864.c` kini mencari child DT `"flash_sgm37864"` + nama subdev `"sgm37864_v4l2-led*"` sesuai stock; `ocp81375.c` memakai `ocp81375_mode_ctrl()` di `V4L2_CID_FLASH_LED_MODE` + fallback `FLASH_IOC_SET_DUTY`.
+
+### Rilis sebelumnya: `venc-fod-dt2w-20261122` (kernel `17a6b66d7927`, `vendor_boot` v10 + DLKM)
 
 ```text
 twrp-vendor_boot-allsrc-display-usb-v10.img  md5 3409f68913613b38d43052458435558b  67.108.864 B
@@ -55,10 +71,11 @@ Boot pembanding `normal2.txt` (GKI `Image` kita + modul stock) berhasil merekam 
 - **Set DLKM (269 modul)**: EROFS identik opsi stock + AVB hashtree footer; zip TWRP menulis langsung ke logical partition tanpa menghapus partisi. 25 modul stock tanpa source (`transsion_tranlog`, `thd`, varian touch alternatif, dll.) tidak disertakan; `tran_zram` diganti `zsmalloc`+`zram`, ditambah `rfkill`, `bluetooth`, `libarc4`, `task_turbo`.
 - **Repack `vendor_boot`**: selalu pakai `tools/repack-vendor-boot-latest.sh` (lihat §Perintah build / Repack). Jangan menyalin `.ko` dari image lama atau memakai `tools/pack-vendor-boot.sh` legacy (`PRETEST.md` §43/§44).
 
-### Ringkasan riwayat rilis (`v1`–`v10`)
+### Ringkasan riwayat rilis (`v1`–`v11`)
 
 | Rilis | `vendor_boot` | Kernel HEAD | Ringkasan perubahan | Referensi |
 |---|---|---|---|---|
+| `aod-dt2w-flash-20261122` | v11 | `78a1441` | Fix FOD di AOD (hapus `0x39` idle mode + tabel alpha RM69220), DT2W 1-byte `simple_read_from_buffer` + `gesture_maps`, V4L2 flashlight (`flash_sgm37864` + `ocp81375`) | `PRETEST.md` §60 |
 | `venc-fod-dt2w-20261122` | v10 | `17a6b66d7927` | Fix akar masalah VENC (`VENC_H264=1`, ADAB, SLBC), ABI notifier AOD/HBM, DT2W AOD, `/dev/goodix_fp` + FOD key `195` | `PRETEST.md` §59 |
 | `video-touch-20261121` | v9 | `6566cb27da18` | Wake awal IRQ gestur, log VSI VENC, log INFO `tran_fp` | `PRETEST.md` §58 |
 | `touchfix-20261121` | v8 | `a453c308cc33` | Kembalikan gate `suspended` `gsx_gesture_ist` + clear gesture event | `PRETEST.md` §57 |
