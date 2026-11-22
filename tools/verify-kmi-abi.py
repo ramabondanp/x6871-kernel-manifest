@@ -15,6 +15,7 @@ Safeguards enforced (exit non-zero on any failure):
 Usage:
   ./tools/verify-kmi-abi.py
   ./tools/verify-kmi-abi.py --ws "$HOME/x6871-kernel" \\
+      --out-dir "$HOME/x6871-kernel/out_bazel" \\
       --vb-dir "$HOME/tmp/vbwork-twrp/build/unzip_boot/root.1/lib/modules" \\
       --vd-dir "$HOME/x6871-out/dlkm-latest-work/vendor_dlkm/lib/modules" \\
       --od-dir "$HOME/x6871-out/dlkm-latest-work/odm_dlkm/lib/modules"
@@ -81,6 +82,28 @@ def parse_ko(path: str):
         crc = struct.unpack("<Q", chunk[:8])[0]
         name = chunk[8:].split(b"\x00", 1)[0].decode("ascii", errors="ignore")
         if name:
+            imp_crcs[name] = crc
+
+    # The legacy table omits names that do not fit in a modversion_info.
+    # Read the extended table too, and reject inconsistent CRCs if both exist.
+    ext_sections = {"__version_ext_names", "__version_ext_crcs"}
+    present_ext_sections = ext_sections & set(sec_idx_name.values())
+    if present_ext_sections:
+        if present_ext_sections != ext_sections:
+            raise ValueError(f"{path}: incomplete extended modversion table")
+        names = dump_section(path, "__version_ext_names")
+        crcs = dump_section(path, "__version_ext_crcs")
+        if names and not names.endswith(b"\x00"):
+            raise ValueError(f"{path}: unterminated extended modversion name")
+        # The compiler may append a second NUL after the last name.
+        payload = names.rstrip(b"\x00")
+        entries = payload.split(b"\x00") if payload else []
+        if len(crcs) != 4 * len(entries) or any(not name for name in entries):
+            raise ValueError(f"{path}: invalid extended modversion table")
+        for raw_name, (crc,) in zip(entries, struct.iter_unpack("<I", crcs)):
+            name = raw_name.decode("ascii")
+            if name in imp_crcs and imp_crcs[name] != crc:
+                raise ValueError(f"{path}: conflicting modversion CRCs for {name}")
             imp_crcs[name] = crc
 
     vermagic = subprocess.check_output(["modinfo", "-F", "vermagic", path], text=True).strip()
@@ -172,6 +195,7 @@ def main():
         default_ws = os.path.join(home, "x6871-clean/ws")
     ap = argparse.ArgumentParser(description="Verify X6871 modules against pure GKI KMI/ABI.")
     ap.add_argument("--ws", default=os.environ.get("KERNEL_ROOT", default_ws))
+    ap.add_argument("--out-dir", help="Bazel output user root (default: <workspace>/out_bazel)")
     ap.add_argument(
         "--vb-dir",
         default=os.path.join(os.environ.get("TMPDIR", os.path.join(home, "tmp")), "vbwork-twrp/build/unzip_boot/root.1/lib/modules"),
@@ -186,13 +210,14 @@ def main():
             sys.exit(f"ERROR: required tool not found: {tool}")
 
     k_src = os.path.join(args.ws, "kernel-6.12")
+    out_dir = os.path.abspath(args.out_dir or os.path.join(args.ws, "out_bazel"))
     bases = sorted(
-        glob.glob(f"{args.ws}/out_bazel/*/execroot/_main/bazel-out/*/bin/kernel_device_modules-6.12"),
+        glob.glob(f"{glob.escape(out_dir)}/*/execroot/_main/bazel-out/*/bin/kernel_device_modules-6.12"),
         key=os.path.getmtime,
         reverse=True,
     )
     if not bases:
-        sys.exit(f"ERROR: no Bazel output found under {args.ws}/out_bazel")
+        sys.exit(f"ERROR: no Bazel output found under {out_dir}")
     base = bases[0]
     k_dir = os.path.join(base, "mgk_64_k612_kernel_aarch64.user")
     m_dir = os.path.join(base, "mgk_64_k612_customer_modules_install.user")
