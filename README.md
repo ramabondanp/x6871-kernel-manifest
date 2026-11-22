@@ -2,14 +2,14 @@
 
 Workspace Bazel+Kleaf untuk membangun modul kernel **Android 16 / kernel 6.12 / MediaTek MT6895** untuk **Infinix GT 20 Pro (X6871)** (berbasis donor MTK 6.12 Motorola `w1vo36.88-36-7` + OPPO `mt6896`).
 
-- **Device modules (`kernel_device_modules-6.12`)**: [`alps-kernel_device_modules-6.12`](https://github.com/ramabondanp/alps-kernel_device_modules-6.12/tree/x6871-android16-6.12) (`x6871-android16-6.12`, **103 commit** di atas baseline `06079c2`, HEAD `6230061`)
+- **Device modules (`kernel_device_modules-6.12`)**: [`alps-kernel_device_modules-6.12`](https://github.com/ramabondanp/alps-kernel_device_modules-6.12/tree/x6871-android16-6.12) (`x6871-android16-6.12`, **104 commit** di atas baseline `06079c2`, HEAD `f661c15`)
 - **Vendor MTK modules (`vendor/mediatek/kernel_modules`)**: [`alps-vendor_mediatek_kernel_modules`](https://github.com/ramabondanp/alps-vendor_mediatek_kernel_modules/tree/x6871-android16-6.12) (`x6871-android16-6.12`, **4 commit** X6871 di atas base Motorola + 13 donor OPPO `86edba6`, HEAD `83b4fa6`)
 - **Output build X6871**: staging **806 file** (**805** nama unik), flat customer install **702** `.ko`
 - **Output baseline MTK murni** (`mtk-base-latest`): **1.401** `.ko`
 - **Panduan cepat dokumen**:
   - [`docs/HANDOFF.md`](docs/HANDOFF.md) — ringkasan status terkini, aturan kerja, perintah build/repack, dan pengetahuan kritis
   - [`docs/BOOTTEST.md`](docs/BOOTTEST.md) — prosedur flash, rollback, dan checklist uji boot per subsistem
-  - [`docs/PRETEST.md`](docs/PRETEST.md) — log teknis kronologis (§1–§65) hasil audit statis, RE biner, dan uji device
+  - [`docs/PRETEST.md`](docs/PRETEST.md) — log teknis kronologis (§1–§66) hasil audit statis, RE biner, dan uji device
   - [`docs/PLAN.md`](docs/PLAN.md) — rencana porting awal dan bukti investigasi per modul (§6.x)
   - [`docs/DEVICES.md`](docs/DEVICES.md) / [`docs/DEVICES-OVERLAY.md`](docs/DEVICES-OVERLAY.md) — tabel pemetaan node Device Tree X6871 ke driver
 
@@ -117,7 +117,7 @@ Jika sudah memakai v16, cukup flash `vendor_boot` v18; kedua DLKM identik.
 | `dlkm-ocfix-20261121` | v2 | Fix spam IRQ battery OC 65 Hz + timing switch 144/120/60/40 Hz |
 | `dlkm-20261120`..`gpu3` | v1 | DLKM 100% source (269 modul), `SCP_IPI_COUNT=59`, Mali r54p1-11eac0, `gpufreq_shared_status` |
 
-Detail tiap rilis ada di [`docs/HANDOFF.md`](docs/HANDOFF.md) dan [`docs/PRETEST.md`](docs/PRETEST.md) §40–§65.
+Detail tiap rilis ada di [`docs/HANDOFF.md`](docs/HANDOFF.md) dan [`docs/PRETEST.md`](docs/PRETEST.md) §40–§66.
 
 ---
 
