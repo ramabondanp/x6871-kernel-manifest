@@ -3856,3 +3856,39 @@ release                                iommu-chg-earpiece-usb-20261122 (raw .img
 ```
 
 Kernel `5f569d0` (commit: `5f569d0` di atas `8944601`).
+
+## 64. `dmesg8`/`logcat6`: charging HVDCP20 lulus; fix earpiece `Playback_R_DAC` dan pullup UDC saat replug
+
+Status uji user pada `iommu-chg-earpiece-usb-20261122` (v14):
+- **Charging adapter HVDCP20/PD**: **LULUS**, tidak ada panic `Pump_Express_show` (dmesg8 `84.9..99.4`: PD HardReset, `port_stat:DCP`, tidak ada UBSAN).
+- **USB replug**: masih gagal.
+- **Earpiece speaker**: masih mati.
+
+Analisis dari `dmesg8.txt` + `logcat6.txt` + disassembly modul stock:
+
+1. **Earpiece (`snd-soc-mt6368.ko`, commit `aca5276`)**:
+   - Di stock `normal2.txt` baris 12439, playback memicu `mt_rcv_event(), event 0x1, mux 1, widget RCV Mux`; di `dmesg8.txt` hanya `mt_lo_event()` yang jalan (`58.678`, `85.648`, `102.545`, `116.158`).
+   - Route/`enum` stock hasil ekstraksi `.rodata`:
+     - `RCV Select` = `Open`, `Playback_R_DAC`, `Voice Playback`, `Test Mode`.
+     - `RCV Mux/Playback_R_DAC/DACR`, `RCV Mux/Test Mode/LINEOUT L`.
+     - `HPL Mux`/`HPR Mux` `LoudSPK Playback` -> `LINEOUT L`, `Test Mode` -> `Receiver`.
+   - `mt_rcv_event()` stock bercabang per mux: `Playback_R_DAC` -> `CON0=0x6`, `CON11=0x97` (DACR); `Voice Playback` -> `CON18=1`, `CON0=0x9`, `CON11=0x9b` (DACL); `Test Mode` -> `ZCD_CON5=8`, `CON11=0x9f`. PRE_PMD hanya mematikan DAC yang dipakai, lalu `ZCD_CON5=0x1f`.
+   - Modul kita sebelumnya hanya punya `Voice Playback->DACL` dan selalu memprogram DACL, sehingga HAL yang menulis `RCV Select=Playback_R_DAC` tidak menemukan pilihan itu dan `RCV Mux` tidak pernah powered.
+   - Fix: samakan enum (`RCV_MUX_PLAYBACK_R_DAC`), tambah `MUX_LO`/`MUX_RCV` ke `mux_select`, samakan route/`mt_rcv_event`, dan simpan mux seperti stock. Verifikasi: route `.rodata` hasil build sekarang **identik** dengan stock.
+2. **USB replug — pullup UDC tidak pernah jalan (`tran_extcon_usb.ko`, commit `68db913`)**:
+   - `dmesg8` sekarang mencetak `tc_detect_bc12_run:switch ic vbus_gd is ready` (`58.585`, `84.929`), jadi perbaikan `get_vbus_gd`/BC1.2 berhasil.
+   - Tetapi setelah role DEVICE (`cur_dr(0) new_dr(2)` `58.862`) tidak ada `mtu3 ... gadget (high-speed) pullup D+`, `mtu3_link_isr: high-speed`, atau `gadget RESET`. Di stock `normal2.txt` `147.088` pullup D+ terjadi 26 ms setelah role, lalu enumerasi di `147.548`.
+   - Disassembly stock `tran_extcon_usb.ko`: `wq_psy` di-queue ke `system_power_efficient_wq`; `extcon_wq` dibuat dengan `WQ_HIGHPRI|WQ_UNBOUND`; dan `extcon->c_role` ditulis **setelah** `usb_role_switch_set_role()`. v13 mengubah ketiganya (`extcon_wq`, `WQ_MEM_RECLAIM`, `c_role` sebelum role switch).
+   - Fix: kembalikan ketiga urutan/flags stock. `get_vbus_gd` dan `tc_bc12_dn` tetap dipertahankan.
+   - Sisa risiko: `tran_extcon_pd_tcpc_notifier()` stock lebih besar (588 B vs 260 B) dan menangani `TC_PD_TYPE`/DR-swap; belum diport karena enum event `tc_tcpc` kita berbeda. Jika replug masih gagal, langkah berikutnya adalah port logika DR-swap stock.
+
+### Artefak (`rcv-usb-20261122`)
+
+```text
+x6871-twrp-vendor_boot-v16.img  md5 b6a0fb64f1043314a990b420af0c163b  67.108.864 B
+vendor_dlkm.img                 md5 72daa1f10eba75d9cd0e3359a27ff76f  24.551.424 B
+odm_dlkm.img                    md5 99b2194fa63cab8c751f71b8fbd4eb5e   4.206.592 B
+/srv path                       /serverhive1/ramabondanp/x6871-clean/out/
+```
+
+Kernel `68db913` (2 commit: `aca5276` earpiece, `68db913` extcon; di atas `5f569d0`). Foto lama v14 disimpan sebagai `vendor_dlkm-v14.img`/`odm_dlkm-v14.img`.

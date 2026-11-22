@@ -2,7 +2,7 @@
 
 Workspace Bazel+Kleaf untuk membangun modul kernel **Android 16 / kernel 6.12 / MediaTek MT6895** untuk **Infinix GT 20 Pro (X6871)** (berbasis donor MTK 6.12 Motorola `w1vo36.88-36-7` + OPPO `mt6896`).
 
-- **Device modules (`kernel_device_modules-6.12`)**: [`alps-kernel_device_modules-6.12`](https://github.com/ramabondanp/alps-kernel_device_modules-6.12/tree/x6871-android16-6.12) (`x6871-android16-6.12`, **100 commit** di atas baseline `06079c2`, HEAD `5f569d0`)
+- **Device modules (`kernel_device_modules-6.12`)**: [`alps-kernel_device_modules-6.12`](https://github.com/ramabondanp/alps-kernel_device_modules-6.12/tree/x6871-android16-6.12) (`x6871-android16-6.12`, **102 commit** di atas baseline `06079c2`, HEAD `68db913`)
 - **Vendor MTK modules (`vendor/mediatek/kernel_modules`)**: [`alps-vendor_mediatek_kernel_modules`](https://github.com/ramabondanp/alps-vendor_mediatek_kernel_modules/tree/x6871-android16-6.12) (`x6871-android16-6.12`, **4 commit** X6871 di atas base Motorola + 13 donor OPPO `86edba6`, HEAD `83b4fa6`)
 - **Output build X6871**: staging **806 file** (**805** nama unik), flat customer install **702** `.ko`
 - **Output baseline MTK murni** (`mtk-base-latest`): **1.401** `.ko`
@@ -79,24 +79,25 @@ Seluruh partisi modul (**222** modul `vendor_boot` + **212** `vendor_dlkm` + **5
 | Kamera foto & rekam video (save) | ✅ Terbukti | 4 sensor + EEPROM + VENC H264/ADAB/SLBC (`17a6b66d7927`) |
 | Optical FOD (layar menyala, AOD, screen-off) | ✅ Terbukti | `/dev/goodix_fp` + HBM uevent + `vddi-gpios` HIGH (`59ed7e7`, `0d456ba`) |
 | DT2W & Flashlight / Torch | ✅ Terbukti | Fix `al2` (`e4ed999`) + `#undef` PT throttling (`ebca3e1`) |
-| **Fast Charging (HVDCP20/TC30 adapter)** | 🔄 Menunggu uji (`v13`) | Tambah `tc30`/`hvdcp20` ke `alg_name_array` + guard bounds check (`0af45b1`) |
-| **Earpiece speaker (`RCV Mux`)** | 🔄 Menunggu uji (`v13`) | Tambah rute DAPM `{EXT_SPK_AMP_W_NAME, NULL, "RCV Mux"}` (`22efa7e`) |
-| **USB replug berulang** | 🔄 Menunggu uji (`v13`) | Implementasi `mt6375_get_vbus_gd_stat` (`F_ST_PWR_RDY`) + serialisasi `extcon_wq` (`8944601`) |
+| **Fast Charging (HVDCP20/TC30 adapter)** | ✅ Terbukti (`v14`) | `tc30`/`hvdcp20` di `alg_name_array` + guard bounds check (`0af45b1`); uji v14 tanpa panic |
+| **Earpiece speaker (`RCV Mux`)** | 🔄 Menunggu uji (`v16`) | Restore `RCV Select=Playback_R_DAC` + route DACR/LINEOUT + cabang `mt_rcv_event` stock (`aca5276`) |
+| **USB replug berulang** | 🔄 Menunggu uji (`v16`) | `get_vbus_gd`/BC1.2 tetap; workqueue + urutan role switch extcon disamakan stock agar UDC pullup/enumerasi lagi (`68db913`) |
 
-### Rilis terbaru: `iommu-chg-earpiece-usb-20261122` (kernel `5f569d0`)
+### Rilis terbaru: `rcv-usb-20261122` (kernel `68db913`)
 
 ```text
-x6871-twrp-vendor_boot-v14.img  md5 c5236194d20621543af6eb14a20e9e7b  67.108.864 B
-vendor_dlkm.img                 md5 378d9adf1de9c5a2d3fa8d8466aefd29  24.551.424 B
-odm_dlkm.img                    md5 d6bb4ed087c9f9f69a96c8687c816b2c   4.206.592 B
+x6871-twrp-vendor_boot-v16.img  md5 b6a0fb64f1043314a990b420af0c163b  67.108.864 B
+vendor_dlkm.img                 md5 72daa1f10eba75d9cd0e3359a27ff76f  24.551.424 B
+odm_dlkm.img                    md5 99b2194fa63cab8c751f71b8fbd4eb5e   4.206.592 B
 ```
 
-Release GitHub: <https://github.com/ramabondanp/x6871-kernel-manifest/releases/tag/iommu-chg-earpiece-usb-20261122>
+Release GitHub: <https://github.com/ramabondanp/x6871-kernel-manifest/releases/tag/rcv-usb-20261122>
 
 ### Ringkasan perjalanan rilis
 
 | Rilis | `vendor_boot` | Sorotan utama |
 |---|---|---|
+| `rcv-usb-20261122` | v16 | Fix earpiece `Playback_R_DAC` (enum/route/event stock) + pullup UDC saat replug (workqueue/urutan role switch stock) |
 | `iommu-chg-earpiece-usb-20261122` | v14 | Fix boot race panic `mtk_iommu` (`hw_list` sebelum `iommu_device_register` + NULL guard `larbdev`) di atas v13 |
 | `chg-earpiece-usb-20261122` | v13 | Fix panic charging HVDCP20 (`tc30`/`hvdcp20` `alg_name_array`), earpiece speaker (`RCV Mux`), USB replug (`mt6375_get_vbus_gd_stat` + `extcon_wq`) |
 | `sofod-dt2w-flash-20261122` | v12 | Fix screen-off FOD (`vddi-gpios` tetap HIGH), DT2W (`al2` tidak mematikan `0xcc`), dan flashlight PT throttling sesuai stock |
