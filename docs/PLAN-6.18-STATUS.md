@@ -129,6 +129,36 @@ Referensi OPPO PMX110 mengonfirmasi kelas-kelas ini dan menambah
 `crypto_shash_finup`, `for_each_kernel_tracepoint`,
 `iommu_get_domain_for_dev`, dan Mali `__folio_lock`.
 
+## Fase 2 — iterasi build penuh
+
+Build `//kernel_device_modules-6.18:mgk_64_k618_customer_modules_install.user`
+dijalankan dengan `--keep_going`; setiap putaran error dikelompokkan dan
+diperbaiki per kategori. Commit terbaru (device modules):
+
+| Commit | Cakupan |
+|---|---|
+| `1acf9872` | UFS 6.18, audio DSP compress, header privat IOMMU |
+| `0a06656b` | namespace dma-heap, GRO ccMNI, alias EYEMON, xHCI DBC |
+| `4f6833d5` | `mcdi` → `hrtimer_setup` |
+| `8b170ca8` | hapus dependensi ARM SMMUv3, `pgsize_bitmap`, UFS PMC, `vdec_fmt` fence |
+| `b5dbe5e7` | argumen `v4l2_fh_add/del`, API CQHCI crypto, rename `rpmb_hmac_sha256`, `bin_attribute` const |
+| `e3d9b5a0` | sisa call site RPMB/v4l2_fh |
+| `6ac6847a`, `21938485` | semua callback `bin_attribute` → const, wakeup unregister |
+| `e840b691` | `mtk-mmc-swcqhci` memakai `key->bytes`/`KEY_TYPE_RAW` |
+| `008b4460` | DRM 6.18: argumen `drm_format_info`, `drm_panel_*` void, `mode_valid` const, `mmc_host_can_gpio_cd`, `file_ref_get` |
+
+Commit vendor modules: `d626fe8`, `2bebd04`, `6742b41`, `ed93bfa`,
+`59df9af`, `4c25e6d`, `269be18`, `7daa323` (namespace `close_fd`,
+`v4l2_fh`, inisialisasi `dev_slave` di camsys).
+
+Kelas error 6.18 yang sudah tertangani antara lain: API privat
+`io-pgtable-arm`, `MODULE_IMPORT_NS("DMA_BUF_HEAP")`,
+`netif_receive_skb_list_internal` (diganti jalur publik), DBC xHCI yang
+tidak diekspor GKI, `hrtimer_init` tersisa, `ufshcd_config_pwr_mode`
+tiga argumen, `snd_compr_tstamp64`, `wakeup_source_destroy`,
+`vm_fault`/`file->f_count` (`file_ref_t`), `bin_attribute` const,
+`drm_panel_*` void, dan `drm_format_info` pada `fb_create`.
+
 ## Rencana codemod (arsip)
 
 Skrip: `scripts/port-6.18-mechanical.py` (dry-run default; `--apply`,
