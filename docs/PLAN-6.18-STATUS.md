@@ -197,13 +197,13 @@ selesai tanpa error:
 | `vendor_boot-6.18-test2.img` | 67.108.864 B | `a8ae05e4e172bf0c7c85ae20fff96e5f` |
 | `vendor_boot-6.18-test3.img` | 67.108.864 B | `03e95db7dbd5161259f325327a23f037` |
 | `vendor_boot-6.18-test4.img` | 67.108.864 B | `c09077991d966a61813d9d85da15bb5c` |
+| `vendor_boot-6.18-test5-dbg.img` | 67.108.864 B | `24181af2448d923e0b83cb2bc04b79a2` |
 | `vendor_dlkm.img` | 24.551.424 B | `e3a23e686d4ba08646c4d0b763c7c05d` |
 | `odm_dlkm.img` | 4.206.592 B | `da2c64a1572ff27382128beb4bbcba8b` |
 
-`vendor_boot-6.18-test4.img` adalah image terbaru: berisi perbaikan
-panic `mrdump.ko`, dua mismatch KCFI tracepoint (`ufs-mediatek-dbg.ko`,
-`met.ko`), dan mapping TFA debug untuk 6.18. Image test3/test2/test1
-jangan dipakai lagi.
+`vendor_boot-6.18-test5-dbg.img` adalah image diagnostik terbaru:
+sama dengan test4 ditambah pembatas log badai MIUMPU. `test4` adalah
+image boot normal terakhir. Image test3/test2/test1 jangan dipakai lagi.
 
 `vendor_dlkm.img` di-repack ulang setelah perbaikan `met.ko` (md5 baru
 `e3a23e686d4ba08646c4d0b763c7c05d`); `odm_dlkm.img` tidak berubah.
@@ -252,7 +252,7 @@ di `8250_mtk.ko` (diganti `pm_runtime_*` langsung) dan
 ### Artefak dan commit
 
 - Device modules (`kernel_device_modules-6.18`, branch
-  `x6871-android17-6.18`): `54d86b4eb545`
+  `x6871-android17-6.18`): `f09133d503df`
 - Vendor modules (`vendor/mediatek/kernel_modules`, branch
   `x6871-android17-6.18`): `d500e72bea0b`
 - Manifest: commit dokumentasi ini
@@ -307,6 +307,29 @@ mismatch. Tujuh entri "unpaired" adalah tabel yang bukan registrasi
 probe (misalnya string `"charger"` milik power supply).
 `ufs-mediatek-mod.ko` memakai loop registrasi yang tidak dapat
 dipasangkan otomatis; tiga callback-nya dicek manual dan cocok.
+
+### Badai MIUMPU 6.18
+
+Uji `vendor_boot-6.18-test4.img` berhenti dengan console yang hanya
+berisi badai interupsi (1036 kejadian dalam 57 ms):
+
+```text
+emimpu_violation_irq:
+[MIUMPU]emiid0
+[1c0]0;...;[3c0]104;...;[3d0]7;[3d4]a;[3d8]3;[3e4]2c06;[3e8]0;
+```
+
+Nilai register konstan, jadi satu master terus mengulang akses ke
+region yang dilindungi. `[3d8]=3` konsisten dengan SRINFO=3 yang
+dipakai IOMMU untuk memicu SMPU saat translation fault. Log boot
+sebelumnya hilang karena setiap interupsi mencetak dump penuh ke
+console pstore 256 KiB.
+
+Commit `f09133d503df` membatasi log 16 kejadian pertama (KERN_ERR,
+termasuk register EMIMPU, AXI ID, dan `comm`/pid), lalu tetap membersihkan
+violation tanpa mencetak atau menjadwalkan AEE. Tujuannya agar pstore
+menyimpan konteks boot sebelum badai. Image `test5-dbg` memakai
+perubahan ini untuk mengidentifikasi master/IOMMU yang fault.
 
 Audit perubahan API 6.13–6.18 yang tidak tertangkap compiler (memakai
 hasil build 6.12 dan 6.18) dicatat di
