@@ -194,8 +194,12 @@ selesai tanpa error:
 | Image | Ukuran | MD5 |
 |---|---:|---|
 | `vendor_boot-6.18-test.img` | 67.108.864 B | `fbd70f65be1d76c01177320e5d7043c2` |
+| `vendor_boot-6.18-test2.img` | 67.108.864 B | `a8ae05e4e172bf0c7c85ae20fff96e5f` |
 | `vendor_dlkm.img` | 24.551.424 B | `07966f8129c5b20d931bf4d08af99a3c` |
 | `odm_dlkm.img` | 4.206.592 B | `da2c64a1572ff27382128beb4bbcba8b` |
+
+`vendor_boot-6.18-test2.img` berisi perbaikan panic `mrdump.ko`
+(lihat bagian "Panic mrdump 6.18" di bawah); image lain tidak berubah.
 
 Ukuran ketiga image sama dengan rilis 6.12; hash berbeda karena
 vermagic/isi modul 6.18.
@@ -237,20 +241,43 @@ di `8250_mtk.ko` (diganti `pm_runtime_*` langsung) dan
 ### Artefak dan commit
 
 - Device modules (`kernel_device_modules-6.18`, branch
-  `x6871-android17-6.18`): `4a0a54da49c8`
+  `x6871-android17-6.18`): `3fd701c35dc4`
 - Vendor modules (`vendor/mediatek/kernel_modules`, branch
   `x6871-android17-6.18`): `35814035c730`
 - Manifest: commit dokumentasi ini
 - Image: `<artefak-lokal>/`
 - Build log: `<log-build-lokal>`
 
+### Panic mrdump 6.18
+
+Uji TWRP pertama panic saat `mrdump.ko` dimuat:
+
+```text
+Unable to handle kernel NULL pointer dereference at 0x0000000000000100
+pc : __pi_strcmp+0xf0
+lr : load_ko_addr_list+0xf8 [mrdump]
+```
+
+6.18 mengganti `struct module_sect_attrs`/`module_notes_attrs` privat
+kernel: tidak ada lagi `nsections`, `notes`, atau `struct
+module_sect_attr` dengan field `address`. Keduanya kini diawali
+`struct attribute_group` dan memakai array `grp.bin_attrs` yang
+di-terminasi NULL; alamat section/note ada di `bin_attribute.private`.
+
+Salinan struktur lama di `mrdump_mini.c` membuat `fill_ko_list()`
+membaca `attr.mode` (0400 = 0x100) sebagai pointer nama string, lalu
+`strcmp()` dereference 0x100. Perbaikan: baca lewat
+`attribute_group.bin_attrs` dan `bin_attribute.private` tanpa menyalin
+layout privat kernel.
+
 Pesan commit 6.18 ditulis ulang ke format kernel (`subsystem: ringkasan
 imperatif ... for 6.18`, body 72 kolom, `Signed-off-by`), dan sudah
 diperiksa dengan `common/scripts/checkpatch.pl`: 0 error/warning pesan.
 
-**Berikutnya:** uji boot hardware (GKI `boot.img` + `system_dlkm.img`
-resmi 6.18 4KB + `vendor_boot` di atas), lalu validasi TWRP/early-init
-sesuai [`BOOTTEST.md`](BOOTTEST.md).
+**Berikutnya:** uji ulang boot hardware dengan
+`vendor_boot-6.18-test2.img` (GKI `boot.img` + `system_dlkm.img` resmi
+6.18 4KB), lalu validasi TWRP/early-init sesuai
+[`BOOTTEST.md`](BOOTTEST.md).
 
 ## Rencana codemod (arsip)
 
