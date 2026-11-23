@@ -109,8 +109,11 @@ def main():
                              "vendor/mediatek/kernel_modules"])
     ap.add_argument("--apply", action="store_true")
     ap.add_argument("--all", action="store_true")
+    ap.add_argument("--only", help="comma-separated transform classes")
     args = ap.parse_args()
     want = SAFE + (RISKY if args.all else ())
+    if args.only:
+        want = tuple(x.strip() for x in args.only.split(",") if x.strip())
 
     total = {}
     changed = 0

@@ -252,7 +252,7 @@ index 4c47f5c..0c2a8b1 100644
 -use_repo(mgk_kernel_toolchain_ext,"kernel_toolchain_info")
 -use_repo(mgk_kernel_toolchain_ext, "kleaf_clang_toolchain")
 diff --git a/mgk.bzl b/mgk.bzl
-index e467f2a..a7388fa 100644
+index e467f2a..30f4e7e 100644
 --- a/mgk.bzl
 +++ b/mgk.bzl
 @@ -25,8 +25,7 @@ load("@mgk_info//:kernel_version.bzl",
@@ -265,30 +265,19 @@ index e467f2a..a7388fa 100644
  }
  # Extra generated headers below $OUT_DIR for external modules.
  _GENERATED_HEADERS_FOR_MODULE = [
-@@ -171,6 +170,22 @@ def define_mgk(
+@@ -171,6 +170,11 @@ def define_mgk(
  
  
      for build in ["eng", "userdebug", "user", "ack"]:
-+        device_pkg = "kernel_device_modules-" + kernel_version
++        fragment_variant = "user" if build == "ack" else build
 +        device_defconfig_fragments = [
-+            "//{}:arch/arm64/configs/{}".format(device_pkg, mgk_defconfig),
-+        ] + [
-+            "//{}:kernel/configs/{}".format(device_pkg, o)
-+            for o in mgk_defconfig_overlays
-+        ] + [
-+            "//{}:kernel/configs/sign.config".format(device_pkg),
++            ":x6871_fragments_{}".format(fragment_variant),
 +        ]
-+        if build == "eng":
-+            device_defconfig_fragments.append(
-+                "//{}:kernel/configs/eng.config".format(device_pkg))
-+        elif build == "userdebug":
-+            device_defconfig_fragments.append(
-+                "//{}:kernel/configs/userdebug.config".format(device_pkg))
 +
          ack_build = build
          ack_dir = "kernel"
          if build == "ack":
-@@ -185,16 +200,8 @@ def define_mgk(
+@@ -185,16 +189,8 @@ def define_mgk(
              mgk_build_config(
                  name = "{}_build_config.{}".format(name, build),
                  arch = "arm64",
@@ -307,7 +296,7 @@ index e467f2a..a7388fa 100644
                  defconfig = mgk_defconfig,
                  defconfig_overlays = mgk_defconfig_overlays,
                  build_config_overlays = [],
-@@ -207,16 +214,8 @@ def define_mgk(
+@@ -207,16 +203,8 @@ def define_mgk(
              mgk_build_config(
                  name = "kernel_aarch64_{}_build_config.{}".format(name, build),
                  arch = "arm64",
@@ -326,7 +315,7 @@ index e467f2a..a7388fa 100644
                  defconfig = mgk_defconfig,
                  defconfig_overlays = mgk_defconfig_overlays,
                  build_config_overlays = [],
-@@ -228,26 +227,22 @@ def define_mgk(
+@@ -228,26 +216,22 @@ def define_mgk(
              # for android common kernel tree
              kernel_build(
                  name = "{}_kernel_aarch64.{}".format(name, build),
@@ -359,7 +348,7 @@ index e467f2a..a7388fa 100644
                  strip_modules=True,
                  outs = DEFAULT_GKI_OUTS,
                  module_outs = common_eng_modules if ack_build == "eng" else common_userdebug_modules if ack_build == "userdebug" else common_user_modules if ack_build == "user" else [],
-@@ -267,11 +262,7 @@ def define_mgk(
+@@ -267,11 +251,7 @@ def define_mgk(
              # for device module tree
              kernel_build(
                  name = "{}.{}".format(name, build),
@@ -372,7 +361,7 @@ index e467f2a..a7388fa 100644
                      ":{}_sources".format(name),
                  ] + kleaf_device_modules_kconfigs,
                  outs = [
-@@ -280,24 +271,18 @@ def define_mgk(
+@@ -280,24 +260,18 @@ def define_mgk(
                  module_outs = common_eng_modules if build == "eng" else common_userdebug_modules if build == "userdebug" else [],
                  module_implicit_outs = common_user_modules if build == "user" else [],
                  build_config = ":{}_build_config.{}".format(name, build),
@@ -402,7 +391,7 @@ index e467f2a..a7388fa 100644
                  # ABI
                  kmi_symbol_list = symbol_list,
                  trim_nonlisted_kmi = True if ack_build == "ack" and symbol_list != None and DEFCONFIG_OVERLAYS.strip() == "" else False,
-@@ -316,14 +301,10 @@ def define_mgk(
+@@ -316,14 +290,10 @@ def define_mgk(
                  + (["{}.{}.{}.{}".format(m, name, kernel_version, build) for m in real_kleaf_user_device_modules] if build == "user" else [])
                  + (["{}.{}.{}.{}".format(m, name, kernel_version, build) for m in real_kleaf_userdebug_device_modules] if build == "userdebug" else [])
                  + (["{}.{}.{}.{}".format(m, name, kernel_version, build) for m in real_kleaf_eng_device_modules] if build == "eng" else [])
@@ -419,7 +408,7 @@ index e467f2a..a7388fa 100644
              kmi_symbol_list_add_only = True,
              kmi_enforced = True,
              module_grouping = False,
-@@ -335,14 +316,10 @@ def define_mgk(
+@@ -335,14 +305,10 @@ def define_mgk(
                  + (["{}.{}.{}.{}".format(m, name, kernel_version, build) for m in real_kleaf_user_device_modules] if build == "user" else [])
                  + (["{}.{}.{}.{}".format(m, name, kernel_version, build) for m in real_kleaf_userdebug_device_modules] if build == "userdebug" else [])
                  + (["{}.{}.{}.{}".format(m, name, kernel_version, build) for m in real_kleaf_eng_device_modules] if build == "eng" else [])
@@ -436,7 +425,7 @@ index e467f2a..a7388fa 100644
              kmi_symbol_list_add_only = True,
              kmi_enforced = True,
              module_grouping = False,
-@@ -352,57 +329,21 @@ def define_mgk(
+@@ -352,57 +318,21 @@ def define_mgk(
          kernel_modules_install(
              name = "{}_internal_modules_install.{}".format(name, build),
              kernel_modules = [
@@ -501,7 +490,7 @@ index e467f2a..a7388fa 100644
                      ":{}.{}".format(name, build),
                      ":{}_internal_modules_install.{}".format(name, build),
                  ],
-@@ -411,15 +352,7 @@ def define_mgk(
+@@ -411,15 +341,7 @@ def define_mgk(
          else:
              copy_to_dist_dir(
                  name = "{}_internal_dist.{}".format(name, build),
@@ -518,7 +507,7 @@ index e467f2a..a7388fa 100644
                  + [
                      ":{}.{}".format(name, build),
                      ":{}_internal_modules_install.{}".format(name, build),
-@@ -430,40 +363,16 @@ def define_mgk(
+@@ -430,40 +352,16 @@ def define_mgk(
          kernel_modules_install(
              name = "{}_customer_modules_install.{}".format(name, build),
              kernel_modules = [
@@ -564,7 +553,7 @@ index e467f2a..a7388fa 100644
                      ":{}.{}".format(name, build),
                      ":{}_customer_modules_install.{}".format(name, build),
                  ],
-@@ -472,15 +381,7 @@ def define_mgk(
+@@ -472,15 +370,7 @@ def define_mgk(
          else:
              copy_to_dist_dir(
                  name = "{}_customer_dist.{}".format(name, build),
@@ -581,7 +570,7 @@ index e467f2a..a7388fa 100644
                  + [
                      ":{}.{}".format(name, build),
                      ":{}_customer_modules_install.{}".format(name, build),
-@@ -493,11 +394,7 @@ def define_mgk(
+@@ -493,11 +383,7 @@ def define_mgk(
          srcs = [":{}_sources".format(name)] + kleaf_device_modules_srcs,
          outs = real_device_modules + real_device_eng_modules,
          kernel_build = ":{}.eng".format(name),
@@ -594,7 +583,7 @@ index e467f2a..a7388fa 100644
      )
      kernel_compile_commands(
          name = "compile_commands_{}_modules.eng".format(name),
-@@ -509,30 +406,18 @@ def define_mgk(
+@@ -509,30 +395,18 @@ def define_mgk(
          srcs = [":{}_sources".format(name)] + kleaf_device_modules_srcs,
          outs = real_device_modules + real_device_userdebug_modules,
          kernel_build = ":{}.userdebug".format(name),
@@ -628,7 +617,7 @@ index e467f2a..a7388fa 100644
      )
  
      kernel_compile_commands(
-@@ -545,11 +430,7 @@ def define_mgk(
+@@ -545,11 +419,7 @@ def define_mgk(
          srcs = [":{}_sources".format(name)] + kleaf_device_modules_srcs,
          outs = real_device_modules + real_device_user_modules,
          kernel_build = ":{}.ack".format(name),
@@ -641,7 +630,7 @@ index e467f2a..a7388fa 100644
      )
  
  
-@@ -564,40 +445,13 @@ def _mgk_build_config_impl(ctx):
+@@ -564,40 +434,13 @@ def _mgk_build_config_impl(ctx):
          content.append("COVERITY_BUILD=True")
      else:
          content.append("DEVICE_MODULES_REL_DIR=$(realpath ${DEVICE_MODULES_DIR} --relative-to ${KERNEL_DIR})")
