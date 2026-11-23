@@ -122,14 +122,15 @@ def main():
             print(f"skip missing root: {root}")
             continue
         for path in files(root):
-            with open(path, errors="surrogateescape") as f:
+            with open(path, errors="surrogateescape", newline="") as f:
                 text = f.read()
             new, counts = transform(text, want)
             if counts:
                 for k, v in counts.items():
                     total[k] = total.get(k, 0) + v
                 if new != text and args.apply:
-                    with open(path, "w", errors="surrogateescape") as f:
+                    with open(path, "w", errors="surrogateescape",
+                              newline="") as f:
                         f.write(new)
                     changed += 1
     print("transform hits:")
