@@ -1,26 +1,36 @@
 #!/bin/bash
-# Siapkan workspace kernel X6871 (MT6895 / 6.12) setelah `repo sync`.
+# Siapkan workspace kernel X6871 (MT6895 / 6.12 atau 6.18) setelah `repo sync`.
 # Jalankan dari root workspace.
 #
-#   ./setup.sh
+#   ./setup.sh                 # KVER=6.12 (default, produksi)
+#   KVER=6.18 ./setup.sh       # profil PLAN-6.18, GKI di path bawaan `common`
 #
 # Melakukan (idempotent, aman dijalankan berulang):
 #   1. MODULE.bazel  <- mgk.MODULE.bazel (root AOSP tidak memuat MGK)
-#   2. symlink common-6.12 -> kernel-6.12
+#   2. symlink common-<KVER> -> GKI (kernel-6.12 atau common)
 #   3. symlink 13 module donor OPPO mt6896 (hanya bila workspace split legacy)
 #   4. symlink ../vendor/mediatek (mgk_repo pakai path="../vendor/mediatek")
 #   5. hapus label //vendor/... yang tidak tersedia dari mgk_64.bzl (bila masih ada)
-#   6. pasang backport Kleaf untuk profil KMI 7 CI 16987858 (bila dipakai)
+#   6. patch Kleaf/MGK sesuai profil (multi-abi KMI 7 atau 6.18)
 set -e
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 
+KVER=${KVER:-6.12}
+TREE=kernel_device_modules-$KVER
+if [ "$KVER" = "6.12" ]; then
+  GKI_DIR=kernel-6.12
+else
+  GKI_DIR=common
+fi
+
 MGK_MODULE=build/bazel_mgk_rules/bzlmod/mgk.MODULE.bazel
-F=kernel_device_modules-6.12/kernel/kleaf/mgk_64.bzl
+F=$TREE/kernel/kleaf/mgk_64.bzl
 VM=vendor/mediatek/kernel_modules
 DONOR=donor/oppo-mt6896/vendor/mediatek/kernel_modules
+HERE=$(cd -- "$(dirname -- "$0")" && pwd)
 [ -f "$MGK_MODULE" ] || die "$MGK_MODULE tidak ada; jalankan dari root workspace setelah repo sync"
-[ -d kernel-6.12 ] || die "kernel-6.12 tidak ada"
+[ -d "$GKI_DIR" ] || die "$GKI_DIR tidak ada (KVER=$KVER)"
 [ -f "$F" ] || die "$F tidak ada"
 [ -d "$VM" ] || [ -d "$DONOR" ] || die "$VM tidak ada"
 
@@ -29,8 +39,8 @@ if [ -e ../vendor/mediatek ] || [ -L ../vendor/mediatek ]; then
   [ ../vendor/mediatek -ef vendor/mediatek ] || \
     die "../vendor/mediatek bukan milik workspace ini; gunakan workspace di bawah direktori induk terpisah"
 fi
-if [ -e common-6.12 ]; then
-  [ common-6.12 -ef kernel-6.12 ] || die "common-6.12 tidak menunjuk ke kernel-6.12 workspace ini"
+if [ -e common-$KVER ]; then
+  [ common-$KVER -ef "$GKI_DIR" ] || die "common-$KVER tidak menunjuk ke $GKI_DIR workspace ini"
 fi
 
 # --- 1. MODULE.bazel -------------------------------------------------------
@@ -43,8 +53,17 @@ if [ -L MODULE.bazel ] || ! cmp -s MODULE.bazel "$MGK_MODULE"; then
   echo "MODULE.bazel <- $MGK_MODULE"
 fi
 
-# --- 2. common-6.12 --------------------------------------------------------
-[ -e common-6.12 ] || { ln -sfn kernel-6.12 common-6.12; echo "symlink common-6.12"; }
+# --- 2. common-<KVER> ------------------------------------------------------
+[ -e common-$KVER ] || { ln -sfn "$GKI_DIR" common-$KVER; echo "symlink common-$KVER -> $GKI_DIR"; }
+
+# --- 2b. Bazel 8: banyak glob lama memang kosong ---------------------------
+if [ "$KVER" = "6.18" ]; then
+  touch device.bazelrc
+  if ! grep -q 'incompatible_disallow_empty_glob=false' device.bazelrc; then
+    printf 'common --incompatible_disallow_empty_glob=false\n' >> device.bazelrc
+    echo 'device.bazelrc: allow empty glob (Bazel 8)'
+  fi
+fi
 
 # --- 3. donor OPPO (fallback untuk workspace split legacy) -----------------
 if [ -d "$VM/afs_common_utils" ] && [ ! -L "$VM/afs_common_utils" ]; then
@@ -106,19 +125,39 @@ else
   echo "mgk_64.bzl: sudah bersih (0 label tak tersedia)"
 fi
 
-# GKI 14d405822690 memuat target ABI yang belum tersedia di Kleaf Motorola.
-# Backport hanya rule build; jangan mengubah kernel-6.12.
-if [ "$(git -C kernel-6.12 rev-parse HEAD 2>/dev/null)" = 14d40582269013a9bc6df12b2479da18f27e3d33 ]; then
-  KLEAF_PATCH=$(cd -- "$(dirname -- "$0")" && pwd)/patches/kleaf-multi-abi-update.patch
-  if git -C build/kernel apply --reverse --check "$KLEAF_PATCH" 2>/dev/null; then
-    echo 'Kleaf: backport multi_abi_update sudah terpasang'
-  elif git -C build/kernel apply --check "$KLEAF_PATCH"; then
-    git -C build/kernel apply "$KLEAF_PATCH"
-    echo 'Kleaf: backport multi_abi_update terpasang'
+# --- 6. patch profil -------------------------------------------------------
+if [ "$KVER" = "6.18" ]; then
+  MGK_PATCH=$HERE/patches/bazel_mgk_rules-6.18.patch
+  [ -f "$MGK_PATCH" ] || die "$MGK_PATCH tidak ada"
+  if git -C build/bazel_mgk_rules apply --reverse --check "$MGK_PATCH" 2>/dev/null; then
+    echo 'bazel_mgk_rules: patch 6.18 sudah terpasang'
+  elif git -C build/bazel_mgk_rules apply --check "$MGK_PATCH"; then
+    git -C build/bazel_mgk_rules apply "$MGK_PATCH"
+    echo 'bazel_mgk_rules: patch 6.18 terpasang'
   else
-    die 'backport multi_abi_update tidak dapat diterapkan; cek revisi dan perubahan lokal build/kernel'
+    die 'patch bazel_mgk_rules-6.18 tidak dapat diterapkan; cek revisi dan perubahan lokal'
+  fi
+  # Root MODULE.bazel harus memakai versi yang sudah dipatch (deps main-kernel-2026).
+  cp "$MGK_MODULE" MODULE.bazel
+else
+  # GKI 14d405822690 memuat target ABI yang belum tersedia di Kleaf Motorola.
+  # Backport hanya rule build; jangan mengubah kernel-6.12.
+  if [ "$(git -C kernel-6.12 rev-parse HEAD 2>/dev/null)" = 14d40582269013a9bc6df12b2479da18f27e3d33 ]; then
+    KLEAF_PATCH=$HERE/patches/kleaf-multi-abi-update.patch
+    if git -C build/kernel apply --reverse --check "$KLEAF_PATCH" 2>/dev/null; then
+      echo 'Kleaf: backport multi_abi_update sudah terpasang'
+    elif git -C build/kernel apply --check "$KLEAF_PATCH"; then
+      git -C build/kernel apply "$KLEAF_PATCH"
+      echo 'Kleaf: backport multi_abi_update terpasang'
+    else
+      die 'backport multi_abi_update tidak dapat diterapkan; cek revisi dan perubahan lokal build/kernel'
+    fi
   fi
 fi
 
 echo
-echo 'Selesai. Lanjut:  ./build.sh user  (default OVERLAYS="entry_level_legacy.config X6871.config")'
+if [ "$KVER" = "6.18" ]; then
+  echo 'Selesai. Lanjut:  KVER=6.18 ./build.sh user'
+else
+  echo 'Selesai. Lanjut:  ./build.sh user  (default OVERLAYS="entry_level_legacy.config X6871.config")'
+fi

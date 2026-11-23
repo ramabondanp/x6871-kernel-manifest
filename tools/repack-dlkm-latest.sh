@@ -18,6 +18,9 @@ ROOT=$(cd "$(dirname "$0")/.." && pwd)
 DEFAULT_WS="$HOME/x6871-kernel"
 [ -d "$DEFAULT_WS" ] || [ ! -d "$HOME/x6871-clean/ws" ] || DEFAULT_WS="$HOME/x6871-clean/ws"
 KERNEL_ROOT=${KERNEL_ROOT:-$DEFAULT_WS}
+KVER=${KVER:-6.12}
+KCODE=64_k6${KVER#6.}
+if [ -d "$KERNEL_ROOT/kernel-$KVER" ]; then GKI_DIR="kernel-$KVER"; else GKI_DIR="common"; fi
 OUT_DIR=${OUT_DIR:-$(dirname "$KERNEL_ROOT")/out}
 BASE_TEMPLATE=${BASE_TEMPLATE:-$ROOT/tools/dlkm}
 DLKM_CFG=${DLKM_CFG:-$ROOT/tools/dlkm/config}
@@ -42,23 +45,24 @@ while [ $# -gt 0 ]; do
 done
 
 [ -n "$WORK_DIR" ] || WORK_DIR="$OUT_DIR/dlkm-latest-work"
-TOOLS_BIN="$KERNEL_ROOT/prebuilts/kernel-build-tools/linux-x86/bin"
+TOOLS_BIN="$KERNEL_ROOT/prebuilts/kernel-build-tools/linux_musl-x86/bin"
+[ -x "$TOOLS_BIN/mkfs.erofs" ] || TOOLS_BIN="$KERNEL_ROOT/prebuilts/kernel-build-tools/linux-x86/bin"
 [ -x "$TOOLS_BIN/mkfs.erofs" ] || { echo "ERROR: missing $TOOLS_BIN/mkfs.erofs" >&2; exit 1; }
 [ -x "$TOOLS_BIN/avbtool" ]    || { echo "ERROR: missing $TOOLS_BIN/avbtool" >&2; exit 1; }
 [ -x "$TOOLS_BIN/fec" ]        || { echo "ERROR: missing $TOOLS_BIN/fec" >&2; exit 1; }
 
 if [ -z "$STAGING" ]; then
-    STAGING=$(ls -dt "$KERNEL_ROOT"/out_bazel/*/execroot/_main/bazel-out/*/bin/kernel_device_modules-6.12/mgk_64_k612_customer_modules_install.user/staging/lib/modules/6.12.* 2>/dev/null | head -1 || true)
+    STAGING=$(ls -dt "$KERNEL_ROOT"/out_bazel/*/execroot/_main/bazel-out/*/bin/kernel_device_modules-$KVER/mgk_${KCODE}_customer_modules_install.user/staging/lib/modules/$KVER.* 2>/dev/null | head -1 || true)
 fi
 [ -d "$STAGING" ] || { echo "ERROR: staging tree not found: $STAGING" >&2; exit 1; }
 
 export PATH="$TOOLS_BIN:$PATH"
 
-python3 - "$KERNEL_ROOT" "$STAGING" "$BASE_TEMPLATE" "$DLKM_CFG" "$WORK_DIR" "$OUT_DIR" <<'PY'
+python3 - "$KERNEL_ROOT" "$GKI_DIR" "$STAGING" "$BASE_TEMPLATE" "$DLKM_CFG" "$WORK_DIR" "$OUT_DIR" <<'PY'
 import hashlib, os, re, shutil, subprocess, sys
 from pathlib import Path
 
-ws, stg, base_tpl, dlkm_cfg, work_dir, out_dir = map(os.path.realpath, sys.argv[1:7])
+ws, gki_dir, stg, base_tpl, dlkm_cfg, work_dir, out_dir = map(os.path.realpath, sys.argv[1:8])
 work = Path(work_dir)
 for path in map(Path, (ws, stg, base_tpl, dlkm_cfg)):
     if work == path or work in path.parents or path in work.parents:
@@ -75,8 +79,13 @@ if work.is_dir() and any(work.iterdir()) and not marker.is_file():
 kver = os.path.basename(stg)
 print(f"[repack-dlkm] staging: {stg}")
 
-# Determine protected GKI module basenames directly from kernel-6.12/modules.bzl
-mods_bzl = open(os.path.join(ws, "kernel-6.12/modules.bzl")).read()
+# Determine protected GKI module basenames directly from the GKI tree.
+# 6.12 keeps the list in modules.bzl; 6.18 moved it to bazel/modules_private.bzl.
+mods_path = os.path.join(ws, gki_dir, "modules.bzl")
+mods_bzl = open(mods_path).read()
+if "_COMMON_GKI_MODULES_LIST" not in mods_bzl:
+    mods_path = os.path.join(ws, gki_dir, "bazel/modules_private.bzl")
+    mods_bzl = open(mods_path).read()
 all_gki_ko = {os.path.basename(m) for m in re.findall(r'"([^"]+\.ko)"', mods_bzl)}
 m_unprot = re.search(r"_COMMON_UNPROTECTED_MODULES_LIST\s*=\s*\[([^\]]*)\]", mods_bzl, re.S)
 unprot_ko = {os.path.basename(m) for m in re.findall(r'"([^"]+\.ko)"', m_unprot.group(1))} if m_unprot else {"zram.ko", "zsmalloc.ko"}

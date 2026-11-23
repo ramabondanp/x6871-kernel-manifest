@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Overlay manifest AOSP android17-6.18 untuk Infinix GT 20 Pro (X6871, MT6895).
+
+  Jalankan dari root workspace kernel:
+
+    repo init -u https://android.googlesource.com/kernel/manifest \
+              -b common-android17-6.18-2026-09 depth 1
+    mkdir -p .repo/local_manifests
+    cp ~/x6871-kernel-manifest/local_manifest-6.18.xml \
+       .repo/local_manifests/x6871-6.18.xml
+    repo sync -j16
+
+  Profil ini adalah target PLAN-6.18 (docs/PLAN-6.18.md):
+    - GKI AOSP murni dipin ke tag android17-6.18-2026-09_r13
+      (kernel/common 910ab23e44c4, Linux 6.18.32, KMI 5, 4 KB)
+      di path bawaan common.
+    - kernel/build tetap milik AOSP main-kernel-2026 (bawaan manifest).
+    - bazel_mgk_rules / bazel_common_rules dari Motorola, dipatch
+      idempotent oleh setup.sh memakai patches/bazel_mgk_rules-6.18.patch.
+    - Device modules dan vendor modules memakai branch x6871-android17-6.18.
+
+  Repo berat yang tidak dipakai build DDK dibuang untuk menghemat disk.
+-->
+<manifest>
+  <remote name="moto" fetch="https://github.com/MotorolaMobilityLLC" />
+  <remote name="alps" fetch="https://github.com/ramabondanp" />
+
+  <!-- GKI tetap di path bawaan AOSP: common. Pin ke tag r13. -->
+  <extend-project name="kernel/common"
+                  revision="refs/tags/android17-6.18-2026-09_r13"
+                  upstream="android17-6.18-2026-09" />
+
+  <!-- Repo berat non-DDK (lihat PLAN-6.18 Fase 0). -->
+  <remove-project name="platform/bootable/libbootloader" />
+  <remove-project name="platform/prebuilts/fuchsia_sdk" />
+  <remove-project name="device/google/cuttlefish_vmm" />
+  <remove-project name="platform/external/rust/android-crates-io" />
+  <remove-project name="platform/external/u-boot" />
+  <remove-project name="platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9" />
+  <remove-project name="platform/prebuilts/gcc/linux-x86/x86/x86_64-linux-android-4.9" />
+  <remove-project name="kernel/devices/google/raviole" />
+  <remove-project name="kernel/common-modules/wonder" />
+  <remove-project name="kernel/common-modules/trusty" />
+  <remove-project name="platform/external/virtio-media" />
+  <remove-project name="kernel/common-modules/virtual-device" />
+  <remove-project name="platform/external/ltp" />
+  <remove-project name="platform/prebuilts/jdk/jdk11" />
+
+  <!-- Kleaf + MGK rules. build/kernel sengaja tetap AOSP main-kernel-2026. -->
+  <project path="build/bazel_common_rules"
+           name="kernel_platform-build-bazel_common_rules"
+           remote="moto" revision="android-16-release-w2we36.56-98-2" />
+  <project path="build/bazel_mgk_rules" name="kernel-build-bazel_mgk_rules"
+           remote="moto" revision="android-16-release-w1vo36.88-36-7" />
+
+  <!-- Port X6871 untuk 6.18. -->
+  <project path="kernel_device_modules-6.18" name="alps-kernel_device_modules-6.12"
+           remote="alps" revision="x6871-android17-6.18" />
+  <project path="vendor/mediatek/kernel_modules"
+           name="alps-vendor_mediatek_kernel_modules"
+           remote="alps" revision="x6871-android17-6.18" />
+</manifest>

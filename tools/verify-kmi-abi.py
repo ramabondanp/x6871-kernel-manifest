@@ -2,9 +2,9 @@
 """Verify X6871 vendor/odm/recovery kernel modules against pure upstream GKI KMI/ABI.
 
 Safeguards enforced (exit non-zero on any failure):
-  1. Pure GKI check: warns/fails if kernel-6.12 has local edits (--allow-dirty-gki to override).
+  1. Pure GKI check: warns/fails if the pinned GKI tree has local edits (--allow-dirty-gki to override).
   2. Vermagic check: every .ko across vendor_boot/vendor_dlkm/odm_dlkm matches the built GKI release.
-  3. Official GKI ABI check: 0 CRC mismatches against kernel-6.12/gki/aarch64/abi.stg.
+  3. Official GKI ABI check: 0 CRC mismatches against <gki>/gki/aarch64/abi.stg.
   4. Trimmed-GKI check: 0 imports of unlisted (non-KMI) vmlinux symbols.
   5. CONFIG_MODULE_SIG_PROTECT check: 0 exports colliding with protected GKI system_dlkm modules.
   6. Symbol & CRC closure:
@@ -14,7 +14,7 @@ Safeguards enforced (exit non-zero on any failure):
 
 Usage:
   ./tools/verify-kmi-abi.py
-  ./tools/verify-kmi-abi.py --ws "$HOME/x6871-kernel" \\
+  ./tools/verify-kmi-abi.py --kver 6.18 --ws "$HOME/6.18/ws" \\
       --out-dir "$HOME/x6871-kernel/out_bazel" \\
       --vb-dir "$HOME/tmp/vbwork-twrp/build/unzip_boot/root.1/lib/modules" \\
       --vd-dir "$HOME/x6871-out/dlkm-latest-work/vendor_dlkm/lib/modules" \\
@@ -194,6 +194,8 @@ def main():
     if not os.path.isdir(default_ws) and os.path.isdir(os.path.join(home, "x6871-clean/ws")):
         default_ws = os.path.join(home, "x6871-clean/ws")
     ap = argparse.ArgumentParser(description="Verify X6871 modules against pure GKI KMI/ABI.")
+    ap.add_argument("--kver", default=os.environ.get("KVER", "6.12"),
+                    help="kernel version profile (default: 6.12)")
     ap.add_argument("--ws", default=os.environ.get("KERNEL_ROOT", default_ws))
     ap.add_argument("--out-dir", help="Bazel output user root (default: <workspace>/out_bazel)")
     ap.add_argument(
@@ -209,20 +211,26 @@ def main():
         if shutil.which(tool) is None:
             sys.exit(f"ERROR: required tool not found: {tool}")
 
-    k_src = os.path.join(args.ws, "kernel-6.12")
+    kver_arg = args.kver
+    kcode = "64_k6" + kver_arg.split(".")[-1]
+    tree = f"kernel_device_modules-{kver_arg}"
+    gki = os.path.join(args.ws, f"kernel-{kver_arg}")
+    if not os.path.isdir(gki):
+        gki = os.path.join(args.ws, "common")
+    k_src = gki
     out_dir = os.path.abspath(args.out_dir or os.path.join(args.ws, "out_bazel"))
     bases = sorted(
-        glob.glob(f"{glob.escape(out_dir)}/*/execroot/_main/bazel-out/*/bin/kernel_device_modules-6.12"),
+        glob.glob(f"{glob.escape(out_dir)}/*/execroot/_main/bazel-out/*/bin/{tree}"),
         key=os.path.getmtime,
         reverse=True,
     )
     if not bases:
         sys.exit(f"ERROR: no Bazel output found under {out_dir}")
     base = bases[0]
-    k_dir = os.path.join(base, "mgk_64_k612_kernel_aarch64.user")
-    m_dir = os.path.join(base, "mgk_64_k612_customer_modules_install.user")
+    k_dir = os.path.join(base, f"mgk_{kcode}_kernel_aarch64.user")
+    m_dir = os.path.join(base, f"mgk_{kcode}_customer_modules_install.user")
     stgs = sorted(
-        glob.glob(os.path.join(m_dir, "staging/lib/modules/6.12.*")),
+        glob.glob(os.path.join(m_dir, f"staging/lib/modules/{kver_arg}.*")),
         key=os.path.getmtime,
         reverse=True,
     )
@@ -249,14 +257,17 @@ def main():
 
     errors = []
 
-    # 1. Pure GKI check (never edit kernel-6.12)
+    # 1. Pure GKI check (never edit the GKI tree)
     gki_dirty = subprocess.check_output(["git", "-C", k_src, "status", "--porcelain"], text=True).strip()
     if gki_dirty and not args.allow_dirty_gki:
-        errors.append(f"kernel-6.12 is dirty (GKI must NEVER be edited):\n{gki_dirty}")
+        errors.append(f"{os.path.basename(k_src)} is dirty (GKI must NEVER be edited):\n{gki_dirty}")
 
     # 2. Load official GKI abi.stg, Module.symvers, vmlinux.symvers, and protected GKI symbols
     abi_crcs = load_abi_stg(os.path.join(k_src, "gki/aarch64/abi.stg"))
-    unprotected = load_unprotected_gki_mods(os.path.join(k_src, "modules.bzl"))
+    mods_bzl = os.path.join(k_src, "modules.bzl")
+    if "_COMMON_UNPROTECTED_MODULES_LIST" not in open(mods_bzl).read():
+        mods_bzl = os.path.join(k_src, "bazel/modules_private.bzl")
+    unprotected = load_unprotected_gki_mods(mods_bzl)
 
     vmlinux_syms = {}
     for line in open(os.path.join(k_dir, "vmlinux.symvers")):
@@ -353,7 +364,7 @@ def main():
     print(f"GKI release : {kver}")
     print(f"ABI symbols : {len(abi_crcs)} (build vs abi.stg mismatches: {len(build_vs_abi)})")
     print(f"Modules     : {sum(counts.values())} ({counts})")
-    print(f"  1. Pure GKI (kernel-6.12 clean)    : {'PASS' if not gki_dirty else 'DIRTY'}")
+    print(f"  1. Pure GKI ({os.path.basename(k_src)} clean){'':<8}: {'PASS' if not gki_dirty else 'DIRTY'}")
     print(f"  2. Wrong vermagic                  : {len(bad_vm)}")
     print(f"  3. CONFIG_MODULE_SIG_PROTECT hits  : {len(prot_hits)}")
     print(f"  4. vendor_boot standalone unres/crc: {len(vb_unres)} / {len(vb_crc_bad)}")

@@ -21,7 +21,9 @@ ROOT=$(cd "$(dirname "$0")/.." && pwd)
 DEFAULT_WS="$HOME/x6871-kernel"
 [ -d "$DEFAULT_WS" ] || [ ! -d "$HOME/x6871-clean/ws" ] || DEFAULT_WS="$HOME/x6871-clean/ws"
 KERNEL_ROOT=${KERNEL_ROOT:-$DEFAULT_WS}
-TREE="$KERNEL_ROOT/kernel_device_modules-6.12"
+KVER=${KVER:-6.12}
+KCODE=64_k6${KVER#6.}
+TREE="$KERNEL_ROOT/kernel_device_modules-$KVER"
 TMPDIR=${TMPDIR:-$HOME/tmp}
 PACKER=${PACKER:-$TMPDIR/vbwork-twrp}
 BASE_OUT=${BASE_OUT:-$TMPDIR/x6871}
@@ -56,8 +58,13 @@ done
 [ -f "$RECOVERY_LOAD_LIST" ] || die "modules.load.recovery tidak ada: $RECOVERY_LOAD_LIST"
 [ -d "$PACKER/build/unzip_boot/root.1" ] || \
     die "packer belum di-unpack: $PACKER/build/unzip_boot/root.1"
-UNPACK="$KERNEL_ROOT/tools/mkbootimg/unpack_bootimg.py"
+# main-kernel-2026 moved host tools to linux_musl-x86/bin and dropped the
+# tools/mkbootimg repo. Accept both layouts.
+UNPACK="$KERNEL_ROOT/prebuilts/kernel-build-tools/linux_musl-x86/bin/unpack_bootimg"
+[ -x "$UNPACK" ] || UNPACK="$KERNEL_ROOT/prebuilts/kernel-build-tools/linux-x86/bin/unpack_bootimg"
+[ -x "$UNPACK" ] || UNPACK="$KERNEL_ROOT/tools/mkbootimg/unpack_bootimg.py"
 [ -f "$UNPACK" ] || die "unpack_bootimg tidak ada: $UNPACK"
+if [ -x "$UNPACK" ]; then UNPACK_CMD=("$UNPACK"); else UNPACK_CMD=(python3 "$UNPACK"); fi
 mkdir -p "$TMPDIR"
 
 if [ -z "$OUT" ]; then
@@ -76,19 +83,19 @@ if [ "$SKIP_BUILD" = "0" ]; then
         --config=stamp \
         --repo_manifest="$TREE/fake_manifest.xml" \
         --experimental_writable_outputs --allow_ddk_unsafe_headers=1 \
-        --user_ddk_unsafe_headers=//kernel_device_modules-6.12:mtk_use_gki_unsafe_headers \
-        --repo_env=KERNEL_VERSION=kernel-6.12 --repo_env=KERNEL_BUILD_VARIANT=user \
+        --user_ddk_unsafe_headers=//kernel_device_modules-$KVER:mtk_use_gki_unsafe_headers \
+        --repo_env=KERNEL_VERSION=kernel-$KVER --repo_env=KERNEL_BUILD_VARIANT=user \
         --repo_env=DEFCONFIG_OVERLAYS="entry_level_legacy.config X6871.config" \
         --repo_env=SUPPORT_PLATFORM=mt6895 --repo_env=SOURCE_DATE_EPOCH=0 \
-        --//build/bazel_mgk_rules:kernel_version=6.12 \
-        "//kernel_device_modules-6.12:mgk_64_k612_customer_modules_install.user" )
+        --//build/bazel_mgk_rules:kernel_version=$KVER \
+        "//kernel_device_modules-$KVER:mgk_${KCODE}_customer_modules_install.user" )
 else
     info "build dilewati (--skip-build)"
 fi
 
 if [ -z "$STAGING" ]; then
     # Pick the newest staging tree via direct glob (avoids walking all of out_bazel).
-    STAGING=$(ls -dt "$KERNEL_ROOT"/out_bazel/*/execroot/_main/bazel-out/*/bin/kernel_device_modules-6.12/mgk_64_k612_customer_modules_install.user/staging/lib/modules/6.12.* 2>/dev/null | head -1 || true)
+    STAGING=$(ls -dt "$KERNEL_ROOT"/out_bazel/*/execroot/_main/bazel-out/*/bin/kernel_device_modules-$KVER/mgk_${KCODE}_customer_modules_install.user/staging/lib/modules/$KVER.* 2>/dev/null | head -1 || true)
 fi
 [ -n "$STAGING" ] || die "staging hasil build tidak ditemukan"
 [ -d "$STAGING" ] || die "staging tidak ada: $STAGING"
@@ -108,7 +115,7 @@ info "pack bbootimg"
 info "verifikasi isi image"
 WORK=$(mktemp -d "$TMPDIR/repack-verify.XXXXXX")
 trap 'rm -rf "$WORK"' EXIT
-python3 "$UNPACK" --boot_img "$PACKER/vendor_boot.img" --out "$WORK/vb" >/dev/null
+"${UNPACK_CMD[@]}" --boot_img "$PACKER/vendor_boot.img" --out "$WORK/vb" >/dev/null
 [ -f "$WORK/vb/vendor_ramdisk00" ] || die "vendor_ramdisk00 tidak ada di image"
 zstd -d -c "$WORK/vb/vendor_ramdisk00" > "$WORK/rd.cpio"
 mkdir -p "$WORK/root"
