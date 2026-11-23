@@ -503,7 +503,7 @@ cd $HOME/x6871-kernel-manifest
 | Image | Ukuran | MD5 |
 |---|---:|---|
 | `vendor_boot-6.18-test11-iommu.img` | 67.108.864 B | `0ee453c16ae20b6dfbf2cc4bf0db492e` |
-| `vendor_dlkm.img` (dengan fix ipesys) | 24.551.424 B | `7e8d45ada4a38bee96a79d0c40fcd75d` |
+| `vendor_dlkm.img` (dengan fix ipesys + v4l2) | 24.551.424 B | `70144e66a846b1de359d99c82afbd264` |
 | `odm_dlkm.img` | 4.206.592 B | `da2c64a1572ff27382128beb4bbcba8b` (tidak berubah) |
 
 Unduhan: https://gofile.io/d/oTgnm1xd
@@ -535,3 +535,27 @@ di `vendor_dlkm`.
   ulang `vendor_dlkm`.
 - Solusi 3 belum teruji karena panic terjadi sebelum batas timeout
   firmware 10 s.
+
+### Hasil log pstore uji (vendor_dlkm fix ipesys)
+
+- Fix `e37b531921` bekerja: `mtk_ipesys_me_probe` tidak lagi panic dan
+  boot menembus userspace sampai `t = 14.17 s` (apexd, Trustonic,
+  charger, UFS, dsb.).
+- Dua bug V4L2 6.18 muncul setelah userspace membuka node video:
+  1. `v4l2_open+0x12c` WARN untuk node DPE: `dpe_fop_open()` tidak
+     memakai `v4l2_fh`, sehingga 6.18 memanggil `release` dan
+     mengembalikan `-ENODEV`. Diperbaiki di
+     `vendor/mediatek/kernel_modules` commit `8f77ce0001`:
+     `struct v4l2_fh` menjadi anggota pertama
+     `DPE_USER_INFO_STRUCT`, di-init di open dan di-teardown di release.
+  2. `vidioc_vdec_querycap+0x1c` Oops pada `t = 14.167 s`:
+     `v4l_querycap()` 6.18 memanggil `vidioc_querycap(file, NULL, cap)`,
+     sedangkan driver memakai `fh_to_ctx(priv)` → alamat
+     `0xffffffffffffffd8`. Diperbaiki di `kernel_device_modules-6.18`
+     commit `e924a12ab6`: decoder dan encoder memakai
+     `video_drvdata(file)`.
+- Warning non-fatal `proc_register: '/proc/mtk_typec' already
+  registered` berasal dari `tran_extcon_usb` dan `mux_switch` yang
+  sama-sama membuat entri proc; tidak mematikan boot, dicatat terpisah.
+- `vendor_dlkm.img` baru: md5 `70144e66a846b1de359d99c82afbd264`,
+  8/8 PASS. `vendor_boot`/`odm_dlkm` tidak berubah.
