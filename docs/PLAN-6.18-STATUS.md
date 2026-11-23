@@ -13,7 +13,7 @@ Diperbarui: 2026-11-23 (UTC)
 | 1 — Kleaf/MGK + device tree 6.18 | **Selesai** | Kernel 6.18.32 target `mgk_64_k618` |
 | 2 — Codemod API 6.13–6.18 | **Selesai** | Build penuh 546 `.ko` berhasil |
 | 3 — Milestone `vendor_boot` | **Selesai (build)** | 221 modul, image terverifikasi |
-| Gerbang boot #1 | Belum | Butuh hardware TWRP + early-init |
+| Gerbang boot #1 | Sebagian | TWRP boot PASS; boot sistem panic di `atf_logger`, sudah diperbaiki |
 | 4 — DLKM berat | **Selesai (build)** | Sched, Mali, WLAN, cam/vcodec/audio |
 | 5 — Repack + verifier 8 gerbang | **Selesai** | 8/8 PASS, 487 modul |
 
@@ -196,12 +196,18 @@ selesai tanpa error:
 | `vendor_boot-6.18-test.img` | 67.108.864 B | `fbd70f65be1d76c01177320e5d7043c2` |
 | `vendor_boot-6.18-test2.img` | 67.108.864 B | `a8ae05e4e172bf0c7c85ae20fff96e5f` |
 | `vendor_boot-6.18-test3.img` | 67.108.864 B | `03e95db7dbd5161259f325327a23f037` |
+| `vendor_boot-6.18-test4.img` | 67.108.864 B | `c09077991d966a61813d9d85da15bb5c` |
 | `vendor_dlkm.img` | 24.551.424 B | `07966f8129c5b20d931bf4d08af99a3c` |
 | `odm_dlkm.img` | 4.206.592 B | `da2c64a1572ff27382128beb4bbcba8b` |
 
-`vendor_boot-6.18-test3.img` adalah image terbaru: berisi perbaikan panic
-`mrdump.ko` dan dua mismatch KCFI tracepoint (`ufs-mediatek-dbg.ko`,
-`met.ko`). Image test2/test1 jangan dipakai lagi.
+`vendor_boot-6.18-test4.img` adalah image terbaru: berisi perbaikan
+panic `mrdump.ko`, dua mismatch KCFI tracepoint (`ufs-mediatek-dbg.ko`,
+`met.ko`), dan mapping TFA debug untuk 6.18. Image test3/test2/test1
+jangan dipakai lagi.
+
+Uji hardware dengan `vendor_boot-6.18-test3.img`: **TWRP berhasil
+boot**. Boot ke sistem berikutnya panic di `atf_logger.ko`; lihat
+bagian "Panic atf_logger 6.18".
 
 Ukuran ketiga image sama dengan rilis 6.12; hash berbeda karena
 vermagic/isi modul 6.18.
@@ -243,7 +249,7 @@ di `8250_mtk.ko` (diganti `pm_runtime_*` langsung) dan
 ### Artefak dan commit
 
 - Device modules (`kernel_device_modules-6.18`, branch
-  `x6871-android17-6.18`): `6d2e8d18bc77`
+  `x6871-android17-6.18`): `54d86b4eb545`
 - Vendor modules (`vendor/mediatek/kernel_modules`, branch
   `x6871-android17-6.18`): `d500e72bea0b`
 - Manifest: commit dokumentasi ini
@@ -299,13 +305,35 @@ probe (misalnya string `"charger"` milik power supply).
 `ufs-mediatek-mod.ko` memakai loop registrasi yang tidak dapat
 dipasangkan otomatis; tiga callback-nya dicek manual dan cocok.
 
+### Panic atf_logger 6.18
+
+Boot sistem setelah TWRP berhasil berhenti di `modprobe atf_logger`:
+
+```text
+WARNING: ... at asm/io.h:275 lookup_reserved_memory+0xa0/0xd8 [atf_logger]
+[TFA]RO debug buf vaddr:0x0
+Unable to handle kernel NULL pointer dereference at 0x0000000000000000
+pc : tfa_debug_probe+0x6c/0x218 [atf_logger]
+```
+
+6.18 mengubah `ioremap_prot()` di arm64: fungsi hanya menerima
+`pgprot_t` dari mapping user, mengembalikan NULL (dan `WARN_ON_ONCE`)
+untuk proteksi kernel. Kode lama memberi
+`pgprot_writecombine(PAGE_KERNEL_RO)` sehingga `info.vaddr` menjadi
+NULL, tetapi `IS_ERR(NULL)` bernilai false dan
+`lookup_runtime_log()` langsung dereference `info.vaddr`.
+
+Perbaikan: pakai `ioremap_wc()` (atribut write-combine yang sama) dan
+tolak vaddr NULL. Panggilan `ioremap_prot(PAGE_KERNEL)` di `tkv.c` juga
+diganti `ioremap_cache()`.
+
 Pesan commit 6.18 ditulis ulang ke format kernel (`subsystem: ringkasan
 imperatif ... for 6.18`, body 72 kolom, `Signed-off-by`), dan sudah
 diperiksa dengan `common/scripts/checkpatch.pl`: 0 error/warning pesan.
 
-**Berikutnya:** uji ulang boot hardware dengan
-`vendor_boot-6.18-test3.img` (GKI `boot.img` + `system_dlkm.img` resmi
-6.18 4KB), lalu validasi TWRP/early-init sesuai
+**Berikutnya:** TWRP sudah PASS; uji boot sistem dengan
+`vendor_boot-6.18-test4.img` (GKI `boot.img` + `system_dlkm.img` resmi
+6.18 4KB), lalu lanjutkan validasi early-init sesuai
 [`BOOTTEST.md`](BOOTTEST.md).
 
 ## Rencana codemod (arsip)
