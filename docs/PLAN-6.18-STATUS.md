@@ -237,9 +237,9 @@ di `8250_mtk.ko` (diganti `pm_runtime_*` langsung) dan
 ### Artefak dan commit
 
 - Device modules (`kernel_device_modules-6.18`, branch
-  `x6871-android17-6.18`): `1070b66fb726`
+  `x6871-android17-6.18`): `4a0a54da49c8`
 - Vendor modules (`vendor/mediatek/kernel_modules`, branch
-  `x6871-android17-6.18`): `7fb62ffeb3a1`
+  `x6871-android17-6.18`): `35814035c730`
 - Manifest: commit dokumentasi ini
 - Image: `<artefak-lokal>/`
 - Build log: `<log-build-lokal>`
