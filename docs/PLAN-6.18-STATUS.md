@@ -305,6 +305,10 @@ probe (misalnya string `"charger"` milik power supply).
 `ufs-mediatek-mod.ko` memakai loop registrasi yang tidak dapat
 dipasangkan otomatis; tiga callback-nya dicek manual dan cocok.
 
+Audit perubahan API 6.13–6.18 yang tidak tertangkap compiler (memakai
+hasil build 6.12 dan 6.18) dicatat di
+[`API-6.18-AUDIT.md`](API-6.18-AUDIT.md).
+
 ### Panic atf_logger 6.18
 
 Boot sistem setelah TWRP berhasil berhenti di `modprobe atf_logger`:
