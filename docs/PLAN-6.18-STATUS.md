@@ -46,6 +46,9 @@ Diperbarui: 2026-11-23 (UTC)
   - `mgk_build_config` tidak lagi meng-source
     `build.config.{common,aarch64,gki}` yang sudah menjadi trap di
     `main-kernel-2026`;
+  - `KERNEL_DIR` dihapus dari build config dan diganti
+    `kernel_build(makefile = "//common:Makefile")` sesuai
+    `docs/build_configs.md`;
   - defconfig/fragmen diserahkan ke `kernel_build`;
   - `Image.lzma`/`Image.zst` ditambahkan ke `make_goals`.
 - Device tree:
@@ -68,9 +71,17 @@ Diperbarui: 2026-11-23 (UTC)
     GKI base, sehingga ABI/KMI tetap murni.
 - Fragmen config:
   - `kernel_build_config` `x6871_fragments_{user,eng,userdebug}`
-    menggabungkan defconfig + overlay + `sign.config` (+ varian) dalam
-    satu file, karena urutan `post_defconfig_fragments` di Kleaf 6.18
-    tidak dijamin.
+    menggabungkan **gki_defconfig + device defconfig + overlay +
+    `sign.config`** (+ varian) menjadi satu defconfig penuh.
+  - `kernel_build.defconfig` diarahkan ke file itu untuk build device;
+    `check_defconfig = "disabled"`.
+  - Alasan: `merge_config.sh` melewati simbol yang tidak ada di base
+    defconfig. `CONFIG_COMMON_CLK_MT8196` baru muncul sebagai default
+    `ARCH_MEDIATEK`, jadi harus ada di defconfig penuh agar disable
+    `# CONFIG_... is not set` dihormati.
+  - Bug yang ditemukan: disable sempat ditulis tanpa prefix `CONFIG_`
+    (`# COMMON_CLK_MT8196 is not set`) sehingga diabaikan parser;
+    sudah diperbaiki menjadi `# CONFIG_COMMON_CLK_MT8196 is not set`.
 - Build target:
   `//kernel_device_modules-6.18:mgk_64_k618_customer_modules_install.user`
   sedang dijalankan di `out_bazel_test`.
