@@ -503,7 +503,7 @@ cd $HOME/x6871-kernel-manifest
 | Image | Ukuran | MD5 |
 |---|---:|---|
 | `vendor_boot-6.18-test11-iommu.img` | 67.108.864 B | `0ee453c16ae20b6dfbf2cc4bf0db492e` |
-| `vendor_dlkm.img` | 24.551.424 B | `4197dbacb6da4679bc6a16188231b989` |
+| `vendor_dlkm.img` (dengan fix ipesys) | 24.551.424 B | `7e8d45ada4a38bee96a79d0c40fcd75d` |
 | `odm_dlkm.img` | 4.206.592 B | `da2c64a1572ff27382128beb4bbcba8b` (tidak berubah) |
 
 Unduhan: https://gofile.io/d/oTgnm1xd
@@ -512,3 +512,26 @@ Verifikasi `tools/verify-kmi-abi.py --kver 6.18` untuk image ini: 8/8
 PASS, 487 modul (221/209/57), 0 mismatch. Image berisi 221 modul
 `vendor_boot`, termasuk `emi-mpu-hook-v1.ko` di stage-1; `apu_top` tetap
 di `vendor_dlkm`.
+
+### Hasil test11 (log pstore uji)
+
+- Solusi 1 bekerja: tidak ada satu pun baris `emimpu_violation_irq` /
+  `MIUMPU` di seluruh log. `__apu_wake_rpc_rcx` berhasil pada 4.589 s
+  (`PWR_RDY 0x2 -> 0x3`), mapping APU IOMMU berjalan dengan
+  `ttbr=0x14c00001` (bukan 0), `smc call 7..11` dan
+  `remote processor apusys_rv is now attached` selesai, lalu IPI APU
+  bertrafik normal. Badai ~41 kHz dan RCU stall tidak muncul.
+- Panic baru pada 4.690 s, tidak terkait APU:
+  `Unable to handle kernel NULL pointer dereference at 0x124`,
+  `device_link_add+0xdc` dari `mtk_ipesys_me_probe`. DT
+  `ipesys_me@15320000` memang menonaktifkan `mediatek,larb` (`#if 0`),
+  tetapi probe tetap memanggil `device_link_add(&pdev->dev,
+  &larb_pdev->dev, ...)` dengan `larb_pdev = NULL`.
+- Perbaikan `e37b531921` (`vendor/mediatek/kernel_modules`):
+  lewati device link bila node/device LARB tidak ada, probe lanjut.
+- `vendor_dlkm.img` di-repack ulang dengan fix ini
+  (md5 `7e8d45ada4a38bee96a79d0c40fcd75d`) dan verifier 8 gerbang
+  tetap 8/8 PASS. `vendor_boot`/`odm_dlkm` tidak berubah; cukup flash
+  ulang `vendor_dlkm`.
+- Solusi 3 belum teruji karena panic terjadi sebelum batas timeout
+  firmware 10 s.

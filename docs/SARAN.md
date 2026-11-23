@@ -318,7 +318,7 @@ modem tidak ikut dimuat di stage-1.
 | Image | Ukuran | MD5 |
 |---|---:|---|
 | `vendor_boot-6.18-test11-iommu.img` | 67.108.864 B | `0ee453c16ae20b6dfbf2cc4bf0db492e` |
-| `vendor_dlkm.img` | 24.551.424 B | `4197dbacb6da4679bc6a16188231b989` |
+| `vendor_dlkm.img` | 24.551.424 B | `7e8d45ada4a38bee96a79d0c40fcd75d` |
 | `odm_dlkm.img` | 4.206.592 B | `da2c64a1572ff27382128beb4bbcba8b` |
 
 Unduhan: https://gofile.io/d/oTgnm1xd
