@@ -27,9 +27,12 @@ TREE="$KERNEL_ROOT/kernel_device_modules-$KVER"
 TMPDIR=${TMPDIR:-$HOME/tmp}
 PACKER=${PACKER:-$TMPDIR/vbwork-twrp}
 BASE_OUT=${BASE_OUT:-$TMPDIR/x6871}
-MODLIST="$ROOT/tools/recovery-modules.txt"
-LOAD_LIST="$ROOT/tools/modules.load"
-RECOVERY_LOAD_LIST="$ROOT/tools/modules.load.recovery"
+# 6.18 has its own mkp-free lists; keep 6.12 defaults otherwise.
+VSUFFIX=""
+[ -f "$ROOT/tools/recovery-modules-$KVER.txt" ] && VSUFFIX="-$KVER"
+MODLIST="$ROOT/tools/recovery-modules${VSUFFIX}.txt"
+LOAD_LIST="$ROOT/tools/modules.load${VSUFFIX}"
+RECOVERY_LOAD_LIST="$ROOT/tools/modules.load.recovery${VSUFFIX}"
 STRIP=${STRIP:-llvm-strip}
 DEPMOD=${DEPMOD:-depmod}
 

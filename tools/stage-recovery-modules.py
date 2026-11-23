@@ -165,7 +165,7 @@ def main():
     if not os.path.isdir(args.staging):
         die("staging tidak ada: " + args.staging)
     version = args.version or os.path.basename(os.path.normpath(args.staging))
-    if not version.startswith("6.12."):
+    if not (version.startswith("6.12.") or version.startswith("6.18.")):
         die("nama staging bukan versi kernel: " + version)
 
     dest_norm = os.path.normpath(args.dest)
