@@ -619,5 +619,10 @@ Hasil:
   [`patches/selinux-x6871-6.18.patch`](../patches/selinux-x6871-6.18.patch).
 - Tidak ada `enforce=0` global; domain `kernel` permissive hanya di
   policy TWRP. Android memakai policy system/vendor yang sudah dipatch.
+- **WiFi/Bluetooth belum jalan** (`log kernel uji`): `conninfra.cfg`
+  berlabel `connsys_vendor_file` belum di-allow, sehingga conninfra
+  power on gagal dan `WMT turn on WIFI fail` / `BT turn on fail`.
+  Patch `firmware_load` sudah ditambah allow `connsys_vendor_file`
+  (plus patch inkremental); `vendor.img` perlu dipatch ulang dan diuji.
 - Gerbang boot #1 dinyatakan **LULUS**. Pengujian subsistem lanjutan
   mengikuti checklist `BOOTTEST.md`.

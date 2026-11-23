@@ -11,16 +11,19 @@
  (class filesystem (mount remount unmount getattr relabelfrom relabelto associate quotamod quotaget watch ))
 --- a/vendor_sepolicy.cil
 +++ b/vendor_sepolicy.cil	2026-11-23 13:43:44.786460124 +0000
-@@ -20058,3 +20058,10 @@
+@@ -20058,3 +20058,13 @@
  (typeattribute base_typeattr_237_202504)
  (typeattributeset base_typeattr_237_202504 (and (domain) (not (dumpstate_202504 init_202504))))
  
 +; X6871 6.18: the kernel firmware loader now checks READING_FIRMWARE
 +; (6.12 ignored it). mali_csffw.bin is intended to be
 +; same_process_hal_file; keep vendor_file for images whose labels were not
-+; regenerated. Both permissions only allow reading firmware.
++; regenerated. conninfra.cfg/connfem.cfg are connsys_vendor_file and are
++; needed before conninfra can power on WiFi/Bluetooth. All permissions
++; only allow reading firmware.
 +(allow kernel same_process_hal_file (system (firmware_load)))
 +(allow kernel vendor_file (system (firmware_load)))
++(allow kernel connsys_vendor_file (system (firmware_load)))
 +
 --- a/vendor_file_contexts
 +++ b/vendor_file_contexts	2026-11-23 13:43:44.977458598 +0000

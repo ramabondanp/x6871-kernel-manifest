@@ -1,0 +1,11 @@
+--- a/vendor_sepolicy.cil
++++ b/vendor_sepolicy.cil
+@@ -20061,7 +20061,8 @@
+ ; X6871 6.18: the kernel firmware loader now checks READING_FIRMWARE
+ ; (6.12 ignored it). mali_csffw.bin is intended to be
+ ; same_process_hal_file; keep vendor_file for images whose labels were not
+ ; regenerated. Both permissions only allow reading firmware.
+ (allow kernel same_process_hal_file (system (firmware_load)))
+ (allow kernel vendor_file (system (firmware_load)))
++(allow kernel connsys_vendor_file (system (firmware_load)))
+ 

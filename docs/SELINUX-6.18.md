@@ -12,14 +12,19 @@ Gejala tanpa patch (`log pstore uji`/`log pstore uji`):
 ```text
 mali: loading /vendor/firmware/mali_csffw.bin failed with error -13
 haptic_hv: loading /odm/firmware/haptic_ram.bin failed with error -13
+loading /vendor/firmware/conninfra.cfg failed with error -13
 avc: denied { firmware_load } for ... scontext=u:r:kernel:s0
      tcontext=u:object_r:vendor_file:s0 tclass=system
+avc: denied { firmware_load } for path="/vendor/firmware/conninfra.cfg"
+     scontext=u:r:kernel:s0 tcontext=u:object_r:connsys_vendor_file:s0
 ```
 
 Mali firmware gagal termuat → SurfaceFlinger crash berulang → zygote
-restart loop → `hang_detect` reboot. **Boot ke sistem 6.18 memerlukan
-patch SELinux ini**; patch bukan bagian dari kernel dan tidak mengubah
-`kernel-6.18` (gate #7 tetap bersih).
+restart loop → `hang_detect` reboot. `conninfra.cfg` gagal dibaca →
+`conninfra` tidak bisa power on → WiFi dan Bluetooth mati
+(`WMT turn on WIFI fail`, `BT turn on fail`). **Boot ke sistem 6.18
+memerlukan patch SELinux ini**; patch bukan bagian dari kernel dan
+tidak mengubah `kernel-6.18` (gate #7 tetap bersih).
 
 ## Isi patch
 
@@ -28,10 +33,22 @@ patch SELinux ini**; patch bukan bagian dari kernel dan tidak mengubah
 1. `plat_sepolicy.cil` — tambah `firmware_load` ke
    `(class system (...))`.
 2. `vendor_sepolicy.cil` — izinkan domain `kernel` membaca
-   `same_process_hal_file` dan `vendor_file` dengan permission
-   `firmware_load`.
+   `same_process_hal_file`, `vendor_file`, dan `connsys_vendor_file`
+   dengan permission `firmware_load`. `connsys_vendor_file` adalah
+   label `conninfra.cfg`/`connfem.cfg`; tanpa ini WiFi/Bluetooth tidak
+   bisa power on.
 3. `vendor_file_contexts` — label `/odm/firmware/haptic_ram.bin`
    sebagai `same_process_hal_file` (sama seperti `mali_csffw.bin`).
+
+Kalau `selinux-x6871-6.18.patch` versi lama sudah terpasang (baru
+mengizinkan `same_process_hal_file`/`vendor_file`), tambahkan allow
+`connsys_vendor_file` dengan patch inkremental
+[`patches/selinux-x6871-6.18-connsys.patch`](../patches/selinux-x6871-6.18-connsys.patch):
+
+```bash
+cd <dir-berisi-vendor_sepolicy.cil-hasil-patch>
+patch -p1 < $HOME/x6871-kernel-manifest/patches/selinux-x6871-6.18-connsys.patch
+```
 
 ## Cara pasang
 
@@ -75,16 +92,23 @@ sudah diuji dengan `secilc` 3.5.
 Setelah boot:
 
 ```bash
-dmesg | grep -E 'mali_csffw|haptic_ram|avc.*firmware_load'
+dmesg | grep -E 'mali_csffw|haptic_ram|conninfra\.cfg|avc.*firmware_load|WMT turn on|BT turn on'
 ```
 
-Harus tidak ada lagi `failed with error -13` untuk kedua firmware;
-SurfaceFlinger/zygote tidak crash berulang.
+Harus tidak ada lagi `failed with error -13` untuk firmware tersebut;
+SurfaceFlinger/zygote tidak crash berulang; `conninfra` power on dan
+WiFi/Bluetooth bisa dinyalakan.
 
 ## Hasil uji
 
 - Boot ke sistem 6.18: **PASS setelah patch SELinux** (system plat +
   vendor) dan `vendor_boot-6.18-test12-twrpfix.img`.
+- Uji `log kernel uji` (2026-11-23): boot dan touch jalan, tetapi WiFi dan
+  Bluetooth gagal. Penyebab: `conninfra.cfg` berlabel
+  `connsys_vendor_file` belum di-allow, sehingga `conninfra` power on
+  gagal (`WMT turn on WIFI fail`, `BT turn on fail`). Patch sudah
+  ditambah allow `connsys_vendor_file`; `vendor.img` perlu di-patch
+  ulang lalu diuji.
 - TWRP touch/vibrator tidak memakai patch ini; itu diperbaiki lewat
   policy TWRP di `vendor_boot` (lihat
   [`PLAN-6.18-STATUS.md`](PLAN-6.18-STATUS.md#twrp-touch--vibrator-test12)).
