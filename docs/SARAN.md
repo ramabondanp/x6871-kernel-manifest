@@ -400,3 +400,56 @@ dan back-end. Membetulkan `Hostless_LPBK` saja tidak cukup.
   playback (t=40.29/42.20, 47.46/49.99, 70.17/71.35, 91.75 s), bukan lagi
   kegagalan registrasi kartu. Error `snd-audio-dsp` PCM open tetap ada
   karena ADSP tidak aktif, tetapi tidak menghambat audio yang diuji.
+
+## 8. Facebook Story 6.18 — uji perbaikan di sisi kernel
+
+- `log kernel uji`: tiga sesi VP9 non-secure (`svp 0`, konteks 31/33/35) berhasil
+  membuat instance MediaTek, lalu `vdec_vcp_decode()` melaporkan
+  `unsupported (-1,-1)` dalam 1–3 ms. `QBUF` gagal setelah penolakan itu.
+  Tidak ada fault IOMMU VDEC pada percobaan ini. `log kernel uji` sebelumnya
+  merekam fault tersendiri: H.264 berhasil init pada 720×1280 dan
+  368×640, lalu `LAT_WDMA` dan `CORE/VLD` sama-sama fault di `0x31c00000`.
+- `log Android` hanya mencakup buffer `events` saat boot, bukan sesi
+  playback. Log itu tidak mengidentifikasi profil VP9 atau fallback
+  yang dipilih Facebook.
+- [Dump stock X6871 SP20](https://gitlab.com/rama-firmware-dumps/infinix/Infinix-X6871/-/blob/X6871-16.3.0.155SP20%28OP008PF001AZ%29/all_files.txt)
+  dipakai sebagai referensi. Pengguna mengonfirmasi bahwa modul stock
+  dapat memutar Story. Decoder VP9 hardware tetap aktif; usulan fallback
+  lewat XML tidak dipakai.
+
+### 8.1 Perubahan build uji
+
+- `mtk_iommu.ko` (`vendor_boot`): saat invalidasi HypMMU Type-2 untuk
+  IOMMU multimedia MT6895, gunakan ID tabel hardware (`MM_TABLE=0`),
+  bukan tag firmware milik klien pertama yang menempel ke domain.
+  Di `log kernel uji`, `iommu_test` membuat domain VDEC sebelum klien UBE;
+  domain itu mewarisi tag `1`. Pada fault H.264, lookup software masih
+  menemukan PA, tetapi lookup hypervisor di tabel multimedia memberi `0`.
+  Ini kandidat perbaikan H.264, belum bukti penyebab penolakan VP9.
+  Jalur APU, pengelompokan domain, dan proteksi IOMMU tidak diubah.
+- `mtk-vcodec-dec.ko` (`vendor_dlkm`): tambah pesan `VP9 header rejected`
+  dengan ukuran payload, panjang buffer, offset, flag, dan bit status.
+  Hanya dicetak jika VCP menolak header VP9 non-secure; bukan perubahan
+  perilaku decode. Tidak ada salinan payload video yang dicetak.
+
+### 8.2 Artefak dan uji perangkat
+
+Hasil build/repack ada di `<artefak-lokal>/vdec-kernel-test/`.
+Verifier KMI/ABI **8/8 PASS** untuk 487 modul, dan hashtree DLKM lulus.
+`common`, DTB, bootconfig, fragmen recovery, policy TWRP, dan konfigurasi
+codec Android tidak diubah. `odm_dlkm.img` hasil repack identik dengan
+image sebelumnya.
+
+| Image uji | MD5 |
+|---|---|
+| `vendor_boot-6.18-vdec-test.img` | `04e34410592666fc0050264a205af9bb` |
+| `vendor_dlkm.img` | `4f8dc3fe049200af443f122030cf1c78` |
+
+Unduhan: https://gofile.io/d/2DHz5NGR (kedua image di folder
+`6.18-vdec-test`; MD5 di atas sudah dicocokkan dengan file yang diunggah).
+
+Uji kedua image bersama pasangan `boot`/`system_dlkm` GKI 6.18 yang sama.
+Pada Story yang gagal sebelumnya, cek apakah fault `LAT_WDMA`/`CORE/VLD`
+hilang dan apakah VP9 masih ditolak. Jika VP9 masih gagal, ambil baris baru
+`VP9 header rejected`; gunakan TikTok sebagai kontrol. **Belum diuji di
+perangkat dan belum bisa disebut fix Facebook Story.**
