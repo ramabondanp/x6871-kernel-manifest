@@ -331,8 +331,8 @@ Pasangkan dengan `boot.img` + `system_dlkm.img` GKI
 
 **Status:** akar kegagalan registrasi kartu teridentifikasi dari log dan
 perbandingan sumber dengan baseline 6.12 KMI 6. Perbaikan sudah diterapkan,
-build + repack + verifier 8/8 lulus; uji perangkat masih pending. Lihat
-[rencana port 6.18](PLAN-6.18.md).
+build + repack + verifier 8/8 lulus, dan audio terkonfirmasi aman di
+perangkat (`log kernel uji`). Lihat [rencana port 6.18](PLAN-6.18.md).
 
 ### 7.1 Bukti dari `log kernel uji`
 
@@ -395,6 +395,8 @@ dan back-end. Membetulkan `Hostless_LPBK` saja tidak cukup.
 - Artefak: `vendor_dlkm-6.18-audio-dpcm.img`, 24.551.424 B,
   md5 `ad24e0ac5d51c070fe3db2e41f4e18e8`,
   https://gofile.io/d/oTgnm1xd
-- **Belum diuji di perangkat.** Verifikasi akhir tetap: kartu muncul di
-  `/proc/asound/cards`, tidak ada `no playback, no capture`, lalu uji
-  speaker FS1599, earpiece, dan mikrofon.
+- **Terkonfirmasi di perangkat:** audio aman pada `log kernel uji`. Amplifier
+  speaker FS1599 menunjukkan siklus `spk_amp_event 2/4` berulang saat
+  playback (t=40.29/42.20, 47.46/49.99, 70.17/71.35, 91.75 s), bukan lagi
+  kegagalan registrasi kartu. Error `snd-audio-dsp` PCM open tetap ada
+  karena ADSP tidak aktif, tetapi tidak menghambat audio yang diuji.
