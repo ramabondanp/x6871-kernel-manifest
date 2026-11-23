@@ -326,3 +326,75 @@ Unduhan: https://gofile.io/d/oTgnm1xd
 Pasangkan dengan `boot.img` + `system_dlkm.img` GKI
 `6.18.32-android17-5-gecdaacc9a0ee-4k` yang sama. Verifier 8 gerbang:
 8/8 PASS (487 modul; 0 unresolved/CRC mismatch).
+
+## 7. Regresi audio 6.18 — flag DPCM pada `mt6895-mt6368` (2026-11-23)
+
+**Status:** akar kegagalan registrasi kartu teridentifikasi dari log dan
+perbandingan sumber dengan baseline 6.12 KMI 6. Perbaikan sudah diterapkan,
+build + repack + verifier 8/8 lulus; uji perangkat masih pending. Lihat
+[rencana port 6.18](PLAN-6.18.md).
+
+### 7.1 Bukti dari `log kernel uji`
+
+```text
+[    5.684120] Hostless_LPBK: ASoC error (-22): substream Hostless_LPBK has no playback, no capture
+[    5.684128] mt6895-mt6368 sound: ASoC: can't create pcm Hostless_LPBK :-22
+[    5.687676] mt6895-mt6368 sound: mt6895_mt6368_dev_probe snd_soc_register_card fail -22
+```
+
+Kedua amplifier FS1599 (`6-0034` dan `6-0035`) sudah berhasil probe
+sebelumnya. Kegagalan yang menghentikan registrasi kartu adalah `-EINVAL`
+ketika ASoC membuat PCM `Hostless_LPBK`. Pesan `adsp_system_bootup fail
+ret(-14)` juga muncul pada 6.12 karena node `adspsys@1e000000` dinonaktifkan
+di DT X6871 (lihat [PRETEST.md §52.1](PRETEST.md#521-audio-tran_audio_controlko--mt6895-mt6368ko-vendor_dlkm));
+pesan tersebut bukan penyebab kegagalan registrasi ini.
+
+### 7.2 Perbedaan dengan 6.12 KMI 6
+
+Commit port `a20a68e37647` mengganti `.dpcm_playback` dan `.dpcm_capture`
+dengan `.playback_only` dan `.capture_only` satu per satu di
+`sound/soc/mediatek/mt6895/mt6895-mt6368.c`. Pada 6.12, kedua flag DPCM
+bernilai `1` membiarkan link dua arah tetap mendukung playback dan capture.
+Pada 6.18, `soc_get_playback_capture()` di `common/sound/soc/soc-pcm.c`
+memakai `.playback_only` untuk menonaktifkan capture dan `.capture_only`
+untuk menonaktifkan playback. Jika keduanya bernilai `1`, kedua arah
+dinonaktifkan dan fungsi mengembalikan `-EINVAL`.
+
+`Hostless LPBK DAI` sendiri mendeklarasikan kedua arah. Ada **17 link**
+dengan kedua flag `*_only` aktif di `mt6895-mt6368.c`, mencakup front-end
+dan back-end. Membetulkan `Hostless_LPBK` saja tidak cukup.
+
+### 7.3 Usulan perbaikan dan verifikasi
+
+1. Di driver perangkat 6.18, hilangkan kedua flag `*_only` dari link yang
+   memang dua arah. Pertahankan hanya flag yang sesuai pada link satu arah.
+   Cocokkan setiap link dengan kemampuan DAI dan arah pada baseline 6.12;
+   pertahankan nama, urutan link, dan routing mixer untuk ABI HAL X6871.
+2. Build dan repack `vendor_dlkm` dari staging 6.18 terbaru. Modul yang
+   ditargetkan adalah `mt6895-mt6368.ko`; GKI `common`, DTB, dan baseline
+   6.12 tidak perlu diubah. Ikuti [status port](PLAN-6.18-STATUS.md#perintah-kerja)
+   dan [prosedur repack](BOOTTEST.md#2-membuat-image-vendor_boot--dlkm).
+   Jalankan `tools/verify-kmi-abi.py --kver 6.18` dan pastikan 8/8 lulus.
+3. Pada perangkat, pastikan kartu muncul di `/proc/asound/cards` dan tidak
+   ada lagi `no playback, no capture`. Uji speaker FS1599, earpiece, dan
+   perekaman mikrofon; lulus verifier saja tidak membuktikan audio bekerja.
+
+### 7.4 Implementasi dan verifikasi (2026-11-23)
+
+- `kernel_device_modules-6.18/sound/soc/mediatek/mt6895/mt6895-mt6368.c`:
+  menghapus pasangan `.playback_only = 1` + `.capture_only = 1` dari
+  **17 link dua arah** (count playback 34 → 17, capture 37 → 20; selisih
+  tepat 17/17). Flag pada link satu arah tidak diubah.
+- Build: `bazel build
+  //kernel_device_modules-6.18/sound/soc/mediatek/mt6895:mt6895-mt6368.mgk_64_k618.6.18.user`
+  sukses (28,9 s, cache `out_bazel_test`).
+- Repack: `tools/repack-dlkm-latest.sh` sukses; 209 `.ko` vendor_dlkm,
+  57 `.ko` odm_dlkm, AVB hashtree terverifikasi.
+- `tools/verify-kmi-abi.py --kver 6.18`: **8/8 PASS**, 487 modul,
+  0 unresolved/CRC mismatch, 0 non-KMI import.
+- Artefak: `vendor_dlkm-6.18-audio-dpcm.img`, 24.551.424 B,
+  md5 `ad24e0ac5d51c070fe3db2e41f4e18e8`,
+  https://gofile.io/d/oTgnm1xd
+- **Belum diuji di perangkat.** Verifikasi akhir tetap: kartu muncul di
+  `/proc/asound/cards`, tidak ada `no playback, no capture`, lalu uji
+  speaker FS1599, earpiece, dan mikrofon.
