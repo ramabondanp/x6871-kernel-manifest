@@ -10,12 +10,12 @@ Diperbarui: 2026-11-23 (UTC)
 | Fase | Status | Catatan |
 |---|---|---|
 | 0 — Manifest, branch, workspace | **Selesai** | Workspace `<workspace-6.18>` |
-| 1 — Kleaf/MGK + device tree 6.18 | **Berjalan** | Kernel 6.18.32 target `mgk_64_k618` |
-| 2 — Codemod API 6.13–6.18 | **Sebagian** | 8 kelas diterapkan (lihat bawah) |
-| 3 — Milestone `vendor_boot` | Belum | Menunggu kompilasi 6.18 |
-| Gerbang boot #1 | Belum | Butuh TWRP + early-init |
-| 4 — DLKM berat | Belum | Sched, Mali, WLAN, cam/vcodec/audio |
-| 5 — Repack + verifier 8 gerbang | Belum | `verify-kmi-abi.py --kver 6.18` |
+| 1 — Kleaf/MGK + device tree 6.18 | **Selesai** | Kernel 6.18.32 target `mgk_64_k618` |
+| 2 — Codemod API 6.13–6.18 | **Selesai** | Build penuh 546 `.ko` berhasil |
+| 3 — Milestone `vendor_boot` | **Selesai (build)** | 221 modul, image terverifikasi |
+| Gerbang boot #1 | Belum | Butuh hardware TWRP + early-init |
+| 4 — DLKM berat | **Selesai (build)** | Sched, Mali, WLAN, cam/vcodec/audio |
+| 5 — Repack + verifier 8 gerbang | **Selesai** | 8/8 PASS, 487 modul |
 
 ## Referensi donor 6.18
 
@@ -175,6 +175,58 @@ heap memakai `DMA_BUF_HEAP`, `scheduler` memakai `pick_task(rq, rf)`
 tanpa `entity_eligible`, GED tanpa notifier fbdev, dan `apu_top` memakai
 `devfreq_add_governor` + header privat `governor.h`. Detail ada di
 [`PMX110-6.18-REFERENCE.md`](PMX110-6.18-REFERENCE.md).
+
+## Hasil build penuh 6.18 (2026-11-23)
+
+Build `//kernel_device_modules-6.18:mgk_64_k618_customer_modules_install.user`
+selesai tanpa error:
+
+- staging total **546** `.ko` = 379 device OOT + 39 vendor OOT + 128 GKI.
+- Set runtime **487** modul = **221** `vendor_boot` + **209**
+  `vendor_dlkm` + **57** `odm_dlkm`; `mkp.ko` dihapus sesuai keputusan
+  desain.
+- Inventaris runtime identik dengan rilis 6.12
+  `gki-kmi7-aw22xxx-20261122`, kecuali `mkp.ko` (sengaja tidak ada di
+  6.18).
+
+### Image hasil repack
+
+| Image | Ukuran | MD5 |
+|---|---:|---|
+| `vendor_boot-6.18-test.img` | 67.108.864 B | `fbd70f65be1d76c01177320e5d7043c2` |
+| `vendor_dlkm.img` | 24.551.424 B | `07966f8129c5b20d931bf4d08af99a3c` |
+| `odm_dlkm.img` | 4.206.592 B | `da2c64a1572ff27382128beb4bbcba8b` |
+
+Ukuran ketiga image sama dengan rilis 6.12; hash berbeda karena
+vermagic/isi modul 6.18.
+
+### Verifikasi 8 gerbang
+
+`tools/verify-kmi-abi.py --kver 6.18`:
+
+```text
+GKI release : 6.18.32-android17-5-gecdaacc9a0ee-4k
+ABI symbols : 9593 (build vs abi.stg mismatches: 0)
+Modules     : 487 ({'vendor_boot': 221, 'vendor_dlkm': 209, 'odm_dlkm': 57})
+  1. Pure GKI (common clean)        : PASS
+  2. Wrong vermagic                  : 0
+  3. CONFIG_MODULE_SIG_PROTECT hits  : 0
+  4. vendor_boot standalone unres/crc: 0 / 0
+  5. Full runtime closure unres/crc  : 0 / 0
+  6. Official abi.stg CRC mismatches : 0
+  7. Non-KMI unlisted vmlinux imports: 0
+  8. modules.dep/load & other errors : 0
+ALL KMI/ABI SAFEGUARDS PASSED.
+```
+
+Dua import non-KMI terakhir yang diperbaiki: `serial8250_rpm_get/put`
+di `8250_mtk.ko` (diganti `pm_runtime_*` langsung) dan
+`__hw_protection_trigger` di `mtk_low_battery_throttling.ko` (diganti
+`orderly_poweroff(true)`).
+
+**Berikutnya:** uji boot hardware (GKI `boot.img` + `system_dlkm.img`
+resmi 6.18 4KB + `vendor_boot` di atas), lalu validasi TWRP/early-init
+sesuai [`BOOTTEST.md`](BOOTTEST.md).
 
 ## Rencana codemod (arsip)
 
