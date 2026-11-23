@@ -92,6 +92,8 @@ serta `for_each_kernel_tracepoint`.
   - Bug yang ditemukan: disable sempat ditulis tanpa prefix `CONFIG_`
     (`# COMMON_CLK_MT8196 is not set`) sehingga diabaikan parser;
     sudah diperbaiki menjadi `# CONFIG_COMMON_CLK_MT8196 is not set`.
+- `X6871.config` juga menonaktifkan dua modul in-tree yang duplikat
+  dengan OOT: `CONFIG_MTK_DVFSRC` dan `CONFIG_REGULATOR_RT5133`.
 - Build target:
   `//kernel_device_modules-6.18:mgk_64_k618_customer_modules_install.user`
   sedang dijalankan di `out_bazel_test`.
