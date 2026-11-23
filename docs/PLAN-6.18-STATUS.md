@@ -674,3 +674,35 @@ Perlu flash ulang dan uji video/JPEG.
   `57bfe3cdd8295c7669aed610d3b0fa1b`, 221 modul, 0 dirty,
   `sepolicy` TWRP tetap kernel-permissive. `vendor_dlkm` tetap
   `7d488c2d2d3bff4f5e642ec9dabeaaff`.
+
+### FB story video — port workqueue vdec OPPO (2026-11-23)
+
+`log kernel uji` saat FB story gagal:
+
+```text
+[30/33/37...] VP90 decoder -> vdec_vcp_decode unsupported
+[42] H264 720x1280 -> TF larb 5 LAT_WDMA / larb 4 VLD
+     mva 0x31c00000, error_code 1, QBUF after unrecoverable error
+```
+
+TikTok/YouTube normal, dan kegagalan yang sama juga terjadi di 6.12
+(tanpa log). Stock X6871 6.12 (`mtk-vcodec-dec.ko` 6.12.38) berjalan
+normal dan mengekspor `vdec_q_work`/`vdec_q_run_work_handler`;
+sumber OPPO MT6896 donor (`oppo/mt6896_b_16.0_reno12`) memakai
+workqueue `q_run_work`, `has_queued`, `worker_lock`, dan cleanup buffer
+saat init gagal. Tree kita masih memakai queue langsung tanpa
+`q_run_work` dan tanpa cleanup init.
+
+Perbaikan (commit kernel English `31781fa`):
+- Port queue/flush/`queue_dec_work_irqsave`/`vdec_q_run_work_handler`
+  dan workqueue `vdec_q_work` dari donor OPPO.
+- Worker memegang `worker_lock`; lock ganda di dalam worker dihapus.
+- Sederhanakan set-frame worker (tanpa `vdec_set_frame_lock`).
+- Tambah cleanup `inst->vcu.bufs` pada jalur gagal `vdec_vcp_init`.
+- Perubahan 6.18 (`file->private_data`, timer API) dipertahankan.
+
+Image: `vendor_dlkm.img` md5
+`cf926cee4a09c8a75036aceac1cfeddc` (209 modul, 191 load),
+di-upload sebagai `vendor_dlkm-6.18-vdec-oppo.img`.
+`vendor_boot-6.18-test13-clean.img` dan `odm_dlkm.img` tidak berubah.
+Perlu uji FB story setelah flash; belum diverifikasi di perangkat.
