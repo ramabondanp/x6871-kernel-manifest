@@ -13,7 +13,7 @@ Diperbarui: 2026-11-23 (UTC)
 | 1 — Kleaf/MGK + device tree 6.18 | **Selesai** | Kernel 6.18.32 target `mgk_64_k618` |
 | 2 — Codemod API 6.13–6.18 | **Selesai** | Build penuh 546 `.ko` berhasil |
 | 3 — Milestone `vendor_boot` | **Selesai (build)** | 221 modul, image terverifikasi |
-| Gerbang boot #1 | Sebagian | TWRP boot PASS; boot sistem panic di `atf_logger`, sudah diperbaiki |
+| Gerbang boot #1 | **Lulus** | TWRP PASS (touch + vibrator); boot sistem PASS |
 | 4 — DLKM berat | **Selesai (build)** | Sched, Mali, WLAN, cam/vcodec/audio |
 | 5 — Repack + verifier 8 gerbang | **Selesai** | 8/8 PASS, 487 modul |
 
@@ -596,3 +596,21 @@ haptic_hv: loading /vendor/firmware/haptic_ram.bin failed -13
   modul cocok staging. `vendor_dlkm`/`odm_dlkm` tidak berubah.
 - Android tetap memakai patch SELinux vendor (allow `firmware_load`)
   dari paket terpisah; patch TWRP tidak menggantikannya.
+
+### Hasil uji perangkat (2026-11-23)
+
+Flash ketiga image di bawah, lalu diuji di perangkat:
+
+| Image | md5 |
+|---|---|
+| `vendor_boot-6.18-test12-twrpfix.img` | `57608d6d57e411db851cd75e2ff0b460` |
+| `vendor_dlkm.img` | `70144e66a846b1de359d99c82afbd264` |
+| `odm_dlkm.img` | `da2c64a1572ff27382128beb4bbcba8b` |
+
+Hasil:
+- **TWRP PASS**: touch goodix berfungsi dan vibrator berfungsi.
+- **Boot ke sistem PASS**: Android boot sampai system tanpa panic.
+- Tidak ada `enforce=0` global; domain `kernel` permissive hanya di
+  policy TWRP. Android memakai policy dari system/vendor.
+- Gerbang boot #1 dinyatakan **LULUS**. Pengujian subsistem lanjutan
+  mengikuti checklist `BOOTTEST.md`.
