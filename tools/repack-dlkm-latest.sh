@@ -62,7 +62,9 @@ python3 - "$KERNEL_ROOT" "$GKI_DIR" "$STAGING" "$BASE_TEMPLATE" "$DLKM_CFG" "$WO
 import hashlib, os, re, shutil, subprocess, sys
 from pathlib import Path
 
-ws, gki_dir, stg, base_tpl, dlkm_cfg, work_dir, out_dir = map(os.path.realpath, sys.argv[1:8])
+ws = os.path.realpath(sys.argv[1])
+gki_dir = sys.argv[2]
+stg, base_tpl, dlkm_cfg, work_dir, out_dir = map(os.path.realpath, sys.argv[3:8])
 work = Path(work_dir)
 for path in map(Path, (ws, stg, base_tpl, dlkm_cfg)):
     if work == path or work in path.parents or path in work.parents:
