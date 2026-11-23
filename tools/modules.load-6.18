@@ -59,6 +59,7 @@ clk-dbg-mt6895.ko
 emi.ko
 emi-mpu.ko
 emi-mpu-v2.ko
+emi-mpu-hook-v1.ko
 emi-slb.ko
 mtk_dramc.ko
 mtk-vmm-spm.ko

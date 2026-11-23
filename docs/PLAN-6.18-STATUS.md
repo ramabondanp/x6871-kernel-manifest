@@ -413,3 +413,87 @@ cd $HOME/x6871-kernel-manifest
 - Jangan pernah mencampur image KMI 6 dan KMI 7/6.18.
 - `kernel-6.18`/`common` tidak boleh diedit; semua perubahan di device
   modules dan overlay manifest.
+
+## Temuan boot 6.18 (2026-11-23)
+
+- DTB 6.18 identik byte-for-byte dengan DTB 6.12 yang boot normal
+  (`ead6a965b0aaacc2a9c520721693f342`); DTS 6.18 juga identik. Jadi
+  kegagalan boot bukan karena DT/DTB.
+- `log pstore uji` (panic test3) berisi log 6.18 lengkap 0.0–4.68 s.
+  Panic test3 berasal dari `tfa_debug_probe` di `atf_logger`; sudah
+  diperbaiki oleh `54d86b4eb545` untuk test4 dan sesudahnya.
+- Di log yang sama, 91 modul GKI gagal dimuat:
+  `.gnu.linkonce.this_module section size must match ...`
+  (`zsmalloc`, `pstore_zone`, `netfs`, `virtio*`, `macsec`, dst.).
+  Artinya `system_dlkm` yang terpasang tidak cocok dengan `boot.img`
+  6.18; kemungkinan masih 6.12 atau build GKI berbeda. Perbaikan:
+  flash `boot.img` dan `system_dlkm.img` dari satu paket GKI 6.18
+  (`gecdaacc9a0ee`, 4 KB).
+- `mtk-wdt` aktif dengan timeout 31 s. Sistem hang setelah 4.68 s,
+  watchdog reset sekitar 31 s; badai MIUMPU di 31.76 s muncul di jalur
+  reset dan memenuhi 256 KB console ramoops, sehingga menutupi log
+  boot. Badai bukan penyebab hang.
+- `emi-mpu-hook-v1.ko` tidak ada di `tools/modules.load-6.18`, sehingga
+  stage-1 tidak memuat hook `by_plat_isr_hook`. Akibatnya IOMMU
+  translation fault (`srinfo_r=3`, `axi_id=0x2c06`) tidak di-bypass dan
+  `md_handler`/`iommu_handler` dipanggil berulang di hardirq. Perbaikan:
+  hook ditambahkan tepat setelah `emi-mpu-v2.ko` di
+  `tools/modules.load-6.18`, dan `md_handler` dibatasi dengan `show`.
+- Uji berikutnya: `vendor_boot-6.18-test9-emihook.img`
+  (md5 `84522556a4006d2ba78f531b150e2707`), tanpa panic buatan.
+  Uji ini untuk melihat apakah badai MIUMPU berhenti dan sistem bisa
+  melewati 31 detik. Jika masih hang, langkah berikutnya adalah
+  diagnostik `hrtimer` (bukan `delayed_work`).
+
+## Hasil test9 (log pstore uji)
+
+- Hook stage-1 aktif: `emi_mpu_isr_hook`, `srinfo_r 3`,
+  `axi_id_r 11270 (0x2c06)`, `To bypass this violation`. Tidak ada lagi
+  91 error `.gnu.linkonce.this_module`, jadi `system_dlkm` sudah cocok.
+- Log pstore sekarang menyimpan 1.35–31.73 s (tidak lagi didominasi
+  badai), tetapi IRQ tetap ~41.000 kali/detik. Bypass hanya menahan
+  `printk`, bukan menghentikan sumber fault.
+- Fault pertama muncul pada 4.626 s, tepat setelah
+  `remoteproc1: attaching to apusys_rv` dan SMC APU 8–11. APU memakai
+  IOVA `0xffef9000` (config) dan `0xffef8000` (IPI). APU init timeout
+  pada 14.823 s (`APU initialization timeout!!`).
+- Pada 25.6 s terjadi RCU stall: `rcu_preempt kthread starved for 2698
+  jiffies`; CPU6 terjebak di `stop_machine_yield`/`multi_cpu_stop`,
+  CPU0 di badai EMI. `stop_machine` tidak selesai karena CPU0 tidak
+  pernah keluar dari hardirq; watchdog reset ~31 s.
+- Perbandingan 6.12 vs 6.18: urutan modul APU/EMI identik
+  (`mtk_apu_power_throttling` baris 45, `emi-mpu-hook-v1` baris 104,
+  `apu_top` baris 130, `apusys` baris 131), dan source APU
+  (`apu_config.c`, `apu_ipi.c`, `apu_rproc.c`, `apu.h`,
+  `mvpu2_preempt.c`) identik. Jadi regresi ada di kernel/IOMMU/GKI
+  6.18, bukan di urutan modul atau source APU.
+- Uji konfirmasi APU: `vendor_dlkm.img` tanpa APU
+  (md5 `64e8aa756fa72ff150b68a1cb50cf693`, 206 modul, tanpa
+  `apusys`/`apu_top`/`mtk_apu_power_throttling`),
+  https://gofile.io/d/EclhAxEP. Jika sistem boot melewati 31 s,
+  penyebab hang terkonfirmasi APU; kamera/AI/MDLA/MVPU tidak aktif
+  pada image ini.
+
+
+
+## Penerapan SARAN §5.3 (2026-11-23)
+
+- `mtk_iommu.c`: `mtk_iommu_hw_program()` dipisah dari `mtk_iommu_hw_init()`
+  (request IRQ tidak idempoten). Suspend menandai `apu_pm_sta = OFF`;
+  resume `APU_IOMMU` memprogram ulang register + `REG_MMU_PT_BASE_ADDR`
+  jika hardware kehilangan state, lalu menandai `POWER_ON_STA` hanya
+  setelah read-back `ttbr` cocok. Ini memindahkan inisialisasi APU IOMMU
+  ke `pm_runtime_get_sync()` di `mt6895_apu_power_on()`, setelah RCX
+  menyala dan sebelum SMC start uP.
+- `apu_rproc.c`: timeout firmware kini `-ETIMEDOUT` (bukan sukses), dan
+  jalur `stop:` mematikan APU (`power_off`) bila `F_FAST_ON_OFF` tidak
+  diset.
+- Solusi 2 (memindahkan `apu_top` + `mtk_apu_power_throttling` ke
+  `vendor_boot`) **tidak diterapkan**: closure `apu_top` di 6.18 berisi
+  57 modul dan 13 di antaranya belum ada di `vendor_boot`, termasuk
+  `ccci_md_all`/`mtk_pbm`/`mtk_mdpm`; selain itu
+  `mt6895_apu_top_pb()` tidak memanggil `__apu_wake_rpc_rcx()` (hanya
+  `mt6895_apu_top_on()` saat apusys power-on), sehingga premisnya tidak
+  tercapai. Rincian ada di [`SARAN.md` §6.2](SARAN.md).
+- Build ulang sukses: `mtk_iommu.ko`, `apusys.ko`, dan target penuh
+  `mgk_64_k618_customer_modules_install.user`.
