@@ -1,0 +1,128 @@
+# Status Eksekusi PLAN-6.18
+
+Diperbarui: 2026-11-23 (UTC)
+
+> Dokumen ini melacak eksekusi [`PLAN-6.18.md`](PLAN-6.18.md). Baseline
+> produksi 6.12 (`gki-kmi6-20261122`) tidak berubah.
+
+## Ringkasan
+
+| Fase | Status | Catatan |
+|---|---|---|
+| 0 — Manifest, branch, workspace | **Selesai** | Workspace `<workspace-6.18>` |
+| 1 — Kleaf/MGK + device tree 6.18 | **Berjalan** | Kernel 6.18.32 target `mgk_64_k618` |
+| 2 — Codemod API 6.13–6.18 | Belum | 8 kelas transformasi terpetakan |
+| 3 — Milestone `vendor_boot` | Belum | Menunggu kompilasi 6.18 |
+| Gerbang boot #1 | Belum | Butuh TWRP + early-init |
+| 4 — DLKM berat | Belum | Sched, Mali, WLAN, cam/vcodec/audio |
+| 5 — Repack + verifier 8 gerbang | Belum | `verify-kmi-abi.py --kver 6.18` |
+
+## Fase 0 — selesai
+
+- `local_manifest-6.18.xml`:
+  - GKI tetap di path bawaan `common`, dipin ke tag
+    `android17-6.18-2026-09_r13` (commit `ecdaacc9`, Linux `6.18.32`,
+    KMI 5, 4 KB).
+  - `kernel/build` memakai AOSP `main-kernel-2026`.
+  - `build/bazel_mgk_rules` + `build/bazel_common_rules` dari Motorola.
+  - Device modules di `kernel_device_modules-6.18`; vendor modules di
+    `vendor/mediatek/kernel_modules`.
+  - Repo berat non-DDK dibuang dari sync.
+- Branch `x6871-android17-6.18` dibuat dari ujung
+  `x6871-android16-6.12` pada kedua repo port.
+- Workspace terisolasi: `<workspace-6.18>`
+  (`../vendor/mediatek` milik workspace ini, bukan workspace 6.12).
+- Script mendukung `KVER=6.18`: `build.sh`, `setup.sh`,
+  `tools/repack-vendor-boot-latest.sh`, `tools/repack-dlkm-latest.sh`,
+  `tools/verify-kmi-abi.py --kver 6.18`.
+
+## Fase 1 — berjalan
+
+- `patches/bazel_mgk_rules-6.18.patch`:
+  - target `mgk_64_k618`, path GKI `common`, device tree
+    `kernel_device_modules-6.18`;
+  - toolchain dari `main-kernel-2026` (`kernel_toolchain_ext`,
+    `rules_rust`, `rules_devicetree`, `package_metadata`, `zstd`);
+  - `mgk_build_config` tidak lagi meng-source
+    `build.config.{common,aarch64,gki}` yang sudah menjadi trap di
+    `main-kernel-2026`;
+  - defconfig/fragmen diserahkan ke `kernel_build`;
+  - `Image.lzma`/`Image.zst` ditambahkan ke `make_goals`.
+- Device tree:
+  - `BUILD.bazel`, `fake_manifest.xml`, `mgk_64.bzl`, `mgk_modules.bzl`
+    memakai `//common` dan `kernel_device_modules-6.18`.
+  - `mgk_64_k618_defconfig` (salinan 6.12, belum dipangkas).
+  - `kernel/kleaf/gki_modules_6.18.bzl`: 83 modul GKI + 22 KUnit
+    (daftar statis karena `get_gki_modules_list()` 6.18 mengembalikan
+    `select()`).
+  - `ack_headers.bzl`: 134 header yang tidak ada di 6.18 dibuang
+    (4.051 entri tersisa).
+  - 3 blok `choice` Kconfig diubah dari `bool`/`tristate` ke `prompt`
+    agar diterima parser 6.18.
+  - `x6871_modules.bzl`: 412 target OOT (tanpa `mkp.ko`).
+- `X6871.config`:
+  - ditambah disable 192 driver platform MTK **in-tree**
+    (`COMMON_CLK_MT*`, `PINCTRL_MT*`, `COMMON_CLK_MEDIATEK`) karena
+    X6871 memakai modul OOT (`clk-common.ko`, `clk-mt6895*.ko`,
+    `pinctrl-*`). Ini hanya berlaku pada build modul perangkat, bukan
+    GKI base, sehingga ABI/KMI tetap murni.
+- Fragmen config:
+  - `kernel_build_config` `x6871_fragments_{user,eng,userdebug}`
+    menggabungkan defconfig + overlay + `sign.config` (+ varian) dalam
+    satu file, karena urutan `post_defconfig_fragments` di Kleaf 6.18
+    tidak dijamin.
+- Build target:
+  `//kernel_device_modules-6.18:mgk_64_k618_customer_modules_install.user`
+  sedang dijalankan di `out_bazel_test`.
+- Error yang sudah dilewati: repo sync tidak lengkap
+  (`prebuilts/kernel-build-tools`), `gbl` override, `py_binary` Bazel 8,
+  glob kosong, trap `build.config`, `DEFCONFIG` deprecated, dan
+  modpost `clk-mt8196-*`.
+
+## Fase 2 — rencana codemod
+
+Skrip: `scripts/port-6.18-mechanical.py` (dry-run default; `--apply`,
+`--all`, `--only <kelas>`). Satu commit per kategori:
+
+| # | Kelas | Hit (device+vendor) | Transformasi |
+|---|---|---:|---|
+| 1 | `module_import_ns` | 196 | `MODULE_IMPORT_NS(NS)` → `MODULE_IMPORT_NS("NS")` |
+| 2 | `timer_delete` | 438 | `del_timer[_sync]` → `timer_delete[_sync]` |
+| 3 | `timer_container_of` | 75 | `from_timer` → `timer_container_of` |
+| 4 | `hrtimer_setup` | 68 | `hrtimer_init` + `.function` → `hrtimer_setup` |
+| 5 | `no_llseek` | 54 | hapus `.llseek = no_llseek` |
+| 6 | `power_supply_reference` | 43 | `*_get_by_phandle` → `*_get_by_reference` |
+| 7 | `dapm_rename` | 41 | `dapm_*` → `snd_soc_dapm_*` |
+| 8 | `wakeup_source` | 18 | create/add | remove/destroy → register/unregister |
+
+Transformasi 1–5 aman secara mekanis; 6–8 memerlukan pemeriksaan
+argumen/manual setelah kompilasi pertama.
+
+## Perintah kerja
+
+```bash
+cd <workspace-6.18>
+
+# build
+KVER=6.18 OUT_DIR="$PWD/out_bazel_6.18" \
+  $HOME/x6871-kernel-manifest/build.sh user
+
+# codemod (dry-run)
+python3 $HOME/x6871-kernel-manifest/scripts/port-6.18-mechanical.py
+
+# verifikasi akhir
+cd $HOME/x6871-kernel-manifest
+./tools/verify-kmi-abi.py --kver 6.18 \
+  --ws <workspace-6.18> \
+  --vb-dir ... --vd-dir ... --od-dir ...
+```
+
+## Catatan risiko
+
+- `X6871.config` menonaktifkan simbol config yang **namanya dipakai
+  bersama** Kconfig in-tree dan OOT. Target OOT yang diperiksa
+  (`clk-*`, `pinctrl-*`) tidak memakai `kconfig`/`defconfig`, jadi tetap
+  dibangun; tetap wajib diverifikasi lewat 8 gerbang dan uji boot.
+- Jangan pernah mencampur image KMI 6 dan KMI 7/6.18.
+- `kernel-6.18`/`common` tidak boleh diedit; semua perubahan di device
+  modules dan overlay manifest.

@@ -50,7 +50,7 @@ Unduh `vendor_boot`, `vendor_dlkm`, dan `odm_dlkm` dari [GitHub Release](https:/
 - [Panduan teknis](docs/HANDOFF.md) — riwayat rilis, [unduhan referensi](docs/HANDOFF.md#unduhan-referensi), pemecahan masalah build, dan [build baseline MediaTek tanpa driver X6871](docs/HANDOFF.md#build-baseline-mtk-tanpa-driver-x6871).
 - [Profil uji KMI 7](docs/HANDOFF.md#profil-uji-kmi-7--google-ci-16987858) — overlay terpisah untuk Google CI `16987858`; build default dan image rilis di atas tetap KMI 6.
 - [Pemetaan hardware](docs/DEVICES.md) dan [overlay X6871](docs/DEVICES-OVERLAY.md) — hubungan perangkat dengan drivernya.
-- [Log pengujian](docs/PRETEST.md), [catatan porting 6.12](docs/PLAN.md), dan [rencana 6.18](docs/PLAN-6.18.md) (belum tersedia).
+- [Log pengujian](docs/PRETEST.md), [catatan porting 6.12](docs/PLAN.md), [rencana 6.18](docs/PLAN-6.18.md), dan [status eksekusi 6.18](docs/PLAN-6.18-STATUS.md).
 
 ## Kredit dan lisensi
 

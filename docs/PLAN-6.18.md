@@ -1,8 +1,11 @@
 # PLAN 6.18 — Rencana Upstreaming X6871 (MT6895) ke `android17-6.18-2026-09_r13`
 
-> **Status (2026-11-22): PLAN ONLY — belum dieksekusi.**
+> **Status (2026-11-23): IN PROGRESS — Fase 0 selesai, Fase 1 berjalan.**
+> Lihat [status eksekusi](PLAN-6.18-STATUS.md) untuk progres, error yang
+> sudah dilewati, dan perintah kerja.
 > Baseline produksi tetap di `android16-6.12-2026-09_r16` (KMI 6, rilis `gki-kmi6-20261122`, workspace `<workspace-6.12>`).
-> Skrip di repo ini masih untuk 6.12; `--kver 6.18` adalah opsi yang direncanakan, belum tersedia.
+> Script di repo ini sudah mendukung `KVER=6.18`; workspace 6.18 terpisah di
+> `<workspace-6.18>`.
 
 ---
 
