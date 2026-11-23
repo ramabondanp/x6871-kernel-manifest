@@ -197,13 +197,16 @@ selesai tanpa error:
 | `vendor_boot-6.18-test2.img` | 67.108.864 B | `a8ae05e4e172bf0c7c85ae20fff96e5f` |
 | `vendor_boot-6.18-test3.img` | 67.108.864 B | `03e95db7dbd5161259f325327a23f037` |
 | `vendor_boot-6.18-test4.img` | 67.108.864 B | `c09077991d966a61813d9d85da15bb5c` |
-| `vendor_dlkm.img` | 24.551.424 B | `07966f8129c5b20d931bf4d08af99a3c` |
+| `vendor_dlkm.img` | 24.551.424 B | `e3a23e686d4ba08646c4d0b763c7c05d` |
 | `odm_dlkm.img` | 4.206.592 B | `da2c64a1572ff27382128beb4bbcba8b` |
 
 `vendor_boot-6.18-test4.img` adalah image terbaru: berisi perbaikan
 panic `mrdump.ko`, dua mismatch KCFI tracepoint (`ufs-mediatek-dbg.ko`,
 `met.ko`), dan mapping TFA debug untuk 6.18. Image test3/test2/test1
 jangan dipakai lagi.
+
+`vendor_dlkm.img` di-repack ulang setelah perbaikan `met.ko` (md5 baru
+`e3a23e686d4ba08646c4d0b763c7c05d`); `odm_dlkm.img` tidak berubah.
 
 Uji hardware dengan `vendor_boot-6.18-test3.img`: **TWRP berhasil
 boot**. Boot ke sistem berikutnya panic di `atf_logger.ko`; lihat
@@ -215,7 +218,7 @@ vermagic/isi modul 6.18.
 | Image | Rilis `gki-kmi7-aw22xxx-20261122` | Build 6.18 |
 |---|---|---|
 | `vendor_boot.img` | `ca163b1a031658b156dbd5d856e8bad2` | `fbd70f65be1d76c01177320e5d7043c2` |
-| `vendor_dlkm.img` | `d54910f726bbdba0630869855be178d9` | `07966f8129c5b20d931bf4d08af99a3c` |
+| `vendor_dlkm.img` | `d54910f726bbdba0630869855be178d9` | `e3a23e686d4ba08646c4d0b763c7c05d` |
 | `odm_dlkm.img` | `3b13699addae11e4ddc074013e129f23` | `da2c64a1572ff27382128beb4bbcba8b` |
 
 Perbandingan nama modul: 221/209/57 identik dengan rilis; satu-satunya
