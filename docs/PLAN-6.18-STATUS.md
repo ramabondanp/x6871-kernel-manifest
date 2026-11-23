@@ -97,6 +97,14 @@ serta `for_each_kernel_tracepoint`.
 - Build target:
   `//kernel_device_modules-6.18:mgk_64_k618_customer_modules_install.user`
   sedang dijalankan di `out_bazel_test`.
+- Iterasi kompilasi: modul sudah mulai dibangun. Perbaikan yang masuk:
+  alarmtimer callback `void`, `hrtimer_setup` 209 call site, `.remove`,
+  IDA API, `napi->gro`, `ioremap_prot(pgprot_t)`, `pt_regs.pmr`,
+  `dma_fence`, dma-buf attachment privat, `bin_attribute` const,
+  `gpio_chip.set` int, `is_midr_in_range_list`, `hw_protection_trigger`,
+  UFS trace hooks, dan cluster OOT DVFSRC/MMDVFS
+  (`MTK_DVFSRC_HELPER`, `DEVICE_MODULES_REGULATOR_MTK_DVFSRC`,
+  `MTK_MMDVFS`).
 - Error yang sudah dilewati: repo sync tidak lengkap
   (`prebuilts/kernel-build-tools`), `gbl` override, `py_binary` Bazel 8,
   glob kosong, trap `build.config`, `DEFCONFIG` deprecated, dan
