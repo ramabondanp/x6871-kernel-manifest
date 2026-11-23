@@ -234,6 +234,16 @@ di `8250_mtk.ko` (diganti `pm_runtime_*` langsung) dan
 `__hw_protection_trigger` di `mtk_low_battery_throttling.ko` (diganti
 `orderly_poweroff(true)`).
 
+### Artefak dan commit
+
+- Device modules (`kernel_device_modules-6.18`, branch
+  `x6871-android17-6.18`): `99d75c8b200f`
+- Vendor modules (`vendor/mediatek/kernel_modules`, branch
+  `x6871-android17-6.18`): `885db78`
+- Manifest: commit dokumentasi ini
+- Image: `<artefak-lokal>/`
+- Build log: `<log-build-lokal>`
+
 **Berikutnya:** uji boot hardware (GKI `boot.img` + `system_dlkm.img`
 resmi 6.18 4KB + `vendor_boot` di atas), lalu validasi TWRP/early-init
 sesuai [`BOOTTEST.md`](BOOTTEST.md).
