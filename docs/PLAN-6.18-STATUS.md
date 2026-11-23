@@ -13,7 +13,7 @@ Diperbarui: 2026-11-23 (UTC)
 | 1 — Kleaf/MGK + device tree 6.18 | **Selesai** | Kernel 6.18.32 target `mgk_64_k618` |
 | 2 — Codemod API 6.13–6.18 | **Selesai** | Build penuh 546 `.ko` berhasil |
 | 3 — Milestone `vendor_boot` | **Selesai (build)** | 221 modul, image terverifikasi |
-| Gerbang boot #1 | **Lulus** | TWRP PASS (touch + vibrator); boot sistem PASS |
+| Gerbang boot #1 | **Lulus** | TWRP PASS (touch + vibrator); boot sistem PASS setelah patch SELinux |
 | 4 — DLKM berat | **Selesai (build)** | Sched, Mali, WLAN, cam/vcodec/audio |
 | 5 — Repack + verifier 8 gerbang | **Selesai** | 8/8 PASS, 487 modul |
 
@@ -608,9 +608,16 @@ Flash ketiga image di bawah, lalu diuji di perangkat:
 | `odm_dlkm.img` | `da2c64a1572ff27382128beb4bbcba8b` |
 
 Hasil:
-- **TWRP PASS**: touch goodix berfungsi dan vibrator berfungsi.
-- **Boot ke sistem PASS**: Android boot sampai system tanpa panic.
+- **TWRP PASS**: touch goodix berfungsi dan vibrator berfungsi
+  (perbaikan policy TWRP di `vendor_boot` test12).
+- **Boot ke sistem PASS setelah patch SELinux**: `system.img`
+  (`plat_sepolicy.cil`) + `vendor.img`
+  (`vendor_sepolicy.cil`, `vendor_file_contexts`) dipatch untuk
+  permission `firmware_load`. Tanpa patch, `mali_csffw.bin` dan
+  `haptic_ram.bin` gagal `-13`, SurfaceFlinger/zygote crash, lalu
+  reboot. Prosedur dan patch: [`SELINUX-6.18.md`](SELINUX-6.18.md),
+  [`patches/selinux-x6871-6.18.patch`](../patches/selinux-x6871-6.18.patch).
 - Tidak ada `enforce=0` global; domain `kernel` permissive hanya di
-  policy TWRP. Android memakai policy dari system/vendor.
+  policy TWRP. Android memakai policy system/vendor yang sudah dipatch.
 - Gerbang boot #1 dinyatakan **LULUS**. Pengujian subsistem lanjutan
   mengikuti checklist `BOOTTEST.md`.

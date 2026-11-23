@@ -1,0 +1,34 @@
+--- a/plat_sepolicy.cil
++++ b/plat_sepolicy.cil	2026-11-23 13:43:45.255456377 +0000
+@@ -423,7 +423,7 @@
+ (mlsconstrain (process (sigkill sigstop signal ptrace setsched setpgid setcap share setrlimit)) (or (eq l1 l2) (eq t1 mlstrustedsubject)))
+ (mlsconstrain (process (ptrace getsched getsession getpgid getcap share getattr)) (or (dom l1 l2) (eq t1 mlstrustedsubject)))
+ (mlsconstrain (process (transition dyntransition)) (or (and (eq h1 h2) (eq l1 l2)) (eq t1 mlstrustedsubject)))
+-(class system (ipc_info syslog_read syslog_mod syslog_console module_request module_load ))
++(class system (ipc_info syslog_read syslog_mod syslog_console module_request module_load firmware_load ))
+ (class capability ())
+ (classcommon capability cap)
+ (class filesystem (mount remount unmount getattr relabelfrom relabelto associate quotamod quotaget watch ))
+--- a/vendor_sepolicy.cil
++++ b/vendor_sepolicy.cil	2026-11-23 13:43:44.786460124 +0000
+@@ -20058,3 +20058,10 @@
+ (typeattribute base_typeattr_237_202504)
+ (typeattributeset base_typeattr_237_202504 (and (domain) (not (dumpstate_202504 init_202504))))
+ 
++; X6871 6.18: the kernel firmware loader now checks READING_FIRMWARE
++; (6.12 ignored it). mali_csffw.bin is intended to be
++; same_process_hal_file; keep vendor_file for images whose labels were not
++; regenerated. Both permissions only allow reading firmware.
++(allow kernel same_process_hal_file (system (firmware_load)))
++(allow kernel vendor_file (system (firmware_load)))
++
+--- a/vendor_file_contexts
++++ b/vendor_file_contexts	2026-11-23 13:43:44.977458598 +0000
+@@ -1605,3 +1605,7 @@
+ /sys/devices/platform/soc/soc:mtk_leds/leds/lcd-backlight/max_brightness u:object_r:sysfs_backlight_file:s0
+ /sys/devices/platform/soc/soc:mtk-leds/leds/lcd-backlight/max_brightness u:object_r:sysfs_backlight_file:s0
+ /vendor/etc/vintf/manifest/vendor\.transsion\.hardware\.screeninfo-service\.xml u:object_r:vendor_configs_file:s0
++
++# X6871 6.18: loaded by haptic_hv via request_firmware(); 6.18 checks
++# READing_FIRMWARE, so give it the same label as mali_csffw.bin.
++/odm/firmware/haptic_ram.bin                                     u:object_r:same_process_hal_file:s0
