@@ -627,3 +627,32 @@ Hasil:
   `5b0827a140e928900a4b91006fba301d`.
 - Gerbang boot #1 dinyatakan **LULUS**. Pengujian subsistem lanjutan
   mengikuti checklist `BOOTTEST.md`.
+
+### Panic log pstore uji — V4L2 `priv == NULL` (2026-11-23)
+
+`VcodecProcess` panic saat `VIDIOC_S_FMT`:
+
+```text
+Unable to handle kernel NULL pointer dereference at 0000000000000098
+pc : vidioc_vdec_s_fmt+0x70/0x2cc [mtk_vcodec_dec]
+Call trace: vidioc_vdec_s_fmt -> v4l_s_fmt -> __video_do_ioctl
+```
+
+Akar masalah: sejak 6.18, `__video_do_ioctl()` mengirim `NULL` sebagai
+argumen `priv` ke semua ioctl handler V4L2 (commit upstream
+`media: v4l2-ioctl: Stop passing fh pointer to ioctl handlers`).
+`mtk_vcodec_dec/enc` dan `mtk-jpeg` masih memakai `fh_to_ctx(priv)`,
+sehingga `ctx` menjadi NULL dan dereference pertama (`+0x98`) fault.
+
+Perbaikan:
+- Semua handler ioctl di `mtk_vcodec_dec.c` dan `mtk_vcodec_enc.c`
+  memakai `fh_to_ctx(file->private_data)`.
+- `mtk_jpeg_core.c` memakai `mtk_jpeg_fh_to_ctx(file->private_data)`;
+  `mtk_jpeg_qbuf` tidak lagi menolak `priv == NULL`.
+- Handler V4L2 lain (`mtk-dpe`, `mtk-isp`, `mtk-aie`) sudah memakai
+  `file->private_data`/`video_drvdata(file)`.
+
+Image baru: `vendor_dlkm.img` md5
+`7d488c2d2d3bff4f5e642ec9dabeaaff` (209 modul, 191 load);
+`odm_dlkm.img` tidak berubah (`da2c64a1572ff27382128beb4bbcba8b`).
+Perlu flash ulang dan uji video/JPEG.

@@ -32,6 +32,7 @@ perubahan signature). Audit dilakukan tanpa hardware, memakai hasil build
 | layout `module_sect_attrs`/`module_notes_attrs` | `attribute_group.bin_attrs` terminator NULL | `mrdump` | diperbaiki |
 | prototipe probe `ufshcd_*` | `enum ufs_trace_str_t` | `ufs-mediatek-dbg` | diperbaiki |
 | probe `pm_qos_*` | `s32` / `enum pm_qos_req_action` | `met` | diperbaiki |
+| V4L2 ioctl `priv` | 6.18 mengirim `NULL` ke semua handler; driver harus ambil fh dari `file->private_data` | `mtk-vcodec-dec/enc`, `mtk-jpeg` | diperbaiki: `fh_to_ctx(file->private_data)`; qbuf jpeg tidak lagi menolak `priv == NULL` |
 
 ## Perubahan yang diperiksa dan dinilai aman
 
