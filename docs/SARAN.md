@@ -451,5 +451,73 @@ Unduhan: https://gofile.io/d/2DHz5NGR (kedua image di folder
 Uji kedua image bersama pasangan `boot`/`system_dlkm` GKI 6.18 yang sama.
 Pada Story yang gagal sebelumnya, cek apakah fault `LAT_WDMA`/`CORE/VLD`
 hilang dan apakah VP9 masih ditolak. Jika VP9 masih gagal, ambil baris baru
-`VP9 header rejected`; gunakan TikTok sebagai kontrol. **Belum diuji di
-perangkat dan belum bisa disebut fix Facebook Story.**
+`VP9 header rejected`; gunakan TikTok sebagai kontrol.
+
+### 8.3 Hasil `log kernel uji` dan kandidat perbaikan sinkronisasi DMA VP9
+
+**Build §8.2 tidak memperbaiki Story.** `log Android` mencatat pembukaan
+`StoryViewerActivity` pada 00:11:26.855, disusul penolakan VP9 pertama
+sekitar 00:11:27.083 setelah mencocokkan waktu kedua log. Sembilan sesi
+ditolak dengan `changed=0x4` setelah inisialisasi VCP sukses. Buffer input
+berisi data (17.927–644.324 B dari 2.094.080 B, offset 0). Tidak ada fault
+VDEC H.264 pada percobaan ini, tetapi juga tidak ada `Init Vdec OK` untuk
+H.264; hasil tersebut belum memvalidasi perubahan IOMMU.
+
+Kandidat berikutnya di `mtk-vcodec-dec.ko`: sinkronkan scatterlist DMA-BUF
+asli memakai perangkat dan arah DMA dari attachment tepat sebelum VCP
+membaca header VP9, bukan hanya mengandalkan sinkronisasi parsial saat
+`buf_prepare`. Tambahkan `dma_wmb()` agar descriptor input dipublikasikan
+sebelum `DEC_START`. Sinkronisasi tambahan hanya untuk header awal VP9
+non-secure dengan payload dan tetap menghormati `NO_CACHE_CLEAN`.
+Penolakan firmware tidak diabaikan dan jalur codec lain tidak diubah.
+Ini menguji kemungkinan data input belum terlihat oleh VCP, bukan akar
+masalah yang sudah terbukti.
+
+- Artefak lokal: `<artefak-lokal>/vp9-dma-test/vendor_dlkm-6.18-vp9-dma-test.img`.
+- Unduhan: https://gofile.io/d/fZX9rpS6
+- MD5: `e6fa2cd59b3267f0f0c79595b780c33a`; SHA-256:
+  `fc53afcc2068df3585b233f986dabc86ec44a979f1537ea0fcca64288df120d7`.
+- Build, AVB hashtree, dan verifier KMI/ABI 8/8 lulus. Dibandingkan build
+  §8.2, hanya `mtk-vcodec-dec.ko` yang berubah; `odm_dlkm` identik.
+- Cukup ganti `vendor_dlkm` apabila sudah memakai set §8.2 untuk
+  `log kernel uji`; pertahankan `vendor_boot`, `odm_dlkm`, GKI dan konfigurasi
+  vendor yang sama.
+- **Hasil uji perangkat: Story tetap hitam.** Cuplikan ulang menunjukkan
+  VP9 masih ditolak dengan `changed=0x4`, offset `0`, dan buffer berisi
+  payload. Dua sesi H.264 (`480×864` dan `720×1280`) melewati tahap
+  `Init Vdec OK`; cuplikan yang dibagikan tidak memuat `TF larb` atau
+  `queue_error_code_event`, tetapi belum membuktikan frame H.264 tampil.
+  Sinkronisasi tambahan tidak menyelesaikan penolakan VP9.
+
+Untuk membedakan input yang diterima kernel dari respons VCP tanpa flash
+ulang, aktifkan sementara `mtk_v4l2_dbg_level=3` pada modul
+`mtk_vcodec_dec`. Level ini mencetak metadata buffer, sembilan byte awal
+input, dan ID/status IPI; kembalikan nilainya setelah percobaan.
+
+**Hasil debug:** dua input yang ditolak memiliki header keyframe VP9
+Profile 0 dengan sync code `49 83 42`. Dimensi yang terbaca dari header
+adalah `540×960` (konteks 83) dan `720×1280` (konteks 85). Ini menunjukkan
+awal bitstream masuk akal saat dibaca CPU, tetapi tidak membuktikan VCP
+membaca byte yang sama atau seluruh frame valid. VCP mengirim
+`B001` (`DEC_START_DONE`) dengan status `-1`; bukan timeout. Konteks 85
+menggunakan IOVA input `0x12fe00000`, di dalam aperture Video uP VDEC
+`0x110000000..0x12fffffff`. Alamat di atas 4 GiB memang sesuai desain
+aperture; log ini tidak menunjukkan truncation. `C005`/`C006` adalah
+permintaan alokasi/bebas dari VCP; status pada baris `pop msg_id` bukan
+hasil alokasi di AP.
+
+**Hasil log alokasi berikutnya:** konteks 105/107/108/110 masing-masing
+mendapat tiga buffer `MEM_TYPE_FOR_SW` (tipe 0; 37.096, 1.832, 14.440 B)
+dan tiga buffer `MEM_TYPE_FOR_HW_CACHE` (tipe 2; 263.168, 62.464,
+123.904 B). Semua IOVA nonzero dan tidak ada kegagalan alokasi/mapping
+yang dilaporkan AP pada cuplikan ini. VCP tetap menolak `DEC_START`
+setelah buffer itu disiapkan. Kolom `pa` di log ini bukan alamat fisik:
+`mtk_vcodec_alloc_mem()` mengisinya dengan alamat DMA yang sama dengan
+`iova`. Keberhasilan map di AP tidak membuktikan VCP dapat membaca
+mapping atau isinya.
+
+Pemeriksaan berikutnya: bandingkan satu sampel VP9 yang sama pada stock
+SP20 dan port 6.18, termasuk hasil `DEC_START_DONE`, perangkat DMA dan
+rentang IOVA untuk bitstream serta buffer kerja. Tidak perlu mengulang
+capture alokasi yang sama. Belum ada bukti untuk memaksa IOVA 32-bit,
+mengganti heap, atau mengubah IOMMU lagi.
