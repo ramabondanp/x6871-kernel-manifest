@@ -656,3 +656,21 @@ Image baru: `vendor_dlkm.img` md5
 `7d488c2d2d3bff4f5e642ec9dabeaaff` (209 modul, 191 load);
 `odm_dlkm.img` tidak berubah (`da2c64a1572ff27382128beb4bbcba8b`).
 Perlu flash ulang dan uji video/JPEG.
+
+### Pembersihan debug test9/test10 (2026-11-23)
+
+- `mtk_iommu.c`: seluruh debug test10 (`test10 finalise/map`,
+  `apu_map_dbg`) dihapus. Tidak ada perubahan fungsi; staging build
+  berikutnya tidak lagi mencetak log debug APU IOMMU.
+- `emi-mpu-v2.c`: guard `if (show && mpu->md_handler)` dipertahankan
+  karena membatasi hook AEE/modem saat badai violation; baris
+  `pr_err("test9 diagnostic build...")` dihapus. Guard di-commit
+  sebagai `be2f658` (`ANDROID: emi: Gate md_handler with the violation
+  log limit`).
+- Commit kernel memakai bahasa Inggris: `050d89c` (V4L2) dan
+  `be2f658` (EMI); manifest tetap bahasa Indonesia.
+- Ketiga repo bersih (0 dirty file).
+- `vendor_boot-6.18-test13-clean.img`: md5
+  `57bfe3cdd8295c7669aed610d3b0fa1b`, 221 modul, 0 dirty,
+  `sepolicy` TWRP tetap kernel-permissive. `vendor_dlkm` tetap
+  `7d488c2d2d3bff4f5e642ec9dabeaaff`.
