@@ -159,6 +159,23 @@ tiga argumen, `snd_compr_tstamp64`, `wakeup_source_destroy`,
 `vm_fault`/`file->f_count` (`file_ref_t`), `bin_attribute` const,
 `drm_panel_*` void, dan `drm_format_info` pada `fb_create`.
 
+Commit setelah pengecekan silang modul OPPO:
+
+| Commit | Cakupan |
+|---|---|
+| `a4b28b99`, `e749e5ce` | GED/dummy DRM `dma_fence`, `FB_EVENT_BLANK` kompat, `iommu` pgsize, UFS PMC |
+| `2479c430`, `a505b426` | sched EEVDF, WLAN cfg80211/GRO, Mali movable/fence, audio `DAIFMT`, apusys format |
+| `9720caa9`, `70d8c031` | fpsgo/sbe `cpufreq_cpu_get`, task_turbo rwsem/binder, local `governor.h` |
+| `506bd813` | vip_engine binder restore hook memakai `current` |
+| vendor `885db78` | prefiks `wpa_` untuk SHA/HMAC WPA agar tidak bentrok `crypto/sha2.h` |
+
+Pengecekan `.ko` OPPO PMX110 6.18 mengonfirmasi arah port: `mediatek-drm`
+memakai `cpufreq_cpu_get`, `mtk-mmc` memakai `mmc_host_can_gpio_cd`,
+heap memakai `DMA_BUF_HEAP`, `scheduler` memakai `pick_task(rq, rf)`
+tanpa `entity_eligible`, GED tanpa notifier fbdev, dan `apu_top` memakai
+`devfreq_add_governor` + header privat `governor.h`. Detail ada di
+[`PMX110-6.18-REFERENCE.md`](PMX110-6.18-REFERENCE.md).
+
 ## Rencana codemod (arsip)
 
 Skrip: `scripts/port-6.18-mechanical.py` (dry-run default; `--apply`,
