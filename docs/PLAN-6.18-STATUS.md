@@ -200,6 +200,16 @@ selesai tanpa error:
 Ukuran ketiga image sama dengan rilis 6.12; hash berbeda karena
 vermagic/isi modul 6.18.
 
+| Image | Rilis `gki-kmi7-aw22xxx-20261122` | Build 6.18 |
+|---|---|---|
+| `vendor_boot.img` | `ca163b1a031658b156dbd5d856e8bad2` | `fbd70f65be1d76c01177320e5d7043c2` |
+| `vendor_dlkm.img` | `d54910f726bbdba0630869855be178d9` | `07966f8129c5b20d931bf4d08af99a3c` |
+| `odm_dlkm.img` | `3b13699addae11e4ddc074013e129f23` | `da2c64a1572ff27382128beb4bbcba8b` |
+
+Perbandingan nama modul: 221/209/57 identik dengan rilis; satu-satunya
+selisih adalah `mkp.ko` (222 → 221 di `vendor_boot`, sengaja dihapus).
+`modules.load` dan `modules.dep` juga identik selain entri `mkp.ko`.
+
 ### Verifikasi 8 gerbang
 
 `tools/verify-kmi-abi.py --kver 6.18`:
