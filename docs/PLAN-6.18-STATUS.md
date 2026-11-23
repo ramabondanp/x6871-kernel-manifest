@@ -195,11 +195,13 @@ selesai tanpa error:
 |---|---:|---|
 | `vendor_boot-6.18-test.img` | 67.108.864 B | `fbd70f65be1d76c01177320e5d7043c2` |
 | `vendor_boot-6.18-test2.img` | 67.108.864 B | `a8ae05e4e172bf0c7c85ae20fff96e5f` |
+| `vendor_boot-6.18-test3.img` | 67.108.864 B | `03e95db7dbd5161259f325327a23f037` |
 | `vendor_dlkm.img` | 24.551.424 B | `07966f8129c5b20d931bf4d08af99a3c` |
 | `odm_dlkm.img` | 4.206.592 B | `da2c64a1572ff27382128beb4bbcba8b` |
 
-`vendor_boot-6.18-test2.img` berisi perbaikan panic `mrdump.ko`
-(lihat bagian "Panic mrdump 6.18" di bawah); image lain tidak berubah.
+`vendor_boot-6.18-test3.img` adalah image terbaru: berisi perbaikan panic
+`mrdump.ko` dan dua mismatch KCFI tracepoint (`ufs-mediatek-dbg.ko`,
+`met.ko`). Image test2/test1 jangan dipakai lagi.
 
 Ukuran ketiga image sama dengan rilis 6.12; hash berbeda karena
 vermagic/isi modul 6.18.
@@ -241,9 +243,9 @@ di `8250_mtk.ko` (diganti `pm_runtime_*` langsung) dan
 ### Artefak dan commit
 
 - Device modules (`kernel_device_modules-6.18`, branch
-  `x6871-android17-6.18`): `3fd701c35dc4`
+  `x6871-android17-6.18`): `6d2e8d18bc77`
 - Vendor modules (`vendor/mediatek/kernel_modules`, branch
-  `x6871-android17-6.18`): `35814035c730`
+  `x6871-android17-6.18`): `d500e72bea0b`
 - Manifest: commit dokumentasi ini
 - Image: `<artefak-lokal>/`
 - Build log: `<log-build-lokal>`
@@ -270,12 +272,39 @@ membaca `attr.mode` (0400 = 0x100) sebagai pointer nama string, lalu
 `attribute_group.bin_attrs` dan `bin_attribute.private` tanpa menyalin
 layout privat kernel.
 
+### Mismatch KCFI tracepoint 6.18
+
+Uji TWRP kedua sampai melewati mrdump, lalu panic di UFS:
+
+```text
+CFI failure at ufshcd_add_uic_command_trace+0x194/0x1c4
+(target: probe_ufshcd_uic_command+0x0/0x164; expected type: 0xfa55a7bd)
+```
+
+Penyebabnya port 6.18 mengganti parameter `enum ufs_trace_str_t` pada
+probe `ufshcd_command`/`ufshcd_uic_command` menjadi `int`; KCFI
+membandingkan hash tipe fungsi, bukan isi pointer `void *`. Enum lokal
+dikembalikan ke signature probe dan dipindah keluar dari blok
+`CONFIG_MTK_AEE_FEATURE`.
+
+Scan statis seluruh modul dengan
+`tools/scan-cfi-tracepoints.py` juga menemukan dua probe MET yang
+memakai signature lama: `pm_qos_update_request` (tiga argumen) dan
+`pm_qos_update_target` (`unsigned int` bukan
+`enum pm_qos_req_action`). Keduanya diperbaiki.
+
+Hasil scan staging 546 modul: 97 pasangan tracepoint diperiksa, 0
+mismatch. Tujuh entri "unpaired" adalah tabel yang bukan registrasi
+probe (misalnya string `"charger"` milik power supply).
+`ufs-mediatek-mod.ko` memakai loop registrasi yang tidak dapat
+dipasangkan otomatis; tiga callback-nya dicek manual dan cocok.
+
 Pesan commit 6.18 ditulis ulang ke format kernel (`subsystem: ringkasan
 imperatif ... for 6.18`, body 72 kolom, `Signed-off-by`), dan sudah
 diperiksa dengan `common/scripts/checkpatch.pl`: 0 error/warning pesan.
 
 **Berikutnya:** uji ulang boot hardware dengan
-`vendor_boot-6.18-test2.img` (GKI `boot.img` + `system_dlkm.img` resmi
+`vendor_boot-6.18-test3.img` (GKI `boot.img` + `system_dlkm.img` resmi
 6.18 4KB), lalu validasi TWRP/early-init sesuai
 [`BOOTTEST.md`](BOOTTEST.md).
 
