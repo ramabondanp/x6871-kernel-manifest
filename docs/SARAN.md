@@ -312,3 +312,15 @@ modem tidak ikut dimuat di stage-1.
   dan `.../apusys:apusys.mgk_64_k618.6.18.user`: sukses.
 - `KVER=6.18 build.sh user` (target
   `mgk_64_k618_customer_modules_install.user`): sukses.
+
+### 6.5 Artefak uji
+
+| Image | Ukuran | MD5 |
+|---|---:|---|
+| `vendor_boot-6.18-test11-iommu.img` | 67.108.864 B | `0ee453c16ae20b6dfbf2cc4bf0db492e` |
+| `vendor_dlkm.img` | 24.551.424 B | `4197dbacb6da4679bc6a16188231b989` |
+| `odm_dlkm.img` | 4.206.592 B | `da2c64a1572ff27382128beb4bbcba8b` |
+
+Pasangkan dengan `boot.img` + `system_dlkm.img` GKI
+`6.18.32-android17-5-gecdaacc9a0ee-4k` yang sama. Verifier 8 gerbang:
+8/8 PASS (487 modul; 0 unresolved/CRC mismatch).
