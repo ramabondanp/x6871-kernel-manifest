@@ -559,3 +559,40 @@ di `vendor_dlkm`.
   sama-sama membuat entri proc; tidak mematikan boot, dicatat terpisah.
 - `vendor_dlkm.img` baru: md5 `70144e66a846b1de359d99c82afbd264`,
   8/8 PASS. `vendor_boot`/`odm_dlkm` tidak berubah.
+
+### TWRP touch & vibrator (test12)
+
+`log TWRP` (6.18) menunjukkan akar yang sama dengan `firmware_load`:
+
+```text
+SELinux: Permission firmware_load in class system not defined in policy.
+goodix_ts: loading /vendor/firmware/goodix_cfg_group.bin failed -13
+goodix_ts: loading /vendor/firmware/goodix_firmware.bin failed -13
+haptic_hv: loading /vendor/firmware/haptic_ram.bin failed -13
+```
+
+- Probe touch dan haptic sebenarnya berhasil (`goodix_ts_core probe
+  success`, `aw_i2c_probe probe completed`), tetapi cfg/firmware
+  goodix dan RAM haptic tidak bisa dibaca. Goodix lalu
+  `stage2 init failed`; touch tidak melaporkan finger. Vibrator tetap
+  tanpa waveform RAM.
+- TWRP memakai policy v30 dari `vendor_boot` (`/sepolicy`) yang tidak
+  mendefinisikan permission `firmware_load`. Yang permissive hanya
+  domain `recovery`; domain `kernel` tetap enforcing, sehingga
+  `request_firmware()` dari kworker ditolak.
+- 6.12 KMI7 tidak terkena karena `selinux_kernel_read_file()` 6.12
+  tidak memeriksa `READING_FIRMWARE`. Perbandingan image KMI7 vs 6.18:
+  dtb, bootconfig, dan `vendor_ramdisk01` byte-identik; 980 file
+  non-modul di platform ramdisk identik; daftar modul hanya berbeda
+  `mkp.ko`.
+- Perbaikan TWRP: `sepolicy` di platform ramdisk di-patch agar domain
+  `kernel` permissive (bit `permissive_map` untuk tipe `kernel`).
+  Ini hanya berlaku untuk TWRP; Android memakai policy dari
+  system/vendor. `root.1/sepolicy` packer disimpan aslinya sebagai
+  `sepolicy.orig`.
+- Image: `vendor_boot-6.18-test12-twrpfix.img`, md5
+  `57608d6d57e411db851cd75e2ff0b460`; `sepolicy` md5
+  `eec594edb028bc8ed8c4627213bd7ab9` (kernel permissive=1), 221
+  modul cocok staging. `vendor_dlkm`/`odm_dlkm` tidak berubah.
+- Android tetap memakai patch SELinux vendor (allow `firmware_load`)
+  dari paket terpisah; patch TWRP tidak menggantikannya.
