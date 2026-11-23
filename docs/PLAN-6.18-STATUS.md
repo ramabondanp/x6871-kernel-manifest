@@ -17,6 +17,16 @@ Diperbarui: 2026-11-23 (UTC)
 | 4 — DLKM berat | Belum | Sched, Mali, WLAN, cam/vcodec/audio |
 | 5 — Repack + verifier 8 gerbang | Belum | `verify-kmi-abi.py --kver 6.18` |
 
+## Referensi donor 6.18
+
+Dump OPPO PMX110 (MediaTek 6.18) sudah dianalisis; lihat
+[`PMX110-6.18-REFERENCE.md`](PMX110-6.18-REFERENCE.md). Bukti utamanya:
+`clk-common.ko` OOT mengekspor `mtk_alloc_clk_data`/`mtk_clk_register_plls`,
+dan modul 6.18 memakai `hrtimer_setup`, `timer_delete`,
+`wakeup_source_register`, `devm_power_supply_get_by_reference`,
+`alloc_netdev_dummy`, `netif_napi_add_weight_locked`, `crypto_shash_finup`,
+serta `for_each_kernel_tracepoint`.
+
 ## Fase 0 — selesai
 
 - `local_manifest-6.18.xml`:
