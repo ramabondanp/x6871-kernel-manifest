@@ -11,7 +11,7 @@ Diperbarui: 2026-11-23 (UTC)
 |---|---|---|
 | 0 — Manifest, branch, workspace | **Selesai** | Workspace `<workspace-6.18>` |
 | 1 — Kleaf/MGK + device tree 6.18 | **Berjalan** | Kernel 6.18.32 target `mgk_64_k618` |
-| 2 — Codemod API 6.13–6.18 | Belum | 8 kelas transformasi terpetakan |
+| 2 — Codemod API 6.13–6.18 | **Sebagian** | 8 kelas diterapkan (lihat bawah) |
 | 3 — Milestone `vendor_boot` | Belum | Menunggu kompilasi 6.18 |
 | Gerbang boot #1 | Belum | Butuh TWRP + early-init |
 | 4 — DLKM berat | Belum | Sched, Mali, WLAN, cam/vcodec/audio |
@@ -102,7 +102,26 @@ serta `for_each_kernel_tracepoint`.
   glob kosong, trap `build.config`, `DEFCONFIG` deprecated, dan
   modpost `clk-mt8196-*`.
 
-## Fase 2 — rencana codemod
+## Fase 2 — codemod diterapkan
+
+Commit di branch `x6871-android17-6.18` (device + vendor):
+
+1. `MODULE_IMPORT_NS("...")` — 107 file device, 86 file vendor.
+2. `del_timer[_sync]` → `timer_delete[_sync]` — 114 + 128 file.
+3. `from_timer` → `timer_container_of` — 30 + 35 file.
+4. `hrtimer_init` + `.function` → `hrtimer_setup` — 57 + 1 file.
+5. Hapus `.llseek = no_llseek` — 54 file.
+6. `*_get_by_phandle` → `*_get_by_reference` — 28 file;
+   dua call site non-devm memakai `of_fwnode_handle()`.
+7. DAPM `snd_soc_dapm_*` — 6 file.
+8. `wakeup_source_register/unregister` — DRM, WLAN, charger, rawbulk.
+
+Referensi OPPO PMX110 mengonfirmasi kelas-kelas ini dan menambah
+`init_dummy_netdev`/`alloc_netdev_dummy`, `netif_napi_add_weight_locked`,
+`crypto_shash_finup`, `for_each_kernel_tracepoint`,
+`iommu_get_domain_for_dev`, dan Mali `__folio_lock`.
+
+## Rencana codemod (arsip)
 
 Skrip: `scripts/port-6.18-mechanical.py` (dry-run default; `--apply`,
 `--all`, `--only <kelas>`). Satu commit per kategori:
