@@ -506,6 +506,8 @@ cd $HOME/x6871-kernel-manifest
 | `vendor_dlkm.img` | 24.551.424 B | `4197dbacb6da4679bc6a16188231b989` |
 | `odm_dlkm.img` | 4.206.592 B | `da2c64a1572ff27382128beb4bbcba8b` (tidak berubah) |
 
+Unduhan: https://gofile.io/d/oTgnm1xd
+
 Verifikasi `tools/verify-kmi-abi.py --kver 6.18` untuk image ini: 8/8
 PASS, 487 modul (221/209/57), 0 mismatch. Image berisi 221 modul
 `vendor_boot`, termasuk `emi-mpu-hook-v1.ko` di stage-1; `apu_top` tetap

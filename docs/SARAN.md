@@ -321,6 +321,8 @@ modem tidak ikut dimuat di stage-1.
 | `vendor_dlkm.img` | 24.551.424 B | `4197dbacb6da4679bc6a16188231b989` |
 | `odm_dlkm.img` | 4.206.592 B | `da2c64a1572ff27382128beb4bbcba8b` |
 
+Unduhan: https://gofile.io/d/oTgnm1xd
+
 Pasangkan dengan `boot.img` + `system_dlkm.img` GKI
 `6.18.32-android17-5-gecdaacc9a0ee-4k` yang sama. Verifier 8 gerbang:
 8/8 PASS (487 modul; 0 unresolved/CRC mismatch).
