@@ -237,12 +237,16 @@ di `8250_mtk.ko` (diganti `pm_runtime_*` langsung) dan
 ### Artefak dan commit
 
 - Device modules (`kernel_device_modules-6.18`, branch
-  `x6871-android17-6.18`): `99d75c8b200f`
+  `x6871-android17-6.18`): `1070b66fb726`
 - Vendor modules (`vendor/mediatek/kernel_modules`, branch
-  `x6871-android17-6.18`): `885db78`
+  `x6871-android17-6.18`): `7fb62ffeb3a1`
 - Manifest: commit dokumentasi ini
 - Image: `<artefak-lokal>/`
 - Build log: `<log-build-lokal>`
+
+Pesan commit 6.18 ditulis ulang ke format kernel (`subsystem: ringkasan
+imperatif ... for 6.18`, body 72 kolom, `Signed-off-by`), dan sudah
+diperiksa dengan `common/scripts/checkpatch.pl`: 0 error/warning pesan.
 
 **Berikutnya:** uji boot hardware (GKI `boot.img` + `system_dlkm.img`
 resmi 6.18 4KB + `vendor_boot` di atas), lalu validasi TWRP/early-init
