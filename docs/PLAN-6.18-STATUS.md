@@ -13,7 +13,7 @@ Diperbarui: 2026-11-23 (UTC)
 | 1 — Kleaf/MGK + device tree 6.18 | **Selesai** | Kernel 6.18.32 target `mgk_64_k618` |
 | 2 — Codemod API 6.13–6.18 | **Selesai** | Build penuh 546 `.ko` berhasil |
 | 3 — Milestone `vendor_boot` | **Selesai (build)** | 221 modul, image terverifikasi |
-| Gerbang boot #1 | **Lulus** | TWRP PASS (touch + vibrator); boot sistem PASS setelah patch SELinux |
+| Gerbang boot #1 | **Lulus** | TWRP PASS (touch + vibrator); boot sistem PASS setelah patch SELinux; WiFi/BT PASS |
 | 4 — DLKM berat | **Selesai (build)** | Sched, Mali, WLAN, cam/vcodec/audio |
 | 5 — Repack + verifier 8 gerbang | **Selesai** | 8/8 PASS, 487 modul |
 
@@ -619,10 +619,11 @@ Hasil:
   [`patches/selinux-x6871-6.18.patch`](../patches/selinux-x6871-6.18.patch).
 - Tidak ada `enforce=0` global; domain `kernel` permissive hanya di
   policy TWRP. Android memakai policy system/vendor yang sudah dipatch.
-- **WiFi/Bluetooth belum jalan** (`log kernel uji`): `conninfra.cfg`
-  berlabel `connsys_vendor_file` belum di-allow, sehingga conninfra
-  power on gagal dan `WMT turn on WIFI fail` / `BT turn on fail`.
-  Patch `firmware_load` sudah ditambah allow `connsys_vendor_file`
-  (plus patch inkremental); `vendor.img` perlu dipatch ulang dan diuji.
+- **WiFi/Bluetooth PASS** setelah `vendor_sepolicy.cil` diberi allow
+  `kernel → connsys_vendor_file` (`firmware_load`), dikonfirmasi
+  pengguna 2026-11-23. Sebelumnya `conninfra.cfg` ditolak `-13`,
+  conninfra power on gagal (`WMT turn on WIFI fail`, `BT turn on fail`).
+  `vendor_sepolicy.cil` hasil patch: md5
+  `5b0827a140e928900a4b91006fba301d`.
 - Gerbang boot #1 dinyatakan **LULUS**. Pengujian subsistem lanjutan
   mengikuti checklist `BOOTTEST.md`.

@@ -104,11 +104,10 @@ WiFi/Bluetooth bisa dinyalakan.
 - Boot ke sistem 6.18: **PASS setelah patch SELinux** (system plat +
   vendor) dan `vendor_boot-6.18-test12-twrpfix.img`.
 - Uji `log kernel uji` (2026-11-23): boot dan touch jalan, tetapi WiFi dan
-  Bluetooth gagal. Penyebab: `conninfra.cfg` berlabel
-  `connsys_vendor_file` belum di-allow, sehingga `conninfra` power on
-  gagal (`WMT turn on WIFI fail`, `BT turn on fail`). Patch sudah
-  ditambah allow `connsys_vendor_file`; `vendor.img` perlu di-patch
-  ulang lalu diuji.
+  Bluetooth sempat gagal karena `conninfra.cfg` berlabel
+  `connsys_vendor_file`. Setelah `vendor_sepolicy.cil` (md5
+  `5b0827a140e928900a4b91006fba301d`) memakai allow tersebut,
+  **WiFi dan Bluetooth PASS** (dikonfirmasi pengguna 2026-11-23).
 - TWRP touch/vibrator tidak memakai patch ini; itu diperbaiki lewat
   policy TWRP di `vendor_boot` (lihat
   [`PLAN-6.18-STATUS.md`](PLAN-6.18-STATUS.md#twrp-touch--vibrator-test12)).
