@@ -27,6 +27,7 @@ Diperbarui: 2026-11-24 (UTC)
 | DPE `v4l2_fh` | **Fixed di isp_70; uji device tertunda** | `v4l2_fh` ditambahkan; build lolos |
 | CMDQ/GCE + MML | **`vote mminfra` fixed; event/MML historis** | Build lolos; verifikasi device tertunda |
 | Thermal `lvts`/`soc_max` | **Fixed, build lolos; uji device tertunda** | Tabel sensor disamakan dengan stock ko; maintainer sedang di luar |
+| Touch (`gt9916_common` + `adaptive-ts`) | **Fixed, build lolos; uji device tertunda** | Paritas stock untuk 240/360 Hz, dynamic report rate, `/dev/tppolldrv` ioctl, state recovery, dan charger anti-noise |
 | `tranhalconfig` | **Terbuka, userspace** | Service/sepolicy vendor, bukan kernel |
 | `fpsgo`/`trans_sched` | **Known limitation; skip di 6.18** | Jangan buat stub palsu; core FPSGO tetap jalan |
 | TEE/Widevine | **Known limitation; sama dengan 6.12 port** | Provisioning/TA, bukan DT atau driver kernel |
@@ -552,6 +553,61 @@ berjalan sesuai level yang tersedia. `gp_read_raw`, `insecure default`,
 dan `drDcihInit` boleh tetap muncul sebagai known limitation selama tidak
 ada crash dan level DRM sesuai kebijakan perangkat.
 
+### 5.8 Touch (`gt9916_common` + `adaptive-ts`) — dynamic report rate, `tppolldrv`, dan charger anti-noise
+
+**Gejala:** pergerakan sentuh di port terasa kurang mulus dibandingkan stock
+pada panel 120/144 Hz meskipun kecepatan SPI (`8 MHz`), resolusi 16x, dan
+firmware/config Goodix sudah sama.
+
+**Akar masalah (audit biner stock X6871 `16.3.0.155SP20`):**
+
+- DTBO stock mengaktifkan `touchscreen,dynamic-report-rate-support`,
+  `touchscreen,pocket-mode-amt-support`, dan
+  `touchscreen,fingerprint-support`.
+- HAL userspace stock `vendor.hardware.trantp-service` (`ITrantp`) berinteraksi
+  dengan `/proc/report_rate_switch`, `/proc/tp_report_rate_switch`,
+  `/proc/border_suppression`, dan char device `/dev/tppolldrv` (`_IOR`/`_IOW`
+  magic `'t'`, struct 260 B).
+- Port sebelumnya tidak memiliki endpoint kontrol tersebut di `adaptive-ts.ko`,
+  belum mengimplementasikan `set_ts_mode()` dan command report rate
+  240/360 Hz (`0x9d`/`0xc0`/`0x27`/`0x17`) di `gt9916_common.ko`, belum
+  memulihkan state pasca-resume, dan membiarkan `charger_work` tidak terpasang ke
+  `power_supply_reg_notifier()`.
+
+**Fix:**
+
+1. `004169f83006` (`adaptive-ts`): parsing properti DT stock, tambah
+   `set_ts_mode()` ke `struct tran_controller_ops`, ekspos
+   `/proc/tp_report_rate_switch`, `/proc/border_suppression` (serta node DT-gated
+   esports/edge-level), daftarkan `/dev/tppolldrv` ioctl, dan jalankan
+   `tp_state_recovery()` saat resume display.
+2. `92c5a6f9d3f3` (`gt9916_common`): implementasi switch 240/360 Hz (`0x9d`/
+   `0xc0`), `goodix_report_rate_switch` (`0x27`), edge restrain (`0x17`), game
+   state/lock point (`0x33`), super-idle sampling (`0xc2`), edge level (`0x36`),
+   `/proc/report_rate_switch` (0666), serta restore mode 360 Hz di
+   `goodix_ts_resume()`.
+3. `80f4abf529e2` (`gt9916_common`): pasang `power_supply_reg_notifier()` pada
+   supply `"battery"` untuk mengirim command anti-noise charger (`0xaf`) dan
+   memulihkannya saat resume ketika terpasang charger.
+
+*(Catatan: `fpsgo.ko` dan `trans_sched.ko` tetap menjadi known limitation
+terpisah di 6.18 pada §5.6.)*
+
+**Artefak build & verifikasi KMI/ABI:**
+
+- `verify-kmi-abi.py --kver 6.18`: **8/8 PASS** (487 modul runtime, `9593`
+  simbol `abi.stg`, 0 mismatch/unresolved).
+- `vendor_boot.img` md5 `9191487268513536b9ea5ebf2984dcc6` (221 modul, `dtb`/
+  `bootconfig`/`vendor_ramdisk01` identik dengan base packer)
+- `vendor_dlkm.img` md5 `37fcaa05ac5b210d2a3ee7da8e1eb79a` (209 modul)
+- `odm_dlkm.img` md5 `954b13ad3fc61bbf54675eb1e526d1a5` (57 modul)
+
+**Verifikasi device (tertunda):** cek keberadaan `/proc/report_rate_switch`,
+`/proc/tp_report_rate_switch`, `/proc/border_suppression`, dan `/dev/tppolldrv`;
+ukur event rate `getevent -lt` saat `report_rate_switch` 0 vs 1 dan sesudah
+sleep/wake; cek log `charger mode in/out` saat colok/cabut charger tanpa
+`failed send charger_cmd`.
+
 ## 6. Error Minor/Rendah
 
 | Gejala | Catatan |
@@ -601,6 +657,11 @@ Urutan verifikasi yang disarankan:
    `gp_read_raw`, `insecure default`, dan `drDcihInit` diterima sebagai
    known limitation 6.18; yang penting tidak ada crash dan level DRM
    sesuai kebijakan perangkat.
+10. Cek touch GT9916: node `/proc/report_rate_switch`,
+    `/proc/tp_report_rate_switch`, `/proc/border_suppression`, dan
+    `/dev/tppolldrv` ada; sampling rate `getevent -lt` naik saat 360 Hz dan
+    tetap pulih setelah resume; log `charger mode in/out` muncul saat
+    charging tanpa `failed send charger_cmd`.
 
 ## 8. Urutan Kerja yang Disarankan
 
@@ -612,6 +673,7 @@ Urutan verifikasi yang disarankan:
 | P1 | Thermal LVTS: verifikasi fix di device | Tabel sensor sudah disamakan dengan stock ko; build lolos |
 | P1 | `tranhalconfig` | Log storm, audit loss, dan lookup lambat |
 | P1 | DPE `v4l2_fh`: verifikasi fix isp_70 di device | Build lolos; warning seharusnya hilang |
+| P1 | Touch GT9916 (`adaptive-ts` + `gt9916_common`): verifikasi di device | Build + 8/8 KMI lolos; `odm_dlkm` + `vendor_boot` direpack |
 | P3 | CMDQ `vote mminfra`: verifikasi di device | Fix false-positive; event/MML historis |
 | P3 | `trans_sched`/`fpsgo` wrapper: skip | Stub tidak memberi fungsi; full RE terlalu besar |
 | P3 | TEE/Widevine: skip perubahan kernel | Bukan regresi 6.18; butuh provisioning vendor |

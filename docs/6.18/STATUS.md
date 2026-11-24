@@ -10,9 +10,11 @@ Diperbarui: 2026-11-24 (UTC)
 > - Syarat SELinux `firmware_load` untuk boot sistem 6.18: [`SELINUX-6.18.md`](../guides/SELINUX-6.18.md)
 > - Kronologi bringup `test1`–`test13` dan analisa yang sudah ditutup: [`BRINGUP-LOG.md`](../archive/6.18/BRINGUP-LOG.md)
 >
-> Per 2026-11-24: fix thermal LVTS, DPE `v4l2_fh`, CMDQ `vote mminfra`, dan
-> pemulihan `VDEC_VENC_MAX` sudah di-commit; uji boot di device tertunda
-> karena maintainer sedang di luar.
+> Per 2026-11-24: fix thermal LVTS, DPE `v4l2_fh`, CMDQ `vote mminfra`,
+> pemulihan `VDEC_VENC_MAX`, serta kontrol report rate & mode touch
+> (`adaptive-ts` + `gt9916_common`: `004169f83006`, `92c5a6f9d3f3`,
+> `80f4abf529e2`) sudah di-commit, dibuild, dan lolos 8/8 `verify-kmi-abi.py`;
+> uji runtime di device tertunda karena maintainer sedang di luar.
 
 ## Ringkasan Fase
 
@@ -34,6 +36,7 @@ Diperbarui: 2026-11-24 (UTC)
 | Boot Android + SELinux `firmware_load` | **PASS di device** | Wajib patch `plat_sepolicy.cil` / `vendor_sepolicy.cil` / `vendor_file_contexts` ([SELINUX-6.18.md](../guides/SELINUX-6.18.md)) |
 | Wi-Fi & Bluetooth (`conninfra`) | **PASS di device** | Berfungsi setelah allow `connsys_vendor_file` (`firmware_load`) |
 | Audio (`mt6895-mt6368`, FS1599) | **PASS di device** | Fix 17 link DPCM dua arah di `mt6895-mt6368.c`; speaker & amplifier aktif |
+| Touch (`gt9916_common` + `adaptive-ts`) | **Fixed di source, uji device tertunda** | Tambah dynamic report rate 240/360 Hz, `/proc/report_rate_switch`, `/proc/tp_report_rate_switch`, `/proc/border_suppression`, `/dev/tppolldrv` ioctl, state recovery pasca-resume, dan charger anti-noise notifier (`004169f83006`..`80f4abf529e2`); `vendor_boot` + `odm_dlkm` direpack |
 | APU IOMMU + MIUMPU/RCU stall | **Fixed, verifikasi log baru tertunda** | `mtk_iommu_hw_program()` saat resume RCX (`6ebc4934a74a`) + hook stage-1 |
 | Video V4L2/H.264/JPEG (`priv == NULL` & `q_run_work`) | **Fixed, uji lanjut tertunda** | `file->private_data` (`050d89c`/`41f442c`/`29ba44c`) + workqueue vdec OPPO (`31781fa`) |
 | Thermal LVTS (`soc_temp_lvts`) | **Fixed di source, uji device tertunda** | Tabel sensor diselaraskan ke 25 sensor stock (`cbabf0ea8c34`); `vendor_dlkm` direpack |
