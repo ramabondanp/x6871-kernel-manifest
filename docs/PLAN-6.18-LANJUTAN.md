@@ -28,7 +28,7 @@ Diperbarui: 2026-11-24 (UTC)
 | CMDQ/GCE + MML | **Noise, prioritas rendah** | Jangan tambah event DT; perbaiki fallback driver |
 | Thermal `lvts`/`soc_max` | **Fixed, build lolos; uji device tertunda** | Tabel sensor disamakan dengan stock ko; maintainer sedang di luar |
 | `tranhalconfig` | **Terbuka, userspace** | Service/sepolicy vendor, bukan kernel |
-| `fpsgo`/`trans_sched` | **Terbuka; msync2 bukan regresi** | RE interface `trans_sched`; `fpsgo` wrapper prioritas rendah |
+| `fpsgo`/`trans_sched` | **Known limitation; skip di 6.18** | Jangan buat stub palsu; core FPSGO tetap jalan |
 | TEE/Widevine | **Terbuka, vendor security** | Provisioning/TA/HDCP, bukan DT |
 | Error minor | **Rendah** | Catat, tangani setelah prioritas utama |
 
@@ -409,30 +409,26 @@ SystemBinderSchedUxFeature: setTranSchedUxTags fail
 (vermagic dan modversions 6.12). Tidak bisa dimuat di 6.18. Source 6.12 di
 tree juga hasil port, bukan source stock.
 
-**Rencana RE:**
+**Keputusan pragmatis: skip di 6.18.**
 
-1. `fpsgo.ko` — prioritas rendah. Rekonstruksi wrapper dari simbol stock
-   (`fpsgo_touch_latency_ko_init`, `notify_fpsgo_touch_latency_ko_ready`,
-   `xgf_get_process_id`) di atas export `mtk_fpsgo_v8.ko`. Kalau wrapper
-   tidak dibutuhkan userspace, core `mtk_fpsgo_v8.ko` tetap jalan.
-2. `trans_sched.ko` — prioritas utama. Full RE 518 KB scheduler fork tidak
-   realistis. Lakukan RE terarah pada interface HAL:
-   - Perangkat: `/dev/trans_sched` (misc device).
-   - Command HAL yang terlihat: `0x40185403` (24 byte write),
-     `0x40085412` (8 byte write), `0x80185415` (24 byte read/write),
-     `0x5416`, dan command state/scene.
-   - Implementasi minimal: misc device `/dev/trans_sched`, handler ioctl,
-     proc node `trans_scheduler`, dan bookkeeping state/ux tag. Hook
-     scheduler tidak diaktifkan dulu.
-   - Efek: HAL mulai jalan dan error `uas-service` berhenti; tuning
-     scheduler Transsion belum aktif.
-3. Kalau nanti dibutuhkan perilaku penuh, lanjutkan RE hook
-   `g_trans_sched_interface` dan tracepoint scheduler.
+- Stub hanya membuat HAL melihat `/dev/trans_sched` dan mengembalikan
+  sukses. Ia tidak menjalankan scheduler Transsion. Itu bisa menipu HAL
+  seolah ux tag diterapkan padahal tidak, dan tetap tidak memberi performa.
+- `trans_sched` penuh membutuhkan RE fork scheduler 518 KB. Tidak sepadan
+  untuk pratinjau.
+- `fpsgo.ko` wrapper hanya helper touch latency/legacy. Core
+  `mtk_fpsgo_v8.ko` sudah jalan; wrapper dilewati.
+- `msync2_dms.ko`/`msync2_frd.ko` tidak ada di stock; dilewati.
+- Log `trans sched don't support!` dan `insmod ... No such file` tidak
+  menyebabkan crash. Kalau log harus bersih, matikan service/insmod di sisi
+  userspace/vendor (HAL `vendor.transsion.performance.sched` dan baris init),
+  bukan menambah module palsu di kernel.
+- Buka lagi hanya kalau ada source resmi atau regresi performa terukur yang
+  bisa dibuktikan.
 
-**Verifikasi:** `/dev/trans_sched` ada, HAL
-`vendor.transsion.performance.sched` start, tidak ada
-`trans sched don't support!`, dan `setTranSchedUxTags` tidak gagal.
-`msync2` tetap dibiarkan karena stock juga tidak punya.
+**Verifikasi:** tidak ada crash dari `trans_sched`/`fpsgo`; core FPSGO
+(`mtk_fpsgo_v8.ko`) tetap terpasang; log `don't support` diterima sebagai
+known limitation 6.18.
 
 ### 5.7 TEE/Widevine — vendor security
 
@@ -496,9 +492,9 @@ Urutan verifikasi yang disarankan:
 6. Cek `/sys/class/thermal`: jumlah zone sesuai stock (38 base + 4 camera),
    `soc_max` ada, suhu valid, dan tidak ada `Failed to register lvts tz 26`.
 7. Cek service `tranhalconfig` ditemukan; tidak ada `audit_lost`.
-8. Cek `/dev/trans_sched` ada dan `uas-service` tidak lagi melaporkan
-   `trans sched don't support!`. `msync2` dibiarkan karena stock juga tidak
-   punya.
+8. Cek tidak ada crash dari `trans_sched`/`fpsgo`. Log
+   `trans sched don't support!` diterima sebagai known limitation 6.18;
+   `msync2` juga tidak ada di stock.
 9. Jalankan playback DRM/HDCP dan cek TEE/Widevine.
 
 ## 8. Urutan Kerja yang Disarankan
@@ -512,7 +508,7 @@ Urutan verifikasi yang disarankan:
 | P1 | `tranhalconfig` | Log storm, audit loss, dan lookup lambat |
 | P2 | DPE `v4l2_fh` | Warning 2x per boot; node V4L2 DPE tidak berfungsi |
 | P2 | CMDQ/GCE + MML | Noise; perbaiki fallback driver |
-| P2 | `trans_sched`: RE interface `/dev/trans_sched` | Error `uas-service`; full scheduler RE terlalu besar |
+| P3 | `trans_sched`/`fpsgo` wrapper: skip | Stub tidak memberi fungsi; full RE terlalu besar |
 | P2 | TEE/Widevine | DRM/Play Integrity; butuh provisioning vendor |
 | P3 | Error minor | Bersihkan setelah prioritas utama selesai |
 
