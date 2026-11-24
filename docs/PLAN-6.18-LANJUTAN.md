@@ -26,7 +26,7 @@ Diperbarui: 2026-11-24 (UTC)
 | Video VP9 | **Terbuka** | Verifikasi fix `7c48ebd`, lanjutkan jika masih gagal |
 | DPE `v4l2_fh` | **Terbuka** | Perbaiki driver atau lepas node V4L2 DPE |
 | CMDQ/GCE + MML | **Noise, prioritas rendah** | Jangan tambah event DT; perbaiki fallback driver |
-| Thermal `lvts`/`soc_max` | **Terbuka, akar masalah ditemukan** | Samakan tabel sensor LVTS dengan stock ko |
+| Thermal `lvts`/`soc_max` | **Fixed, belum diuji di device** | Tabel sensor disamakan dengan stock ko; build lolos |
 | `tranhalconfig` | **Terbuka, userspace** | Service/sepolicy vendor, bukan kernel |
 | `fpsgo`/`msync2` | **Terbuka, build/init** | Tambah module atau hapus `insmod` |
 | TEE/Widevine | **Terbuka, vendor security** | Provisioning/TA/HDCP, bukan DT |
@@ -329,6 +329,13 @@ DTBO.
 valid dan berubah saat beban naik; tidak ada error `soc_max` berulang dari
 `thermal_interface`.
 
+**Status implementasi:** fix sudah masuk commit
+`cbabf0ea8c34` (`thermal: mediatek: Align MT6895 LVTS sensor map with
+stock DTB`). Build 6.18 berhasil, dan tabel `mt6895_tc_settings` di
+`soc_temp_lvts.ko` hasil build sudah cocok dengan stock: 25 sensor, map
+berakhir di id 24, sehingga driver mendaftarkan zone id 1..25. Image
+`vendor_dlkm` sudah direpack dengan 209 modul. Belum diuji boot di device.
+
 ### 5.5 `tranhalconfig` — userspace/sepolicy
 
 **Gejala:**
@@ -452,7 +459,7 @@ Urutan verifikasi yang disarankan:
 | P0 | Verifikasi crash/EMI pasca-fix dengan log baru | Memastikan 7 Oops + RCU stall benar-benar hilang |
 | P0 | Video VP9 | Isu user-facing yang masih terbuka |
 | P1 | Pastikan DTB/DTBO stock yang dipakai, bukan DT tree | ADSP dan node disabled lain tidak relevan untuk DT tree |
-| P1 | Thermal LVTS: samakan tabel sensor dengan stock ko | Semua zone LVTS hilang karena probe gagal di tz 26 |
+| P1 | Thermal LVTS: verifikasi fix di device | Tabel sensor sudah disamakan dengan stock ko; build lolos |
 | P1 | `tranhalconfig` | Log storm, audit loss, dan lookup lambat |
 | P2 | DPE `v4l2_fh` | Warning 2x per boot; node V4L2 DPE tidak berfungsi |
 | P2 | CMDQ/GCE + MML | Noise; perbaiki fallback driver |
