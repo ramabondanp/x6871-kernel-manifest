@@ -24,8 +24,8 @@ Diperbarui: 2026-11-24 (UTC)
 | EMI MPU `SRINFO=3` + RCU stall | **Fixed** oleh commit IOMMU | Verifikasi tidak muncul lagi |
 | ADSP | **Bukan bug; stock DTB disabled** | Pastikan image memakai DTB stock; jangan ubah DT tree |
 | Video VP9 | **Terbuka** | Verifikasi fix `7c48ebd`, lanjutkan jika masih gagal |
-| DPE `v4l2_fh` | **Known limitation; skip di 6.18** | Node V4L2 tidak dipakai; kamera lewat `/dev/DPE` |
-| CMDQ/GCE + MML | **Noise, prioritas rendah** | Jangan tambah event DT; perbaiki fallback driver |
+| DPE `v4l2_fh` | **Fixed di isp_70; uji device tertunda** | `v4l2_fh` ditambahkan; build lolos |
+| CMDQ/GCE + MML | **`vote mminfra` fixed; event/MML historis** | Build lolos; verifikasi device tertunda |
 | Thermal `lvts`/`soc_max` | **Fixed, build lolos; uji device tertunda** | Tabel sensor disamakan dengan stock ko; maintainer sedang di luar |
 | `tranhalconfig` | **Terbuka, userspace** | Service/sepolicy vendor, bukan kernel |
 | `fpsgo`/`trans_sched` | **Known limitation; skip di 6.18** | Jangan buat stub palsu; core FPSGO tetap jalan |
@@ -171,7 +171,7 @@ header VP9 sebelum VCP `DEC_START`, tetapi belum ada log setelah commit itu.
 **Verifikasi:** playback VP9 selesai, tidak ada error qbuf, dan decoding
 tidak berhenti di tengah.
 
-### 5.2 DPE `v4l2_fh` — known limitation, node V4L2 tidak dipakai
+### 5.2 DPE `v4l2_fh` — fixed di isp_70
 
 **Gejala:**
 
@@ -182,43 +182,34 @@ WARNING: CPU: ... at drivers/media/v4l2-core/v4l2-dev.c:438 v4l2_open+...
 **Akar masalah:** `v4l2_open()` di 6.18 mewajibkan driver memakai
 `v4l2_fh` (`V4L2_FL_USES_V4L2_FH`). Kalau flag tidak ada, core mencetak
 WARN, memanggil `release`, dan mengembalikan `-ENODEV`. `camera_dpe.c`
-(`isp_70`) mendaftarkan video node `dpe-vid`, tetapi `dpe_fop_open()`
-hanya memanggil `DPE_open()` lalu `return 0`; tidak ada
-`v4l2_fh_init()`/`v4l2_fh_open()`. Di 6.12 core belum mewajibkan flag
-ini, jadi warning tidak muncul.
+mendaftarkan video node `dpe-vid`, tetapi `dpe_fop_open()` hanya
+memanggil `DPE_open()` lalu `return 0`; tidak ada `v4l2_fh_init()`.
+
+**Kenapa fix sebelumnya tidak jalan:** commit `3cb567a` hanya mengubah
+`mtkcam/mtk-dpe/isp_7sp/camera_dpe.c`. Build X6871 memakai
+`camera_dpe_isp70` dari `isp_70/camera_dpe.c`, jadi warning tetap muncul.
+
+**Fix:** commit `b83dca0` menerapkan pola yang sama ke `isp_70`:
+`struct v4l2_fh` menjadi anggota pertama `DPE_USER_INFO_STRUCT`,
+di-init/di-add di `dpe_fop_open()`, dan di-del/exit di
+`dpe_fop_release()`. Karena `fh` adalah anggota pertama,
+`file->private_data` tetap menunjuk ke `DPE_USER_INFO_STRUCT` yang
+dipakai ioctl/poll.
 
 **Siapa yang membuka node:** di semua dmesg, satu-satunya opener adalah
 `VcodecProcess` (C2 codec service, pid 1506) saat enumerasi `/dev/video*`
-di boot, 2x. `DPE_open`/`DPE_release` berhasil menaikkan/menurunkan user
-count, lalu core menolak open karena tidak ada fh. Kamera tidak pernah
-membuka node V4L2; jalur kamera memakai char device `/dev/DPE`.
+di boot, 2x. Kamera tidak pernah membuka node V4L2; jalur kamera memakai
+char device `/dev/DPE`.
 
-**Kenapa bukan kegagalan fungsi:** setelah open DPE gagal, VcodecProcess
-tetap membuka node vdec/venc (`fops_vcodec_open`) dan codec berjalan.
-Kamera foto/video tetap memakai `/dev/DPE`. Node V4L2 DPE juga tidak
-lengkap: `.mmap`, `.read`, `.write`, dan queue `vb2` dikomentari, jadi
-tidak bisa dipakai untuk streaming.
+**Verifikasi build:** `camera_dpe_isp70.ko` sekarang mengimpor
+`v4l2_fh_init`, `v4l2_fh_add`, `v4l2_fh_del`, `v4l2_fh_exit`.
+`vendor_dlkm.img` baru md5 `86fd65af151a1e813d132c5915686285` sudah
+memuat module ini.
 
-**Opsi:**
+**Verifikasi device (tertunda):** boot baru harus tidak lagi mencetak
+`v4l2_open` WARN; kamera dan playback codec tetap berjalan.
 
-| Opsi | Kelebihan | Risiko |
-|---|---|---|
-| A. `v4l2_fh` wrapper | node bisa dibuka, sesuai core | menyentuh `file->private_data` di beberapa ioctl; node jadi terlihat oleh enumerasi codec; butuh uji device |
-| B. hapus registrasi video node | warning hilang, char device tetap | menggeser nomor `/dev/video*`, beda dari stock; butuh uji codec/kamera |
-| C. skip + catat | tidak mengubah driver | WARN tetap 2x dan menaint kernel |
-
-**Keputusan pragmatis: C, skip perubahan kernel untuk 6.18.**
-Node V4L2 DPE tidak dipakai; jalur fungsional adalah `/dev/DPE`.
-Opsi A menambah risiko tanpa fungsi baru; Opsi B mengubah urutan
-`/dev/video*` dan belum bisa diuji di device. Buka lagi kalau ada
-komponen userspace yang benar-benar memakai node DPE V4L2 atau kalau
-rilis mewajibkan boot tanpa WARN.
-
-**Verifikasi:** warning 2x diterima sebagai known limitation; kamera dan
-playback codec tetap berjalan; tidak ada crash. Kalau nanti dipilih
-Opsi B, verifikasi `/dev/video*` dan codec setelah node dihapus.
-
-### 5.3 CMDQ/GCE dan MML — noise, prioritas rendah
+### 5.3 CMDQ/GCE dan MML — `vote mminfra` fixed; sisanya historis
 
 **Gejala CMDQ:**
 
@@ -229,19 +220,18 @@ Opsi B, verifikasi `/dev/video*` dan codec setelah node dihapus.
 [cmdq][err] vote mminfra on err:1 @cmdq_mbox_enable,3953
 ```
 
-**Temuan:** 101 baris error CMDQ pada satu boot penuh. `gce-event-names` di
-DT stock memang hanya berisi subset; driver display 6.18 meminta event yang
-lebih banyak. `cmdq_mbox_create(..., 1)` meminta channel kedua, sedangkan
-node GCE stock hanya punya satu entri `mboxes`.
+**Temuan:** badai sekitar 100 baris (event names + channel index 1)
+hanya muncul di dmesg1/3/4. Di dmesg2/5/6/7 yang lebih baru tinggal 2x
+`vote mminfra on err:1`. Event display yang diminta driver tidak ada di
+`gce-event-names` stock; jangan menambah event/channel ke DT. Karena
+tidak muncul lagi di log terbaru, tidak ada perubahan driver untuk
+bagian itu.
 
-**Rencana fix:**
-
-- Jangan menambah event atau channel baru ke DT. DT di tree tidak dipakai
-  untuk image, dan DTB stock memang hanya punya subset tersebut.
-- Di driver, tangani `-ENOENT` saat channel hw trace tidak tersedia; jangan
-  request index 1 jika `hw_trace_built_in` tidak aktif.
-- Untuk event yang tidak ada, pastikan driver tetap memakai fallback dan
-  tidak menganggapnya fatal.
+**`vote mminfra on err:1`:** `pm_runtime_get_sync()` mengembalikan 1
+kalau device sudah aktif. Tiga lokasi memeriksa `ret != 0` dan
+menganggap 1 sebagai error. Commit `a71cfd2` mengubahnya menjadi
+`ret < 0` di `cmdq-sec-mailbox.c` dan `mtk-cmdq-mailbox-ext.c`,
+konsisten dengan jalur `fast_mtcmos` yang sudah memakai `ret < 0`.
 
 **Gejala MML:**
 
@@ -249,15 +239,18 @@ node GCE stock hanya punya satu entri `mboxes`.
 mediatek-mml 1f800000.mmlsys-config: error -EBUSY: can't request region for resource
 ```
 
-**Temuan:** `syscon@1f800000` dan `mmlsys-config@1f800000` memakai region
-yang sama. Ini juga ada di DT stock. MML tetap `probe success`, jadi ini
-lebih ke perilaku driver 6.18 daripada node DT yang hilang. DT tree tidak
-dipakai untuk image, jadi fix harus di driver.
+**Temuan:** gejala ini tidak ada di dmesg1-7. Error `mml-aal` IRQ dan
+`read event frame_done fail` hanya muncul di dmesg1/4; di log terbaru
+MML probe dan service `vendor.mmlpq-default` berjalan. Tidak ada
+perubahan driver; jangan hapus node stock.
 
-**Rencana fix:** gunakan syscon/regmap atau fallback `devm_ioremap` untuk
-region yang sudah diklaim; jangan menghapus node stock.
+**Verifikasi build:** `mtk-cmdq-drv-ext.ko` dan `cmdq-sec-drv.ko`
+mengandung pemeriksaan sign bit (`ret < 0`). `vendor_boot.img` baru
+md5 `bcf3801494067a5d1cca578cdf3174c5` dan `vendor_dlkm.img` md5
+`86fd65af151a1e813d132c5915686285` sudah memuatnya.
 
-**Prioritas:** rendah, kecuali muncul gejala MML/video yang spesifik.
+**Verifikasi device (tertunda):** boot baru tidak lagi mencetak
+`vote mminfra on err:1`; display, codec, dan MML tetap berjalan.
 
 ### 5.4 Thermal LVTS — semua zone hilang karena tabel sensor beda dari stock
 
@@ -554,8 +547,9 @@ Urutan verifikasi yang disarankan:
 
 4. Cek video VP9: tidak ada `VP9 header rejected`, `unsupported (-1,-1)`,
    atau `QBUF after unrecoverable error`.
-5. Warning `v4l2_open` 2x diterima sebagai known limitation 6.18;
-   pastikan kamera dan playback codec tetap berjalan.
+5. Cek warning `v4l2_open` sudah hilang dan tidak ada
+   `vote mminfra on err:1`; pastikan kamera, playback codec, dan MML
+   tetap berjalan.
 6. Cek `/sys/class/thermal`: jumlah zone sesuai stock (38 base + 4 camera),
    `soc_max` ada, suhu valid, dan tidak ada `Failed to register lvts tz 26`.
 7. Cek service `tranhalconfig` ditemukan; tidak ada `audit_lost`.
@@ -576,8 +570,8 @@ Urutan verifikasi yang disarankan:
 | P1 | Pastikan DTB/DTBO stock yang dipakai, bukan DT tree | ADSP dan node disabled lain tidak relevan untuk DT tree |
 | P1 | Thermal LVTS: verifikasi fix di device | Tabel sensor sudah disamakan dengan stock ko; build lolos |
 | P1 | `tranhalconfig` | Log storm, audit loss, dan lookup lambat |
-| P3 | DPE `v4l2_fh`: skip | Warning 2x; node V4L2 tidak dipakai, char device tetap |
-| P2 | CMDQ/GCE + MML | Noise; perbaiki fallback driver |
+| P1 | DPE `v4l2_fh`: verifikasi fix isp_70 di device | Build lolos; warning seharusnya hilang |
+| P3 | CMDQ `vote mminfra`: verifikasi di device | Fix false-positive; event/MML historis |
 | P3 | `trans_sched`/`fpsgo` wrapper: skip | Stub tidak memberi fungsi; full RE terlalu besar |
 | P3 | TEE/Widevine: skip perubahan kernel | Bukan regresi 6.18; butuh provisioning vendor |
 | P3 | Error minor | Bersihkan setelah prioritas utama selesai |
