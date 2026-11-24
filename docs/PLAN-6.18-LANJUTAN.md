@@ -252,7 +252,7 @@ md5 `bcf3801494067a5d1cca578cdf3174c5` dan `vendor_dlkm.img` md5
 **Verifikasi device (tertunda):** boot baru tidak lagi mencetak
 `vote mminfra on err:1`; display, codec, dan MML tetap berjalan.
 
-**Artefak gabungan DPE + CMDQ:**
+**Artefak gabungan thermal + DPE + CMDQ:**
 
 | Image | Ukuran | MD5 |
 |---|---:|---|
@@ -261,6 +261,9 @@ md5 `bcf3801494067a5d1cca578cdf3174c5` dan `vendor_dlkm.img` md5
 | `odm_dlkm.img` | 4.206.592 B | `da2c64a1572ff27382128beb4bbcba8b` (tidak berubah) |
 
 Unduhan: https://gofile.io/d/kV60pldu
+
+`vendor_dlkm` ini juga memuat fix thermal LVTS `cbabf0ea8c34`, jadi bisa
+dipakai untuk verifikasi thermal sekaligus.
 
 ### 5.4 Thermal LVTS — semua zone hilang karena tabel sensor beda dari stock
 
@@ -358,7 +361,9 @@ stock DTB`). Build 6.18 berhasil, dan tabel `mt6895_tc_settings` di
 `soc_temp_lvts.ko` hasil build sudah cocok dengan stock: 25 sensor, map
 berakhir di id 24, sehingga driver mendaftarkan zone id 1..25. Image
 `vendor_dlkm` sudah direpack dengan 209 modul. Belum diuji boot di device;
-pengujian runtime ditunda karena maintainer sedang di luar.
+pengujian runtime ditunda karena maintainer sedang di luar. Image gabungan
+terbaru di §5.3 (md5 `86fd65af151a1e813d132c5915686285`) juga memuat fix
+ini.
 
 ### 5.5 `tranhalconfig` — userspace/sepolicy
 
