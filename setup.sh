@@ -151,13 +151,15 @@ if [ "$KVER" = "6.18" ]; then
     die 'patch kleaf-localversion-suffix tidak dapat diterapkan; cek perubahan lokal build/kernel'
   fi
 
-  # Profil uji 6.18-lts (17b8bfe5ce75): patch bug blk_finish_plug/blk_plug_invalidate_ts
+  # Profil uji 6.18-lts: patch bug blk_finish_plug/blk_plug_invalidate_ts
   # via git am agar common tetap bersih (tanpa -dirty). Dihapus saat upstream fix masuk.
   COMMON_LTS_PATCH=$HERE/patches/common-6.18-blk-plug-invalidate-ts.patch
   [ -f "$COMMON_LTS_PATCH" ] || die "$COMMON_LTS_PATCH tidak ada"
+  COMMON_HEAD=$(git -C common rev-parse HEAD 2>/dev/null || true)
   if git -C common apply --reverse --check "$COMMON_LTS_PATCH" 2>/dev/null; then
     echo 'common: patch blk_plug_invalidate_ts sudah terpasang'
-  elif [ "$(git -C common rev-parse HEAD 2>/dev/null)" = 17b8bfe5ce7568445def263dc609f839f3b469f6 ]; then
+  elif [ "$COMMON_HEAD" = 17b8bfe5ce7568445def263dc609f839f3b469f6 ] ||
+       [ "$COMMON_HEAD" = aeb47e4961274be51dd582e00796110922f558e7 ]; then
     git -C common -c core.hooksPath=/dev/null \
       -c user.name="Rama Bondan Prakoso" -c user.email="ramanarubp@gmail.com" \
       am --committer-date-is-author-date "$COMMON_LTS_PATCH"
