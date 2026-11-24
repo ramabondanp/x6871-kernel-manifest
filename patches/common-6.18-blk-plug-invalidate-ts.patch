@@ -1,0 +1,52 @@
+From d763e7ef362c5452df56e1d21c60d24d9ab34872 Mon Sep 17 00:00:00 2001
+From: Rama Bondan Prakoso <ramanarubp@gmail.com>
+Date: Tue, 24 Nov 2026 13:16:49 +0000
+Subject: [PATCH] block: prevent NULL dereference in blk_plug_invalidate_ts()
+
+Clang can reorder the stores in blk_finish_plug() so that
+current->plug = NULL executes before PF_BLOCK_TS is cleared from
+current->flags. If an interrupt preempts the task in between, the task
+is scheduled out and later resumes in finish_task_switch(), where
+blk_plug_invalidate_ts() observes PF_BLOCK_TS still set and dereferences
+current->plug->cur_ktime (NULL + 0x20).
+
+Add a compiler barrier() before clearing current->plug in
+blk_finish_plug(), and restore the NULL check on current->plug in
+blk_plug_invalidate_ts() as defense-in-depth.
+
+Signed-off-by: Rama Bondan Prakoso <ramanarubp@gmail.com>
+---
+ block/blk-core.c       | 1 +
+ include/linux/blkdev.h | 5 ++++-
+ 2 files changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/block/blk-core.c b/block/blk-core.c
+index 2f098d8a48ca..71afa1b0453f 100644
+--- a/block/blk-core.c
++++ b/block/blk-core.c
+@@ -1292,6 +1292,7 @@ void blk_finish_plug(struct blk_plug *plug)
+ {
+ 	if (plug == current->plug) {
+ 		__blk_flush_plug(plug, false);
++		barrier();
+ 		current->plug = NULL;
+ 	}
+ }
+diff --git a/include/linux/blkdev.h b/include/linux/blkdev.h
+index 12a15640bfd5..6f166087d3b0 100644
+--- a/include/linux/blkdev.h
++++ b/include/linux/blkdev.h
+@@ -1247,7 +1247,10 @@ static inline void blk_flush_plug(struct blk_plug *plug, bool async)
+ static __always_inline void blk_plug_invalidate_ts(void)
+ {
+ 	if (unlikely(current->flags & PF_BLOCK_TS)) {
+-		current->plug->cur_ktime = 0;
++		struct blk_plug *plug = current->plug;
++
++		if (plug)
++			plug->cur_ktime = 0;
+ 		current->flags &= ~PF_BLOCK_TS;
+ 	}
+ }
+-- 
+2.43.0

@@ -1,0 +1,13 @@
+diff --git a/kleaf/workspace_status_stamp.py b/kleaf/workspace_status_stamp.py
+index 2f0ea81..f97d175 100644
+--- a/kleaf/workspace_status_stamp.py
++++ b/kleaf/workspace_status_stamp.py
+@@ -122,6 +122,8 @@ def load_attribute_from_json[T](json_file: pathlib.Path, attr_name: str, attr_ty
+ 
+ 
+ def get_localversion_suffix() -> str:
++    if (suffix := os.environ.get("LOCALVERSION_SUFFIX")):
++        return suffix
+     if (build_number := os.environ.get("BUILD_NUMBER")):
+         return "-ab" + build_number
+     return ""

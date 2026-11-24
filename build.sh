@@ -4,6 +4,7 @@
 #
 #   ./build.sh                              # user, mt6895, overlay X6871 (KVER=6.12)
 #   KVER=6.18 ./build.sh user               # profil PLAN-6.18 (GKI common, KMI 5)
+#   KVER=6.18 ./build.sh gki                # build lokal boot-lz4.img + system_dlkm 6.18
 #   ./build.sh userdebug                    # userdebug, mt6895, overlay X6871
 #   OVERLAYS="" ./build.sh user             # tanpa overlay (untuk baseline MTK murni)
 #   PLATFORM=mt6991 ./build.sh user         # override SoC target
@@ -45,13 +46,25 @@ SCOPE=customer
 TARGET="//$TREE:mgk_${KCODE}_${SCOPE}_modules_install.${VARIANT}"
 OUT=${OUT_DIR:-$PWD/out_bazel}
 
+export BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
+
+if [ "$VARIANT" = "gki" ]; then
+  [ "$KVER" = "6.18" ] || { echo "ERROR: mode gki hanya untuk KVER=6.18" >&2; exit 1; }
+  echo "kernel  : $KVER (common GKI images)"
+  echo "targets : //common:kernel_aarch64_gki_artifacts //common:kernel_aarch64_system_dlkm_image"
+  [ -n "${LOCALVERSION_SUFFIX:-}" ] && echo "suffix  : $LOCALVERSION_SUFFIX"
+  exec tools/bazel --output_user_root="$OUT" build \
+    --config=stamp \
+    --repo_manifest="$PWD/$TREE/fake_manifest.xml" \
+    //common:kernel_aarch64_gki_artifacts \
+    //common:kernel_aarch64_system_dlkm_image
+fi
+
 echo "kernel  : $KVER ($TREE)"
 echo "target  : $TARGET"
 echo "platform: $PLATFORM"
 echo "variant : $VARIANT"
 echo "overlays: ${OVERLAYS:-(tidak ada)}"
-
-export BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
 
 exec tools/bazel --output_user_root="$OUT" build \
   --config=stamp \

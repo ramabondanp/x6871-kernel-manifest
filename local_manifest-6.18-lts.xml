@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tambahkan setelah local_manifest-6.18.xml sebagai zz-x6871-6.18-lts.xml.
+     Profil uji GKI build lokal android17-6.18-lts (6.18.63, KMI 6, 4 KB). -->
+<manifest>
+  <extend-project name="kernel/common"
+                  revision="17b8bfe5ce7568445def263dc609f839f3b469f6"
+                  upstream="refs/heads/android17-6.18-lts" />
+</manifest>
