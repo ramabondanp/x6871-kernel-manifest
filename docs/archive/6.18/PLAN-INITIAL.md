@@ -1,8 +1,8 @@
 # PLAN 6.18 — Rencana Upstreaming X6871 (MT6895) ke `android17-6.18-2026-09_r13`
 
-> **Status (2026-11-23): IN PROGRESS — Fase 0 selesai, Fase 1 berjalan.**
-> Lihat [status eksekusi](PLAN-6.18-STATUS.md) untuk progres, error yang
-> sudah dilewati, dan perintah kerja.
+> **Arsip rencana awal (2026-11-23): Fase 0–5 telah selesai.**
+> Lihat [status terkini](../../6.18/STATUS.md) untuk progres dan perintah kerja,
+> serta [tracker isu](../../6.18/TRACKER.md) untuk temuan terbuka.
 > Baseline produksi tetap di `android16-6.12-2026-09_r16` (KMI 6, rilis `gki-kmi6-20261122`).
 > Script di repo ini sudah mendukung `KVER=6.18`; gunakan workspace 6.18
 > yang terpisah dari baseline 6.12.
@@ -75,7 +75,7 @@ Audit langsung dilakukan dengan mencocokkan seluruh **488 `.ko` runtime** (`v19-
    - Wajib lulus 8 gerbang `tools/verify-kmi-abi.py --kver 6.18` sebelum flash/rilis (Aturan Keras #17).
 7. **Konfigurasi perangkat tetap di `X6871.config`**:
    - Bawa `kernel/configs/Kconfig.x6871` dan `X6871.config` dari commit 6.12 `0fba8e7`, beserta integrasi `Kconfig.ext`. Terapkan `entry_level_legacy.config` terlebih dahulu, lalu `X6871.config`.
-   - Sesuaikan simbol dan dependensinya dengan 6.18, lalu verifikasi `.config` akhir build DDK. Jangan mengembalikan override `-DCONFIG_*` atau `#define`/`#undef` di C, dan jangan tambahkan opsi perangkat ke defconfig GKI. Lihat [panduan konfigurasi X6871](HANDOFF.md#konfigurasi-x6871).
+   - Sesuaikan simbol dan dependensinya dengan 6.18, lalu verifikasi `.config` akhir build DDK. Jangan mengembalikan override `-DCONFIG_*` atau `#define`/`#undef` di C, dan jangan tambahkan opsi perangkat ke defconfig GKI. Lihat [panduan konfigurasi X6871](../../guides/BUILD.md#konfigurasi-x6871).
 
 ---
 
@@ -172,4 +172,4 @@ Dikerjakan berurutan pasca-Gerbang #1 lulus:
    8. Integritas `modules.dep`/`modules.load`
 - Verifikasi AVB hashtree `vendor_dlkm.img` dan `odm_dlkm.img` melalui skrip repack DLKM.
 - Audit regresi tabel DT & struct ABI (`mtk-scpsys-mt6895` 39 domain, `charger_ops` 138 field, `gpufreq_shared_status`, `venc_vcu_config`).
-- Gunakan [checklist subsistem di BOOTTEST](BOOTTEST.md#4-checklist-boot-per-subsistem), bukan perintah flash 6.12 di dokumen itu. Siapkan set rollback KMI 6.
+- Gunakan [checklist subsistem di FLASH-AND-TEST](../../guides/FLASH-AND-TEST.md#4-checklist-boot-per-subsistem), bukan perintah flash 6.12 di dokumen itu. Siapkan set rollback KMI 6.

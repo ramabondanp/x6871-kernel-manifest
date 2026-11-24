@@ -2,6 +2,8 @@
 
 Diperbarui: 2026-11-23
 
+> Catatan: audit statis ini dilakukan sebelum bringup di perangkat. Untuk status boot dan hasil uji terkini, lihat [`STATUS.md`](STATUS.md) dan [`TRACKER.md`](TRACKER.md).
+
 Dokumen ini mencatat pemeriksaan perubahan API Linux 6.13–6.18 yang
 **tidak tertangkap compiler** (perubahan semantik, bukan rename atau
 perubahan signature). Audit dilakukan tanpa hardware, memakai hasil build

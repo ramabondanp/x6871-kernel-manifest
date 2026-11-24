@@ -1,7 +1,7 @@
 #!/bin/bash
 # [HISTORIS — sudah ter-commit di alps-kernel_device_modules-6.12 branch x6871-android16-6.12]
 # Pasang driver regulator tran_ldo (ET5904) ke tree kernel.
-# Jalankan dari root workspace. Lihat docs/PLAN.md §6.2.
+# Jalankan dari root workspace. Lihat docs/archive/6.12/PLAN.md §6.2.
 #
 #   ./scripts/add-tran-ldo.sh /path/ke/et5904.c
 #

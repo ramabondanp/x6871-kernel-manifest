@@ -1,7 +1,7 @@
 #!/bin/bash
 # [HISTORIS — sudah ter-commit di alps-kernel_device_modules-6.12 branch x6871-android16-6.12]
 # Pasang driver panel RM69220 (X6871) ke tree kernel.
-# Jalankan dari root workspace. Lihat docs/PLAN.md §7.5.
+# Jalankan dari root workspace. Lihat docs/archive/6.12/PLAN.md §7.5.
 #
 #   ./scripts/add-panel-rm69220.sh /path/ke/mt6897-extract
 #

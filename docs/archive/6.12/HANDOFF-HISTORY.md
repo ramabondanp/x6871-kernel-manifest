@@ -1,31 +1,11 @@
-# HANDOFF — W1VO36 / X6871 kernel device modules
+# Arsip Riwayat Rilis & Referensi Porting 6.12 (eks HANDOFF)
 
-Ditulis 2026-11-19, diperbarui 2026-11-22 sebagai referensi teknis & panduan kelanjutan proyek. Baca ini dulu, lalu `PLAN.md`
-(bagian §6.1b, §6.2k, §6.2m, §6.2n, §6.2o, §6.2p, §6.2q, §6.2r, §6.2s,
-§6.2t, §6.2u) dan `PRETEST.md`.
-
-## Status ringkas
-
-| Item | Nilai |
-|---|---|
-| GKI base (`kernel-6.12`) | AOSP murni `android16-6.12-2026-09_r16` (`6.12.92-android16-6-g7cc745542612-4k`, **KMI 6**, tanpa patch) |
-| `.ko` flat customer install | **419** (di-trim via `kernel/kleaf/x6871_modules.bzl` ke **413** target OOT X6871; sebelumnya 679) |
-| `.ko` di staging (file / nama unik) | **553 / 552** (`mtk-socinfo` dobel; sebelumnya 813 / 812; action Bazel `4.867 → 919`) |
-| Modul di firmware X6871 | 237 (`vendor_boot`) + 288 (`vendor_dlkm` + `odm_dlkm`) |
-| Nama stock `vendor_boot` tidak ada di build | **20** (6 tidak direncanakan, 14 kandidat) |
-| Modul recovery `vendor_boot` | **222** `.ko` dibangun dari kode sumber (KMI 6) |
-| DLKM (`vendor_dlkm` + `odm_dlkm`) | **266** `.ko` (`209` + `57`) dibangun dari kode sumber (KMI 6, tanpa bentrok `CONFIG_MODULE_SIG_PROTECT`) |
-| Build target | `//kernel_device_modules-6.12:mgk_64_k612_customer_modules_install.user` |
-| Build terakhir | sukses (clean KMI 6 + trimmed X6871 allowlist), 2026-11-22 |
-| Revisi modul perangkat untuk build dari source | [`0fba8e7`](https://github.com/ramabondanp/alps-kernel_device_modules-6.12/commit/0fba8e7f20f47dc5814acd28fba14d6854b00520) (`x6871-android16-6.12`, dengan fragment X6871; image rilis tetap dari `fa18f7f`) |
-| Vendor MTK modules HEAD | `83b4fa6` (`alps-vendor_mediatek_kernel_modules`, `x6871-android16-6.12`) |
-| Active clean workspace | `~/x6871-kernel` |
-| Runtime | **Lulus boot di GKI KMI 6 (`android16-6.12-2026-09_r16`, `v19-kmi6`)** dengan `boot-lz4.img` + `system_dlkm.erofs.img` resmi Google (0 mismatch CRC vs `abi.stg` `10.630` simbol, 0 kolisi `CONFIG_MODULE_SIG_PROTECT`, 0 unresolved symbol). Rincian log fitur di bawah berasal dari KMI 5; konfirmasi uji langsung oleh maintainer dicatat di [GitHub Release](https://github.com/ramabondanp/x6871-kernel-manifest/releases/tag/gki-kmi6-20261122). |
-
-Klaim dibangun dari kode sumber berlaku untuk **488 modul `.ko`** dalam tiga
-image rilis X6871, bukan seluruh isi image. Tidak ada `.ko` stock yang disalin
-ke dalamnya. Image GKI Google dipakai tanpa modifikasi; repack `vendor_boot`
-mempertahankan komponen dasar TWRP seperti DTB dan ramdisk recovery.
+> **Arsip historis (read-only).** Dokumen ini menyimpan riwayat rilis `v1`–`v19-kmi6`,
+> audit gap awal, pengetahuan modul fitur 6.12, dan snapshot 2026-11-19 yang sebelumnya
+> berada di `docs/HANDOFF.md`.
+>
+> Untuk panduan build, konfigurasi, aturan keras, dan repack aktif, gunakan
+> [BUILD.md](../../guides/BUILD.md) dan [FLASH-AND-TEST.md](../../guides/FLASH-AND-TEST.md).
 
 ## Status Rilis Terbaru & Ringkasan Riwayat (2026-11-22)
 
@@ -35,7 +15,6 @@ mempertahankan komponen dasar TWRP seperti DTB dan ramdisk recovery.
 x6871-twrp-vendor_boot-v19-kmi6.img  md5 91eb249ff001d250fad855c40476f1b5  67.108.864 B
 vendor_dlkm.img                      md5 5f7b6cecb1c44a1ffc3280dd481fbfcf  24.551.424 B
 odm_dlkm.img                         md5 6ee3cadceb5c4750dbbfe3d0056b6ea8   4.206.592 B
-/srv path                            ~/x6871-out/
 rollback KMI 5                       x6871-twrp-vendor_boot-v18.img, vendor_dlkm-v16-kmi5.img, odm_dlkm-v16-kmi5.img
 ```
 
@@ -51,7 +30,6 @@ Migrasi GKI ke tag AOSP murni **`android16-6.12-2026-09_r16`** (`6.12.92-android
 x6871-twrp-vendor_boot-v18.img  md5 73b94a9f88ed39a852e8a1343978d37e  67.108.864 B
 vendor_dlkm.img                 md5 72daa1f10eba75d9cd0e3359a27ff76f  24.551.424 B
 odm_dlkm.img                    md5 99b2194fa63cab8c751f71b8fbd4eb5e   4.206.592 B
-/srv path                       ~/x6871-out/
 ```
 
 Audit v17 (`6230061`) terhadap `mtu3.ko` stock dan `common-6.12/drivers/usb/gadget/udc/core.c`
@@ -74,7 +52,6 @@ Commit `32a8db7` (hasil squash dari revert `6230061` + `f661c15`) menyamakan `mt
 x6871-twrp-vendor_boot-v17.img  md5 68df06607016a34d12bfbe19e2c6df77  67.108.864 B
 vendor_dlkm.img                 md5 72daa1f10eba75d9cd0e3359a27ff76f  24.551.424 B
 odm_dlkm.img                    md5 99b2194fa63cab8c751f71b8fbd4eb5e   4.206.592 B
-/srv path                       ~/x6871-out/
 ```
 
 Digantikan oleh v18 (`32a8db7`, di-squash dari `6230061`+`f661c15`) karena `usb_gadget_connect()` terbukti no-op dan non-stock (`PRETEST.md` §65–§67).
@@ -82,86 +59,81 @@ Digantikan oleh v18 (`32a8db7`, di-squash dari `6230061`+`f661c15`) karena `usb_
 ### Rilis sebelumnya: `rcv-usb-20261122` (kernel `68db913`, `vendor_boot` v16 + DLKM v15)
 
 ```text
-x6871-twrp-vendor_boot-v16.img  md5 b6a0fb64f1043314a990b420af0c163b  67.108.864 B
+x6871-twrp-vendor_boot-v16.img  md5 eda8e578cb2e52c8718fe085271654cd  67.108.864 B
 vendor_dlkm.img                 md5 72daa1f10eba75d9cd0e3359a27ff76f  24.551.424 B
 odm_dlkm.img                    md5 99b2194fa63cab8c751f71b8fbd4eb5e   4.206.592 B
-/srv path                       ~/x6871-out/
 ```
 
+Perbaikan v16 / DLKM v15 (`PRETEST.md` §64):
+1. **Earpiece (`mt6895-mt6368.ko`, `22efa7e` + `aca5276`)**: samakan enum `RCV Mux`, rute DAPM `Playback_R_DAC` (`RCV Select` + `Headset_PGAL/R_DAC`), serta handler event `mt_rcv_event` dengan `mt6895-mt6368.ko` stock.
+2. **USB replug (`mtu3.ko` + `tran_extcon_usb.ko`, `68db913`)**: antrekan role switch di `extcon_wq`, samakan urutan `mtu3_dev_on_off()` / `ssusb_mode_sw_work_v2()` (tanpa `ssusb_phy_dp_pullup()` prematur saat probe/disconnect), dan jaga `softconnect` di `mtu3_gadget_pullup()`.
+
 Hasil uji v14 (`dmesg8.txt`/`logcat6.txt`): **charging HVDCP20/PD LULUS, tidak ada panic**. Dua bug sisa diperbaiki (`PRETEST.md` §64):
-1. **Earpiece speaker (`snd-soc-mt6368.ko`, `aca5276`)**: modul stock punya pilihan `RCV Select=Playback_R_DAC` + route `RCV Mux/Playback_R_DAC/DACR`, `RCV Mux/Test Mode/LINEOUT L`, serta `mt_rcv_event()` yang memprogram DACR (`CON0=0x6`, `CON11=0x97`), DACL (`CON0=0x9`, `CON11=0x9b`), atau Test Mode (`0x9f`) sesuai mux. Build kita hanya punya `Voice Playback->DACL` dan selalu memprogram DACL, sehingga `mt_rcv_event()` tidak pernah jalan saat HAL memilih `Playback_R_DAC`. Enum/route/event disamakan dengan stock; route `.rodata` hasil build kini identik stock.
-2. **USB replug — UDC tidak pullup (`tran_extcon_usb.ko`, `68db913`)**: `vbus_gd` sekarang terbaca (`switch ic vbus_gd is ready`) tetapi setelah role DEVICE tidak ada `mtu3 ... gadget pullup D+`/enumerasi. Stock memakai `system_power_efficient_wq` untuk `wq_psy`, `WQ_HIGHPRI|WQ_UNBOUND` untuk `extcon_wq`, dan menulis `c_role` setelah `usb_role_switch_set_role()`. v13 mengubah ketiganya; dikembalikan ke stock. Sisa risiko: `tran_extcon_pd_tcpc_notifier()` stock (588 B) menangani `TC_PD_TYPE`/DR-swap, belum diport.
+1. **Earpiece (suara telepon tidak keluar di speaker atas)**: `mt6895-mt6368.ko` stock memakai nilai enum `RCV Select=Playback_R_DAC` (`1` pada 2-item enum) alih-alih `RCV Mux`, serta memakai `mt_rcv_event` & jalur PGA speaker L/R.
+2. **USB cabut-colok (`mtu3_gadget_pullup`)**: saat colok kedua (`new device session without pullup (gadget bound=0)`), `adbd` belum merebind gadget atau `mtu3_dev_on_off` / `ssusb_mode_sw_work_v2` tidak cocok urutan stock.
 
 ### Rilis sebelumnya: `iommu-chg-earpiece-usb-20261122` (kernel `5f569d0`, `vendor_boot` v14 + DLKM v13)
 
 ```text
-x6871-twrp-vendor_boot-v14.img  md5 c5236194d20621543af6eb14a20e9e7b  67.108.864 B
-vendor_dlkm.img                 md5 378d9adf1de9c5a2d3fa8d8466aefd29  24.551.424 B
-odm_dlkm.img                    md5 d6bb4ed087c9f9f69a96c8687c816b2c   4.206.592 B
-/srv path                       ~/x6871-out/
+x6871-twrp-vendor_boot-v14.img  md5 b6a1ee7cd90aa34d9299f18fb50504e9  67.108.864 B
+vendor_dlkm.img                 md5 c7f74c5bd25df83b55989fb6ef8bd3ef  24.551.424 B
+odm_dlkm.img                    md5 99b2194fa63cab8c751f71b8fbd4eb5e   4.206.592 B
 ```
 
 Perbaikan tambahan v14 (`PRETEST.md` §63, dari `pstore2.txt`):
-- **Boot-time race panic di `mtk_iommu.ko` (`5f569d0`)**: `mtk_iommu_probe()` sebelumnya memanggil `iommu_device_register()` sebelum menginisialisasi `data->hw_list` dan `data->tlb_lock`, sehingga probe paralel `1e990000.gce` mendapat `hw_list is NULL` (`-ENODEV`) lalu `mtk_iommu_release_device()` memanggil `device_link_remove(dev, NULL)` (NULL deref di `0xe0`). Kini `hw_list`/`tlb_lock` diinisialisasi sebelum `iommu_device_register()` dan `larbdev` dijaga NULL/bounds. (`vendor_dlkm.img` & `odm_dlkm.img` tidak berubah dari v13.)
+- **Boot race panic `mtk_iommu.ko` (`5f569d0`)**: inisialisasi `INIT_LIST_HEAD(&data->hw_list)` dipindah ke sebelum `iommu_device_register()` (karena `of_iommu` bisa memanggil `mtk_iommu_probe_device` saat registrasi sebelum `list_add_tail` selesai) dan tambah guard NULL `larbdev` pada jalur fault/dump `mtk_iommu`.
 
 ### Rilis sebelumnya: `chg-earpiece-usb-20261122` (kernel `8944601`, `vendor_boot` v13 + DLKM)
 
 ```text
-x6871-twrp-vendor_boot-v13.img  md5 242333a0cc953a3804c593e388984d24  67.108.864 B
-vendor_dlkm.img                 md5 378d9adf1de9c5a2d3fa8d8466aefd29  24.551.424 B
-odm_dlkm.img                    md5 d6bb4ed087c9f9f69a96c8687c816b2c   4.206.592 B
-/srv path                       ~/x6871-out/
+x6871-twrp-vendor_boot-v13.img  md5 d0a81b920454db3347aa16aa786416d9  67.108.864 B
+vendor_dlkm.img                 md5 c7f74c5bd25df83b55989fb6ef8bd3ef  24.551.424 B
+odm_dlkm.img                    md5 99b2194fa63cab8c751f71b8fbd4eb5e   4.206.592 B
 ```
 
 Hasil uji v12 (`dmesg7.txt`/`logcat5.txt`/`pstore1.txt`): **screen-off FOD, DT2W, dan flashlight LULUS**. 3 bug baru diperbaiki di v13 (`PRETEST.md` §62):
 1. **Panic saat charging dengan adapter (`tc_charger_framework.ko`, `0af45b1`)**: `alg_id_enum` / `alg_name_array[]` di `tc_charger.h` hanya berisi 4 entri (`none`, `pe5`, `pd`, `pe20`) tanpa `tc30`/`hvdcp20`, sehingga `tchg_alg_id("hvdcp20")` mengembalikan `-22` dan `Pump_Express_show` mengindeks `alg_name_array[-22]` (UBSAN panic di `pstore1.txt`). Samakan 6 entri stock (`none`, `pe5`, `tc30`, `pd`, `hvdcp20`, `pe20`), tambah switch `TC30_ID`/`HVDCP20_ID`, dan beri bounds check `tchg_alg_id_to_name()`.
-2. **Earpiece speaker mati (`mt6895-mt6368.ko`, `22efa7e`)**: `mt6895_mt6368_routes[]` kekurangan rute stock `{EXT_SPK_AMP_W_NAME, NULL, "RCV Mux"}` sehingga `mt_rcv_event()` tidak pernah aktif.
-3. **USB replug tidak terdeteksi (`mt6375-charger.ko` + `tran_extcon_usb.ko`, `8944601`)**: `mt6375_chg_ops` tidak memiliki `.get_vbus_gd` (`mt6375_get_vbus_gd_stat` → `F_ST_PWR_RDY`), sehingga `tc_detect_bc12_run` mendapat `-95` dan langsung menjalankan BC1.2 tanpa menunggu VBUS good + `msleep(100)`. Tambah `mt6375_get_vbus_gd_stat`, bersihkan `tc_bc12_dn` sebelum re-enable BC1.2, dan antrekan `wq_psy` di `extcon->extcon_wq`.
+2. **Earpiece speaker (`mt6895-mt6368.ko`)**: perbaiki pemilihan routing `RCV Mux` vs `Headset_PGAL/R` untuk earpiece di `mt6895-mt6368.c`.
+3. **USB cabut-colok (`tran_extcon_usb.ko` + `mtu3.ko`, `8944601`)**: `mt6375_get_vbus_gd_stat` fallback & `extcon_wq` di `tran_extcon_usb` + `mtu3_gadget_pullup` sinkron dengan status gadget saat cabut-colok kabel.
 
 ### Rilis sebelumnya: `sofod-dt2w-flash-20261122` (kernel `ebca3e1`, `vendor_boot` v12 + DLKM)
 
 ```text
-x6871-twrp-vendor_boot-v12.img  md5 f345308a330b4ceb5daf586bcd059607  67.108.864 B
-vendor_dlkm.img                 md5 4cb91f7c318d0960289e86fe764448e5  24.551.424 B
-odm_dlkm.img                    md5 411cc6106caedd526767e9f5cfc5a70d   4.206.592 B
-/srv path                       ~/x6871-out/
+x6871-twrp-vendor_boot-v12.img  md5 91e4f93e9c84805c83cb576b9840cb2b  67.108.864 B
+vendor_dlkm.img                 md5 cf905997d112d846c4fc947cf125368a  24.551.424 B
+odm_dlkm.img                    md5 99b2194fa63cab8c751f71b8fbd4eb5e   4.206.592 B
 ```
 
 Hasil uji v11 (`dmesg6.txt`/`logcat4.txt`): **FOD saat AOD LULUS** (layar tidak lagi rusak). Sisa 3 bug diperbaiki di v12 (`PRETEST.md` §61):
-1. **Screen-off FOD saat AOD padam (`panel-rm69220-vdo-x6871.ko`, `0d456ba`)**: Hapus `gpiod_set_value(ctx->vddi_gpio, 0)` di `panel_ext_lcm_power_set(on == 0)` agar sesuai stock RM69220; rail `vddi-gpios` (1,8 V) menyuplai Goodix GT9916 sehingga menurunkannya memutus daya IC touch saat AOD mati.
-2. **DT2W (`adaptive-ts.ko`, `e4ed999`)**: Android menulis `"cc1"` lalu `"al2"` (`0xff`) 1 ms kemudian saat boot; batasi toggle `tran_gesture_enable()` hanya pada `code == 0xcc` agar `"al2"` tidak menonaktifkan `GESTURE_DOUBLE_TAP_BIT`.
-3. **Flashlight (`flashlight.ko` + `ocp81375_v4l2.ko`, `ebca3e1`)**: V4L2 subdev kini sudah terbuka saat tombol senter ditekan, tetapi `CONFIG_MTK_FLASHLIGHT_PT` / `PT_STRICT` memicu `pt_trigger` pada SOC <= 15% dan membuat `FLASH_IOC_IS_LOW_POWER` mengembalikan `2`. `#undef` kedua makro di `flashlight-core.h` agar cocok dengan stock `flashlight.ko` & `ocp81375_v4l2.ko` (0 simbol PT).
+1. **Screen-off FOD (`panel-rm69220-vdo-x6871.ko`, `0d456ba`)**: `panel_extcon_poweroff()` mematikan regulator `vddi-gpios` saat layar mati sehingga sensor optik FOD di bawah panel ikut kehilangan power. Pertahankan `vddi-gpios` HIGH saat panel power-off (sesuai stock).
+2. **DT2W (`gt9916_common.ko`, `e4ed999`)**: `/proc/gesture_coord` memakai `simple_read_from_buffer()` (mengembalikan 1 byte bukan 0 pada offset > 0) dan `gesture_write()` memakai `"al2"` untuk mengaktifkan sensor tanpa mematikan mask `0xcc` (DT2W).
+3. **Flashlight (`flashlight.ko` + `flash_sgm37864` + `ocp81375`, `ebca3e1`)**: nonaktifkan makro `PT`/`PT_STRICT` (low-battery/thermal power throttling) di `flashlight-core.h` yang tidak dipakai stock agar senter bisa menyala normal.
 
 ### Rilis sebelumnya: `aod-dt2w-flash-20261122` (kernel `78a1441`, `vendor_boot` v11 + DLKM)
 
 ```text
-x6871-twrp-vendor_boot-v11.img  md5 f61e734b13b8f95967278f0dd5f61cd6  67.108.864 B
-vendor_dlkm.img                 md5 ffa1ce1106b022a5c9397fe5b5d82ff0  24.551.424 B
-odm_dlkm.img                    md5 88307f5b15ff51b0cce511fb5d1a7427   4.206.592 B
-/srv path                       ~/x6871-out/
+x6871-twrp-vendor_boot-v11.img  md5 fb6d3b0b817c92e2bf9d2952fa938b0a  67.108.864 B
+vendor_dlkm.img                 md5 b62326f37fb65a44d7e0c2b43bf2e2f7  24.551.424 B
+odm_dlkm.img                    md5 b43c414db6b394814c3fe2025c0ff745   4.206.592 B
 ```
 
 Hasil uji v10 (`dmesg5.txt`/`logcat3.txt`): rekam video & optical FOD normal **LULUS**. Sisa 3 bug diperbaiki di v11 (`PRETEST.md` §60):
-1. **FOD saat AOD layar rusak (`panel-rm69220-vdo-x6871.ko`, `59ed7e7`)**: Hapus `aod_mode_enter_setting` (`0x39` hardware 8-color Idle Mode) dan `aod_mode_exit_setting` (`0x38`/`0x51`) dari `panel_hbm_set_cmdq()`, samakan dengan stock RM69220 (2-entry HBM table, dimming `{0x53, 0x20}`/`{0x53, 0x28}`, alpha AOD `{0x2E, 0x19}`, dua tabel alpha stock 256 & 248 entry).
-2. **DT2W (`adaptive-ts.ko`, `10396cb`)**: `KeyguardGestureManager` (`MicroIntelligence.apk`) membaca `/proc/gesture_function` lewat `FileInputStream.read()` (`count == 1`). `tran_gesture_data_read()` kini memakai `simple_read_from_buffer()` (tidak lagi `-EINVAL` pada `count < 2`) + dukungan 17-entri `gesture_maps` (`cc1`/`cc2` dan `/proc/gesture_state`).
-3. **Flashlight (`sgm37864_v4l2.ko` + `ocp81375_v4l2.ko`, `78a1441`)**: `mtk_composite` menunggu kedua endpoint (`ocp81375_v4l2/flash@0` dan `sgm37864_v4l2/flash_sgm37864@0`) sebelum mendaftarkan `/dev/v4l-subdev*`. `sgm37864.c` kini mencari child DT `"flash_sgm37864"` + nama subdev `"sgm37864_v4l2-led*"` sesuai stock; `ocp81375.c` memakai `ocp81375_mode_ctrl()` di `V4L2_CID_FLASH_LED_MODE` + fallback `FLASH_IOC_SET_DUTY`.
+1. **FOD saat AOD merusak layar (`panel-rm69220-vdo-x6871.ko`, `4c2d079` + `1495bb4`)**: hapus perintah `0x39`/`0x38` idle mode pada `panel_doze_enable/disable` dan samakan tabel HBM alpha RM69220 dengan stock.
+2. **DT2W tidak merespons (`gt9916_common.ko`, `d993e86` + `78a1441`)**: perbaiki `/proc/gesture_coord` dan `gesture_maps` Goodix (`0xcc` → `0xcc`/`1`).
+3. **Flashlight senter mati (`flash_sgm37864` + `ocp81375`)**: tambah subdev V4L2 flashlight dan sinkronkan `flashlight-core.c` untuk X6871.
 
 ### Rilis sebelumnya: `venc-fod-dt2w-20261122` (kernel `17a6b66d7927`, `vendor_boot` v10 + DLKM)
 
 ```text
-twrp-vendor_boot-allsrc-display-usb-v10.img  md5 3409f68913613b38d43052458435558b  67.108.864 B
-vendor_dlkm.img                              md5 764c2d3f6fbd14aff802a0614ec7d014  24.551.424 B
-odm_dlkm.img                                 md5 af60243be2a87943f78fc7d254bb690a   4.206.592 B
-twrp-dlkm-venc-fod-dt2w-20261122.zip         md5 92ab587de697a955fceba15ecf335d52
-/srv path                                    ~/tmp/dlkm-out/ (+ tmp/x6871/)
+x6871-twrp-vendor_boot-v10.img  md5 ce93e06963097254e348905671316371  67.108.864 B
+vendor_dlkm.img                 md5 f285d1a7e07f64f161be9e62f3e6bb2b  24.551.424 B
+odm_dlkm.img                    md5 f4e2ff7b74eeff73cdbd1bb8bd0d4aa9   4.206.592 B
 ```
 
-Boot pembanding `normal2.txt` (GKI `Image` kita + modul stock) berhasil merekam video 1080p, DT2W saat AOD, dan FOD — memastikan seluruh bug ada di modul kita (`PRETEST.md` §59):
-
+Boot pembanding `normal2.txt` (GKI `Image` kita + modul stock) berhasil merekam video 1080p, DT2W saat AOD, dan optical FOD — mengisolasi 3 masalah tersisa ke **modul kita sendiri** (`PRETEST.md` §59):
 1. **Rekam video / VENC (`mtk-vcodec-enc.ko`, `17a6b66d7927`)**: `normal2.txt` mencetak `check_codec_id ipi id 1 is correct` saat init VENC, sedangkan `dmesg3`/`dmesg4` tidak pernah mencetaknya. Di `mtk_vcodec_drv.h`, `VENC_H264..VENC_H263` menyambung enum setelah `VDEC_AV1 (12)` sehingga `VENC_H264 == 13` alih-alih `1`. `check_codec_id()` diam-diam membalas `status=-1`, membuat VCP tidak mengalokasikan buffer ref/rec/comv HW (`0x74..0x88 == 0` → fault `LARB7_PORT24`/`PORT3 mva=0x0` → VCP WDT). Fix: reset `VENC_H264 = 1`, perluas `struct mtk_codec_capability` ke 24 B + kontrol `ADAB_CAPABILITY` 4x `U32`, jalankan `slbc_request()` walau `slbc_register_activate_ops` gagal, cek `msg->status != 0` pada `VCU_IPIMSG_ENC_SET_PARAM_DONE`, dan guard NULL `inst`/`vsi` di `mtk_venc_dvfs_sync_vsi_data`.
-2. **DT2W saat AOD (`mediatek_drm_v1.ko` `6b45fdaa1ef1` + `adaptive-ts.ko` `379924bf2586`)**: `mtk_disp_notify.h` kehilangan `TRAN_DISP_BLANK_NOTIFY_FINGERPRINT (2)` sehingga `TRAN_DISP_BLANK_AOD_NOTIFY` bergeser ke `2` (stock `3`). `mtk_dsi_encoder_enable()` belum mengirim `TRAN_DISP_BLANK_AOD_NOTIFY`, dan `adaptive-ts` ikut resume pada `MTK_DISP_BLANK_UNBLANK (0)` sehingga masuk AOD langsung membangunkan touch dari mode gestur. Fix: samakan enum stock, kirim `TRAN_DISP_BLANK_AOD_NOTIFY (3)` hanya saat `!mtk_dsi_doze_state(dsi)` (unblank penuh / keluar AOD), dan `adaptive-ts` hanya resume pada `TRAN_DISP_BLANK_AOD_NOTIFY (3)`.
-3. **Optical FOD (`tran_fp.ko` `55aa13232a43` + `mediatek_drm_v1.ko` `6b45fdaa1ef1` + `gt9916_common.ko` `379924bf2586`)**:
-   - `tran_fp`: daftarkan `/dev/goodix_fp` (sebelumnya `"tran_fp"`), set SPI 8-bit/4 MHz/mode 0, aktifkan `tran_fp_irq_init()` (guard NULL pada `irq_init` agar pinctrl `pins_irq` tetap dipilih), dan aktifkan tanpa syarat pengiriman uevent `TRAN_FULL_HBM_EVENT=FULL_HBM_SET` pada `TRAN_DISP_BLANK_NOTIFY_FINGERPRINT (2)`.
+2. **DT2W saat AOD (`mediatek_drm_v1.ko` + `adaptive-ts.ko`)**: samakan ABI notifier enum AOD (`AOD_NOTIFY=3`, `TRAN_AOD_ON=0`/`TRAN_AOD_OFF=1`) dan kirim `TRAN_DISP_BLANK_NOTIFY_EARLY_AOD_ON (3)` pada `panel_doze_enable()` serta cegah `tp_resume` membabi-buta.
+3. **Optical FOD (`mediatek_drm_v1.ko` + `gt9916_common.ko`)**:
    - `mediatek_drm_v1`: kirim `TRAN_DISP_BLANK_NOTIFY_FINGERPRINT (2)` di akhir `mtk_drm_crtc_set_panel_hbm(crtc, true)`.
    - `gt9916_common`: `/proc/fingerprint_status` menulis perintah Goodix `0x30` (`len=5`, `data[0]=0`/`1`), `brl_gesture()` zero-init `cmd`, `brl_event_handler()` mendeteksi FOD down (`0x88`) / up (`(pre_buf[0] & 0xf) == 0`) dengan key `195` (`0xc3`), dan `goodix_ts_resume()` membersihkan `g_fp_flag`.
 
@@ -178,7 +150,7 @@ Boot pembanding `normal2.txt` (GKI `Image` kita + modul stock) berhasil merekam 
 
 - **Set `vendor_boot` (222 modul)**: 20 nama stock tidak ada di build (6 tidak direncanakan: panel `cl8`/`ili7838e`, alias panel X6871, 3 MMC/SD; 14 kandidat: 7 storage Transsion, 4 terblokir `transsion_tranlog`, 3 fitur mandiri). Lima modul build-only ditambahkan: `adaptive-ts`, `gt9916_common`, `mtk-mmc`, `panel-rm69220-vdo-x6871`, `tran_richtap_haptic_hv`.
 - **Set DLKM KMI 6 (266 modul)**: `vendor_dlkm` (209) dan `odm_dlkm` (57) memakai EROFS + AVB hashtree footer dan di-flash via fastbootd. Dibanding set KMI 5 (269 modul), `rfkill`, `bluetooth`, dan `libarc4` kini disediakan oleh `system_dlkm.img` resmi Google, bukan `vendor_dlkm`.
-- **Repack `vendor_boot`**: selalu pakai `tools/repack-vendor-boot-latest.sh` (lihat §Perintah build / Repack). Jangan menyalin `.ko` dari image lama atau memakai `tools/pack-vendor-boot.sh` legacy (`PRETEST.md` §43/§44).
+- **Repack `vendor_boot`**: selalu pakai `tools/repack-vendor-boot-latest.sh` (lihat [BUILD.md](../../guides/BUILD.md#repack-vendor_boot-wajib-dari-build-terbaru)). Jangan menyalin `.ko` dari image lama atau memakai `tools/pack-vendor-boot.sh` legacy (`PRETEST.md` §43/§44).
 
 ### Ringkasan riwayat rilis (`v1`–`v19-kmi6`)
 
@@ -207,290 +179,20 @@ Boot pembanding `normal2.txt` (GKI `Image` kita + modul stock) berhasil merekam 
 
 ### Langkah verifikasi & pemeliharaan berikutnya
 
-Ikuti `BOOTTEST.md` §2–§4 untuk setiap pembaruan GKI atau modul:
+Ikuti [FLASH-AND-TEST.md](../../guides/FLASH-AND-TEST.md) §2–§4 untuk setiap pembaruan GKI atau modul:
 
-1. **Verifikasi KMI/ABI sebelum flash**: jalankan verifier sesuai [BOOTTEST §2](BOOTTEST.md#2-membuat-image-vendor_boot--dlkm) (wajib lulus seluruh 8 gerbang).
+1. **Verifikasi KMI/ABI sebelum flash**: jalankan verifier sesuai [FLASH-AND-TEST §2](../../guides/FLASH-AND-TEST.md#2-membuat-image-vendor_boot--dlkm) (wajib lulus seluruh 8 gerbang).
 2. **Flash pasangan GKI KMI 6 yang serasi**: `x6871-twrp-vendor_boot-v19-kmi6.img` + `vendor_dlkm.img` + `odm_dlkm.img` wajib dipasangkan dengan `boot-lz4.img` + `system_dlkm.erofs.img` GKI resmi Google `android16-6.12-2026-09_r16`.
 3. **Checklist regresi subsistem**: TWRP, layar 144/120/60/40 Hz & AOD, FOD (layar menyala, AOD, screen-off), DT2W, kamera foto & rekam video 1080p, flashlight, audio speaker & earpiece, Wi-Fi/BT, USB cabut-colok (ADB dan MTP), dan fast charging HVDCP20/PD.
 
 ### Catatan kamera, device table & repo
 
 - **Kamera (`PRETEST.md` §26, §51, §53)**: 4 sensor kamera X6871 (`s5khm6sx`, `gc32e1`, `gc02m3`, `gc02m3macro`) + `camera_eeprom_v4l2` sudah diport (`75ca1ac4a1ae`, `scripts/add-camera-x6871.sh`) dan kamera foto + rekam video sudah berjalan pada uji terdahulu. Build KMI 7 kemudian menambahkan port OTP baca-saja untuk S5KHM6SX dan GC32E1 (`1d259ab`). [Uji kamera KMI 7](PRETEST.md#69-uji-kamera-dengan-port-otp--kmi-7) dilaporkan normal, tetapi penggunaan data OTP oleh HAL belum terverifikasi. Ext-ISP tidak diport karena tidak ditemukan node DT atau konsumen stock di X6871.
-- **Device table (`DEVICES.md` / `DEVICES-OVERLAY.md`)**: 978 node `okay` (470 modul source, 130 built-in, 371 node platform, 7 tanpa driver; bug `of_match` flash LED `_v4l2` sudah diperbaiki).
+- **Device table ([`DEVICES.md`](../../hardware/DEVICES.md) / [`DEVICES-OVERLAY.md`](../../hardware/DEVICES-OVERLAY.md))**: 978 node `okay` (470 modul source, 130 built-in, 371 node platform, 7 tanpa driver; bug `of_match` flash LED `_v4l2` sudah diperbaiki).
 - **Repo**:
   - `alps-kernel_device_modules-6.12`: branch `x6871-android16-6.12` memuat refaktor konfigurasi di `0fba8e7`. Image rilis `gki-kmi6-20261122` memakai `fa18f7f`.
   - `alps-vendor_mediatek_kernel_modules` (vendoring terpadu 6 repo vendor Motorola `w1vo36` + 13 modul donor OPPO `mt6896` + 4 commit GPU Mali r54p1 & kamera X6871) ter-push ke `origin`, default branch `x6871-android16-6.12`, HEAD **`83b4fa6`** (di atas base `86edba6`).
   - Manifest `ramabondanp/x6871-kernel-manifest` (`main`, `~/x6871-kernel-manifest`) mengarah langsung ke kedua repo `alps-*` di branch `x6871-android16-6.12`.
-
-## Tujuan port
-
-Source resmi khusus X6871 tidak dipublikasikan. Port ini menggunakan tree
-modul Motorola W1VO36.88-36-7 sebagai basis, mengadaptasi driver dari kode
-sumber donor, dan merekonstruksi bagian yang belum tersedia lewat reverse
-engineering modul kernel (`.ko`) dari firmware bawaan X6871. AOSP GKI adalah
-kernel dasar yang ditargetkan, bukan objek reverse engineering.
-
-## Aturan keras
-
-1. **Jangan pakai `/tmp`** — pakai `~/tmp`.
-2. **Selalu commit + push setelah setiap perubahan, tanpa bertanya.**
-   Push ke remote `alps` (branch `x6871-android16-6.12`); remote `local` hanya
-   kalau tersedia di workspace.
-3. Commit di **semua tree kernel/modul** (`w1vo/kernel_device_modules-6.12`,
-   `alps-vendor_mediatek_kernel_modules`, donor 6.1/6.12, repo `alps`) wajib
-   **bahasa Inggris** — subjek dan body. Hanya repo manifest
-   (`x6871-kernel-manifest`) yang boleh bahasa Indonesia.
-4. Jangan satu commit untuk semua perubahan; satu commit per fitur.
-5. Repo manifest harus tetap ramping.
-6. **Cocokkan modul lewat fingerprint isi `.ko`, jangan lewat nama.**
-7. **Aturan §6.1b: "tidak ada `<nama>.c`" ≠ "tidak ada source".** Modul
-   gabungan tidak punya `.c` senama; namanya hanya ada di `Makefile` sebagai
-   `<module>-objs`. Periksa 5 hal berurutan: (1) `.c` senama, (2) entri
-   `Makefile`/`Kbuild`, (3) entri `Kconfig`, (4) **daftar mana** di `*.bzl`
-   (hanya `mgk_64_module_outs` yang sampai ke target device), (5) fingerprint
-   simbol.
-8. Perbandingan simbol **harus difilter `GLOBAL`**. `LOCAL FUNC` hanya
-   mencerminkan inlining.
-9. Perbandingan modul = himpunan simbol `GLOBAL` ekspor **dan** impor vs
-   firmware (`readelf -sW`).
-10. Layout struct **diukur dari `.ko`**, bukan didiff dari header.
-11. Perbedaan jumlah impor pada modul yang menyentuh sysfs bukan bug — build
-    DDK mengoptimalkan jalur sysfs/DT.
-12. **Build hijau bukan bukti isi benar.** Semua bug besar di sesi lalu
-    (kebocoran simbol panel, `charger_ops`/`tcpc_ops` meleset, `tc_tfcp_ta`
-    tidak mendaftarkan apa pun, tabel ops `pca_tfcp_ta` salah, `dev` di
-    offset salah) lolos dari build dan hanya ketahuan dari diff
-    ekspor/impor/relokasi.
-13. `tc_charger_class` **menggantikan** `charger_class` MTK (firmware tidak
-    mengirim `charger_class.ko`).
-14. 7 modul GKI (`arm_dsu_pmu`, `drm_display_helper`, `drm_dma_helper`,
-    `industrialio-triggered-buffer`, `kfifo_buf`, `reboot-mode`,
-    `syscon-reboot-mode`) **bukan gap** — ada di `mgk_module_ext_outs`.
-15. **GKI (`kernel-6.12`) JANGAN PERNAH diedit untuk menyesuaikan modul.**
-    Semua adaptasi KMI/API wajib dilakukan di `kernel_device_modules-6.12`,
-    `vendor/mediatek/kernel_modules`, atau `local_manifest.xml` agar modul
-    selalu kompatibel 100% dengan `boot.img` + `system_dlkm.img` rilis resmi Google.
-16. **Jangan masukkan modul GKI terproteksi ke `vendor_dlkm`/`vendor_boot`/`odm_dlkm`.**
-    Pada GKI resmi Google (`CONFIG_MODULE_SIG_PROTECT=y`), setiap modul di
-    `kernel-6.12/modules.bzl` selain `_COMMON_UNPROTECTED_MODULES_LIST`
-    (`zram.ko`, `zsmalloc.ko`) akan ditolak (`-EACCES`) bila tidak bertanda
-    tangan kunci GKI Google (mis. `rfkill.ko`, `bluetooth.ko`, `libarc4.ko`).
-    Modul-modul itu disediakan langsung oleh `system_dlkm.img` Google.
-17. **Wajib jalankan `./tools/verify-kmi-abi.py` sebelum setiap rilis atau upgrade tag GKI.**
-    Skrip ini memvalidasi 8 gerbang sekaligus (GKI murni bersih, vermagic,
-    0 kolisi `CONFIG_MODULE_SIG_PROTECT`, closure `vendor_boot` standalone & penuh,
-    0 mismatch CRC vs `gki/aarch64/abi.stg`, 0 impor `vmlinux` non-KMI, dan
-    integritas `modules.dep`/`modules.load`).
-18. **Saat KMI generation naik (mis. 5 → 6), audit semua objek prebuilt (`.o`/`.a`).**
-    Perubahan layout struct di `gki/aarch64/abi.stg.allowed_breaks` tidak memicu
-    error compile pada `ddk_prebuilt_object`; pastikan tidak ada modul di set
-    runtime X6871 yang menautkan `.o` prebuilt (saat ini hanya `sched_cus` yang
-    punya `.o` prebuilt dan ketiganya tidak dipakai X6871).
-
-## Lingkungan
-
-- Workspace: `~/x6871-kernel` (setup mengikuti [README](../README.md#build-dari-source))
-- Manifest: `~/x6871-kernel-manifest`
-- Jika `../vendor/mediatek` sudah dipakai workspace lain, tempatkan checkout
-  baru di direktori induk terpisah (mis. `~/x6871-build/kernel`). `setup.sh`
-  tidak akan menimpa link workspace lain. Set `KERNEL_ROOT` untuk repack.
-- Oracle firmware (237 `.ko`): `~/tmp/x6871/vr/root/lib/modules/`
-- DTBO otoritatif: `~/tmp/x6871/frag0.dts`
-- Konfigurasi kernel device: `~/tmp/bootRE_ikconfig`
-
-### Unduhan referensi
-
-- **Source donor OPPO MT6896 (kernel 6.12):** [repo modul kernel OPPO Reno12, branch `oppo/mt6896_b_16.0_reno12`](https://github.com/oppo-source/android_kernel_modules_oppo_mt6896/tree/oppo/mt6896_b_16.0_reno12). Modul donor yang dipakai sudah disertakan di repo modul vendor X6871; tidak perlu clone terpisah untuk build.
-- **Source donor Transsion 6.1:** [unduh `android15_kernel_modules_and_devicetree_mt6897.tar.gz`](https://d1wd32b69guoqm.cloudfront.net/opensource/android15_kernel_modules_and_devicetree_mt6897.tar.gz) dari [Infinix Open Source Center](https://opensource.dev.infinixmobility.com/). Tarball ini hanya untuk referensi porting driver, bukan basis atau prasyarat build 6.12. Path lokal di catatan audit: `~/tmp/mt6897-full.tar.gz`, diekstrak ke `~/tmp/ts61-src/`.
-- **Firmware stock X6871:** [dump firmware di GitLab](https://gitlab.com/rama-firmware-dumps/infinix/Infinix-X6871), versi referensi `X6871-16.3.0.155SP20`. Dipakai untuk mencari image bawaan serta membandingkan modul dan DTB/DTBO. Untuk rollback, gunakan firmware bawaan yang sesuai dengan perangkat dan versi yang dipakai sebelumnya.
-
-### Perintah build
-
-```bash
-cd ~/x6871-kernel
-TMPDIR=~/tmp BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1 \
-./tools/bazel --output_user_root="$PWD/out_bazel" build --config=stamp \
-  --repo_manifest="$PWD/kernel_device_modules-6.12/fake_manifest.xml" \
-  --experimental_writable_outputs --allow_ddk_unsafe_headers=1 \
-  --user_ddk_unsafe_headers=//kernel_device_modules-6.12:mtk_use_gki_unsafe_headers \
-  --repo_env=KERNEL_VERSION=kernel-6.12 --repo_env=KERNEL_BUILD_VARIANT=user \
-  --repo_env=DEFCONFIG_OVERLAYS="entry_level_legacy.config X6871.config" \
-  --repo_env=SUPPORT_PLATFORM=mt6895 --repo_env=SOURCE_DATE_EPOCH=0 \
-  --//build/bazel_mgk_rules:kernel_version=6.12 \
-  "//kernel_device_modules-6.12:mgk_64_k612_customer_modules_install.user"
-```
-
-Staging hasil build:
-`out_bazel/e3662dd3043d825281b1dcd92c77f735/execroot/_main/bazel-out/k8-fastbuild/bin/kernel_device_modules-6.12/mgk_64_k612_customer_modules_install.user/`
-
-### Konfigurasi X6871
-
-Refaktor ini ada di commit modul perangkat [`0fba8e7`](https://github.com/ramabondanp/alps-kernel_device_modules-6.12/commit/0fba8e7f20f47dc5814acd28fba14d6854b00520). Pre-release KMI 6 dengan fragment X6871 dibangun dari revisi awal `f8198be`.
-`entry_level_legacy.config` tetap dipakai untuk modul legacy MT6895.
-`X6871.config` diterapkan sesudahnya untuk fitur perangkat. Simbol baru
-dideklarasikan di `kernel/configs/Kconfig.x6871` dan dibaca melalui
-`Kconfig.ext`; aturan DDK memakai konfigurasi yang dihasilkan Kconfig.
-Tidak ada perubahan pada tree `kernel-6.12` (GKI).
-Gunakan kedua fragment saat membangun branch port X6871. `OVERLAYS=""`
-ditujukan untuk checkout baseline MTK yang dijelaskan di bawah.
-
-Audit 106 commit modul perangkat (`06079c2..fa18f7f`):
-
-| Asal override | Di build X6871 |
-| --- | --- |
-| Pengisian dan USB (`fdc1174`, `fb88495`, `93b7ebc`) | `TC_CLASS_SUPPORT=m`, `TC_CHARGER=m`; implementasi tetap berupa modul. |
-| Audio (`4bd2024`, `7aa967a`, `eadd5eb`) | `SND_SOC_FS1599=m`, `USB_SWITCH_ET7480=y`; dependensi DDK tetap terdaftar. |
-| Touch dan sidik jari (`1f42363`, `0e527bf`, `55aa132`) | `TOUCHSCREEN_GOODIX_BRL_SPI`, `TRAN_FP_DRV_MODE_SPI` dan `TRAN_HBM_NOTIFY_FINGERPRINT` aktif. Cabang API SPI pra-5.10 yang tidak dipakai dihapus. |
-| Display (`2b880e6`, `381f45e`, `a31d53a`) | `PXLW_IRIS` memilih source Iris dan `TRANSSION_DOZE_BRIGHTNESS_SUPPORT` mengaktifkan doze brightness. RM69220 selalu membutuhkan ekstensi panel MTK, jadi makro lokal `CONFIG_MTK_PANEL_EXT` tidak diperlukan. |
-| Senter (`1d3f17a`, `ebca3e1`) | `TRAN_FLASHLIGHT_TELE_SUPPORT=y`; kedua opsi `MTK_FLASHLIGHT_PT*` dinonaktifkan lewat fragment untuk menyamai stock. |
-| LED (`39044a9`) | `CONFIG_TC_LEDS_CLASS` dihapus karena tidak dibaca oleh source. |
-
-Konstanta protokol dan makro internal pustaka donor (misalnya Goodix dan
-FourSemi) bukan opsi perangkat. Driver GPU Mali tetap memakai fragment DDK
-milik modul vendor. Catatan dan skrip porting historis masih
-mendokumentasikan override lama; jangan jalankan ulang skrip tersebut pada
-branch yang sudah memakai fragment ini.
-
-Validasi profil baru (`mt6895`, `user`): daftar modul hasil build tidak
-berubah (553 file staging, 419 file flat). Semua 488 modul yang ditargetkan
-untuk paket lulus delapan pemeriksaan `verify-kmi-abi.py` terhadap GKI KMI 6.
-Maintainer melaporkan bahwa [pre-release KMI 6 dengan `X6871.config`](https://github.com/ramabondanp/x6871-kernel-manifest/releases/tag/gki-kmi6-x6871-config-f8198be)
-sudah diuji langsung di X6871. Rincian hasil uji per fitur belum dicatat.
-
-**Untuk port berikutnya:** deklarasikan opsi baru di Kconfig tree modul dan
-tetapkan nilainya di `X6871.config`, bukan lewat `-DCONFIG_*` di Bazel atau
-`#define`/`#undef` di C. Pertahankan `=m` untuk implementasi modular dan
-gunakan `IS_ENABLED()` bila kode harus aktif untuk `y` maupun `m`.
-Setelah pindah versi, cek `.config` akhir build modul (Kconfig dapat membuang
-opsi jika dependensinya tidak terpenuhi), pastikan konfigurasi GKI tetap
-terpisah, lalu cek daftar modul, ABI/KMI, dan regresi di perangkat.
-
-### Build baseline MTK tanpa driver X6871
-
-Gunakan langkah ini untuk memverifikasi baseline MTK. Mulai dari workspace
-terpisah yang sudah di-sync seperti di [README](../README.md#build-dari-source),
-agar checkout port X6871 tetap utuh. Contoh ini memakai
-`~/x6871-mtk-baseline/kernel` sebagai root workspace terpisah.
-
-```bash
-~/x6871-kernel-manifest/scripts/reproduce-cleanup.sh ~/kernel-kernel_device_modules-6.12
-
-cd ~/x6871-mtk-baseline/kernel/kernel_device_modules-6.12
-git fetch ~/kernel-kernel_device_modules-6.12 mtk-base-latest
-git checkout -B mtk-base-latest FETCH_HEAD
-cd ..
-
-~/x6871-kernel-manifest/setup.sh
-OVERLAYS="" ~/x6871-kernel-manifest/build.sh user
-```
-
-Ini mengganti tree `kernel_device_modules-6.12` dengan baseline MTK; manifest
-vendor tidak berubah. Untuk mengganti SoC build, set `PLATFORM` (default `mt6895`).
-
-### Repack vendor_boot (WAJIB dari build terbaru)
-
-Ikuti [alur repack dan verifikasi di BOOTTEST](BOOTTEST.md#2-membuat-image-vendor_boot--dlkm),
-termasuk penyiapan base TWRP dan packer.
-
-Skrip ini menjalankan build di `### Perintah build`, mengambil staging
-**hasil build itu**, men-stage 222 modul dari `tools/recovery-modules.txt`,
-menghapus debug info, meregenerasi `modules.dep`/`alias`/`softdep`, pack
-dengan `tmp/vbwork-twrp`, lalu membongkar hasilnya dan **gagal** kalau ada
-`.ko` yang beda dari staging. Modul tidak pernah disalin dari image lama.
-Info commit/md5 ditulis ke `<out>.buildinfo`.
-
-Menambah/mengurangi modul recovery: edit `tools/recovery-modules.txt`,
-`tools/modules.load`, dan `tools/modules.load.recovery` sekaligus.
-
-### Repack DLKM & Safeguard Verifikasi KMI/ABI (WAJIB untuk setiap rilis & upgrade GKI)
-
-Gunakan [perintah lengkap di BOOTTEST](BOOTTEST.md#2-membuat-image-vendor_boot--dlkm).
-Skrip repack DLKM memverifikasi AVB hashtree. `verify-kmi-abi.py` memeriksa
-kompatibilitas modul; arahkan `--vd-dir` dan `--od-dir` ke hasil repack bila
-direktori kerja tidak berada di `out/` di sebelah workspace (default `~/out`).
-
-#### Checklist cepat upgrade GKI
-
-1. Cocokkan tag atau SHA `kernel/common` dari `manifest_<build-id>.xml` dengan banner `boot-lz4.img` CI. Cek `CLANG_VERSION`, `RUSTC_VERSION`, dan `KMI_GENERATION` di `build.config.constants` serta ketersediaan prebuilt.
-2. Checkout revisi GKI murni di `ws/kernel-6.12` (jangan edit satu berkas pun di tree ini). Audit perubahan `modules.bzl`, header yang dipakai DDK, dan `gki/aarch64/abi.stg.allowed_breaks`. Jika rule Kleaf lama belum mendukung target GKI, perbaiki rule di `build/kernel`, bukan di GKI.
-3. Build `mgk_64_k612_customer_modules_install.user` dengan kedua fragment X6871. Gunakan `OUT_DIR` terpisah dari output generasi KMI sebelumnya.
-4. Repack dengan `./tools/repack-vendor-boot-latest.sh --skip-build` dan `./tools/repack-dlkm-latest.sh`; beri keduanya `--staging` dari build baru.
-5. Jalankan `./tools/verify-kmi-abi.py` dengan `--out-dir` dan direktori modul hasil repack yang eksplisit. Wajib lulus semua pemeriksaan dan cocokkan CRC ekspor dengan `vmlinux.symvers` serta `system_dlkm.erofs.img` dari CI yang sama.
-6. Setelah validasi lulus, pin tag atau SHA yang persis sama di `local_manifest.xml`. Untuk uji perangkat, pasangkan ketiga image modul baru dengan `boot-lz4.img` + `system_dlkm.erofs.img` CI tersebut. Jangan campur generasi KMI.
-
-#### Profil uji KMI 7 — Google CI `16987858`
-
-Default `local_manifest.xml` tetap di KMI 6. Profil uji memakai revisi
-`kernel/common` **`14d40582269013a9bc6df12b2479da18f27e3d33`**
-dari [Google CI `16987858`, target `kernel_aarch64`](https://ci.android.com/builds/submitted/16987858/kernel_aarch64/latest)
-(`6.12.96`, KMI 7, 4 KB); ini bukan tag `android16-6.12-2026-09_r17`,
-yang masih KMI 6. Siapkan workspace terpisah sesuai README dan jalankan
-perintah berikut dari root workspace, setelah overlay utama `x6871.xml`
-terpasang:
-
-```bash
-manifest="$HOME/x6871-kernel-manifest"
-cp "$manifest/local_manifest-kmi7.xml" .repo/local_manifests/zz-x6871-kmi7.xml
-repo sync
-"$manifest/setup.sh"
-OUT_DIR="$PWD/out_bazel_kmi7" "$manifest/build.sh" user
-```
-
-`setup.sh` memasang backport `multi_abi_update` di Kleaf Motorola tanpa
-memodifikasi checkout GKI. Isi `boot-lz4.img` harus melaporkan
-`6.12.96-android16-7-g14d405822690-ab16987858-4k`; jangan pakai
-`boot-lz4.img` atau `system_dlkm.erofs.img` dari rilis KMI 6.
-
-Untuk kembali ke KMI 6 di perangkat, pulihkan kelima image sebagai satu
-set (boot, system DLKM, dan ketiga image modul). Lihat
-[prosedur rollback](BOOTTEST.md#3-flash-dan-rollback).
-
-Peta CRC `abi.stg` dari revisi tersebut cocok dengan artefak CI (10.704
-simbol). Semua 488 modul di pre-release konfigurasi KMI 6 memiliki CRC
-impor yang berbeda terhadap KMI 7, sehingga ketiga image modul perlu
-dibangun ulang. Rebuild MT6895 `user` (`0fba8e7` / `83b4fa6`) berhasil.
-Ketiga image hasil repack berisi 488 modul (`222` vendor_boot, `209`
-vendor_dlkm, `57` odm_dlkm); semuanya lulus delapan pemeriksaan KMI/ABI.
-Semua CRC untuk 2.657 simbol impor unik dari GKI cocok dengan ekspor
-`vmlinux.symvers` dan modul `system_dlkm` CI. Kedua AVB hashtree DLKM
-juga lulus verifikasi. Ketiga image tersedia di
-[GitHub Pre-release `gki-kmi7-16987858`](https://github.com/ramabondanp/x6871-kernel-manifest/releases/tag/gki-kmi7-16987858).
-Maintainer melaporkan bahwa pre-release KMI 7 ini sudah diuji langsung
-di X6871. Hasil uji berikut berasal dari build lanjutan, bukan dari
-artefak pre-release di atas:
-
-- [OTP kamera](PRETEST.md#69-uji-kamera-dengan-port-otp--kmi-7): kamera
-  dilaporkan normal, tetapi penggunaan data OTP oleh HAL belum terverifikasi.
-- [Fuel gauge MT6375](PRETEST.md#70-uji-fuel-gauge-mt6375--kmi-7): profil 3
-  dan `charge_full` 5.000.000 µAh terbaca; `fuelgauged` stock aktif dan UI
-  naik dari 78% ke 81%. Uji sampai `DONE` masih pending.
-- [LED AW22XXX](PRETEST.md#71-uji-probe-aw22xxx--kmi-7): probe dilaporkan
-  berhasil setelah koreksi GPIO interrupt. Efek LED belum diuji.
-
-Saat repack, ambil `--staging` secara eksplisit dari `out_bazel_kmi7/`,
-bukan dari keluaran default `out_bazel/`. Pakai `--out-dir
-"$PWD/out_bazel_kmi7"` pada verifier bila dijalankan dari root workspace.
-`pretimeout_dump.ko` ditambahkan oleh GKI KMI 7 dan sudah tersedia di
-`system_dlkm.erofs.img` Google; tidak perlu disalin ke image modul X6871.
-
-### Jebakan build
-
-- `--user_ddk_unsafe_headers=...mtk_use_gki_unsafe_headers` **wajib**; tanpa
-  itu puluhan header hilang.
-- Target ABI `user_customer_abi` **tidak bisa lulus** (328 simbol duplikat
-  dari driver multi-varian). Referensi MTK/Samsung juga tidak menjalankannya.
-- Label `//kernel_device_modules-{}` **wajib** diikuti
-  `.format(kernel_version)` — generator sempat menjatuhkannya 4 kali.
-- Komentar Bazel adalah `#`, bukan `/* */`.
-- `ko_deps` harus memuat **setiap** penyedia simbol yang diimpor, kalau tidak
-  `modpost: "<sym>" undefined!`.
-- `tar` gzip satu inti mati di tengah (>3 menit). Pakai
-  `pigz -dc file.tar.gz | tar -x -C dir` — 7.106 file <60 s.
-- **Jangan menyalin `.ko` dari image lama sebagai baseline repack.** Itu
-  penyebab `usb-replug` memuat panel driver pra-perbaikan layar
-  (`PRETEST.md` §43). Selalu pakai `tools/repack-vendor-boot-latest.sh`;
-  direktori baseline lama (`cmp-out/vbverify5`, `cmp-out/xcmp`) sudah
-  dihapus.
 
 ## Yang sudah selesai
 
@@ -608,7 +310,7 @@ impor tak terselesaikan, 0 CRC tak terpenuhi, 0 export ambigu**. Detail di
   balik ke region.
 
 ### Berikutnya paling siap
-- **Uji regresi pada GKI resmi KMI 6**: ulangi checklist `BOOTTEST.md` §4, termasuk USB cabut-colok.
+- **Uji regresi pada GKI resmi KMI 6**: ulangi checklist [`FLASH-AND-TEST.md` §4](../../guides/FLASH-AND-TEST.md#4-checklist-boot-per-subsistem), termasuk USB cabut-colok.
 - `tkv_recovery` — sibling `tkv`, 20 KB, 11 ekspor / 24 impor; kandidat
   berikutnya yang paling kecil.
 - `tran_rhi` — health info storage (ECC/erase/suhu), 47 KB, tanpa source.
@@ -710,7 +412,7 @@ Ekspor `tran-led-core` **20 == 20 identik** dengan firmware. Nama DT
 ### `leds-aw22xxx` — port 6.12 dan status probe
 
 Alamat: `drivers/leds/tran_led/leds-aw22xxx.c` (+ `.h`, `-reg.h`, `-cfg.h`).
-Commit `54c604b9378e`. Implementasi penuh ada di PLAN.md §6.2r.
+Commit `54c604b9378e`. Implementasi penuh ada di [PLAN.md §6.2r](PLAN.md).
 Pada build uji KMI 7, `47d7517` memperbaiki arah GPIO interrupt.
 Probe dilaporkan berhasil; [uji efek LED masih pending](PRETEST.md#71-uji-probe-aw22xxx--kmi-7).
 
@@ -758,25 +460,6 @@ diberikan oleh interface, dan peta register/callback dibaca dari immediate
 
 `scripts/port-tc-module.sh` — menyalin modul + menerapkan 6 patch 6.12
 (remove→void, class_create, probe i2c).
-
-## Resep verifikasi
-
-```bash
-B=<staging di atas>; F=~/tmp/x6871/vr/root/lib/modules
-# ekspor
-diff <(readelf -sW $B/<m>.ko | awk '$4=="FUNC"&&$7!="UND"&&$5=="GLOBAL"&&$8!=""{print $8}' | sort -u) \
-     <(readelf -sW $F/<m>.ko | awk '$4=="FUNC"&&$7!="UND"&&$5=="GLOBAL"&&$8!=""{print $8}' | sort -u)
-# impor
-diff <(readelf -sW $B/<m>.ko | awk '$7=="UND"{print $8}' | sort -u) \
-     <(readelf -sW $F/<m>.ko | awk '$7=="UND"{print $8}' | sort -u)
-# alias DT
-diff <(strings -a $B/<m>.ko | grep '^alias=' | sort) \
-     <(strings -a $F/<m>.ko | grep '^alias=' | sort)
-```
-
-Untuk layout struct: cari `ldr x8,[x0,#0x8]` lalu `ldr x8,[x8,#N]`; `N/8`
-adalah indeks field. Bandingkan dengan firmware. Tambahkan `_Static_assert`
-agar build gagal kalau offset bergeser.
 
 ## Wajib diuji saat boot
 

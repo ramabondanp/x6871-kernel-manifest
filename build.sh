@@ -10,7 +10,7 @@
 #
 # OVERLAYS: nama file di kernel_device_modules-<KVER>/kernel/configs/,
 # dipisah spasi. Default: entry_level_legacy.config X6871.config
-# (set OVERLAYS="" untuk menonaktifkan). Lihat docs/PLAN.md & docs/HANDOFF.md.
+# (set OVERLAYS="" untuk menonaktifkan). Lihat docs/guides/BUILD.md.
 #
 # Output terverifikasi 6.12:
 #   - Port X6871 (x6871-android16-6.12, KMI 6): 553 file staging (552 unik), 419 .ko flat (413 target OOT X6871)

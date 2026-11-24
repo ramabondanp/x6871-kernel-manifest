@@ -2,7 +2,7 @@
 """Bandingkan .ko stock vs .ko hasil build sendiri, per section + simbol + relokasi.
 
 Dipakai untuk membuktikan apakah modul stock identik dengan hasil build kita
-(docs/PRETEST.md §26). Modul yang "identik" di sini bukan cuma .text sama, tapi
+(docs/archive/6.12/PRETEST.md §26). Modul yang "identik" di sini bukan cuma .text sama, tapi
 seluruh section yang dimuat, tabel simbol, relokasi section kode, dan modinfo.
 
 Contoh:

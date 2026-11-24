@@ -2,7 +2,7 @@
 
 Diperbarui: 2026-11-24 (UTC)
 
-> Dokumen ini adalah lanjutan dari [`PLAN-6.18-STATUS.md`](PLAN-6.18-STATUS.md).
+> Dokumen ini adalah lanjutan dari [`STATUS.md`](STATUS.md).
 > Fokusnya bukan menambah fitur, tetapi menutup temuan dari log boot 6.18:
 > crash yang sudah punya fix, error non-fatal yang masih berulang, dan
 > keputusan mana yang **tidak boleh** dikejar karena memang disabled di
@@ -247,7 +247,7 @@ memuat module ini.
 ```
 
 **Temuan:** badai sekitar 100 baris (event names + channel index 1)
-hanya muncul di dmesg1/3/4. Di dmesg2/5/6/7 yang lebih baru tinggal 2x
+hanya muncul pada log boot awal. Pada log boot yang lebih baru tinggal 2x
 `vote mminfra on err:1`. Event display yang diminta driver tidak ada di
 `gce-event-names` stock; jangan menambah event/channel ke DT. Karena
 tidak muncul lagi di log terbaru, tidak ada perubahan driver untuk
@@ -265,8 +265,8 @@ konsisten dengan jalur `fast_mtcmos` yang sudah memakai `ret < 0`.
 mediatek-mml 1f800000.mmlsys-config: error -EBUSY: can't request region for resource
 ```
 
-**Temuan:** gejala ini tidak ada di dmesg1-7. Error `mml-aal` IRQ dan
-`read event frame_done fail` hanya muncul di dmesg1/4; di log terbaru
+**Temuan:** gejala ini tidak muncul pada log boot terbaru. Error `mml-aal` IRQ dan
+`read event frame_done fail` hanya muncul pada log boot awal; di log terbaru
 MML probe dan service `vendor.mmlpq-default` berjalan. Tidak ada
 perubahan driver; jangan hapus node stock.
 
@@ -286,7 +286,7 @@ md5 `bcf3801494067a5d1cca578cdf3174c5` dan `vendor_dlkm.img` md5
 | `vendor_dlkm.img` | 24.551.424 B | `86fd65af151a1e813d132c5915686285` |
 | `odm_dlkm.img` | 4.206.592 B | `da2c64a1572ff27382128beb4bbcba8b` (tidak berubah) |
 
-Unduhan: https://gofile.io/d/kV60pldu
+(Image uji disimpan lokal, tidak disertakan di repo.)
 
 `vendor_dlkm` ini juga memuat fix thermal LVTS `cbabf0ea8c34`, jadi bisa
 dipakai untuk verifikasi thermal sekaligus.
@@ -522,7 +522,7 @@ tdrv_widevine      drDcihInit(): drApiStartThread failed: 0x6f03
 | `drApiStartThread failed: 0x6f03` | Thread DCIH di TA DRM stock gagal dibuat; terjadi di TA, bukan di `widevine_driver` kernel |
 
 **Perbandingan 6.12 ke 6.18:** dmesg 6.12 port (`6.12.117...Rama982`,
-`dmesg4.txt` 2026-11-21) memuat pola yang sama: `res 33` berulang, satu
+log boot 2026-11-21) memuat pola yang sama: `res 33` berulang, satu
 `res 8`, dua `drDcihInit ... 0x6f03`, `gp_read_raw ... -65528`, dan
 `insecure default`. Jadi pola ini bukan regresi 6.18. Log runtime stock
 X6871 tidak tersedia, jadi paritas dengan stock belum bisa dibuktikan
@@ -621,8 +621,9 @@ Urutan verifikasi yang disarankan:
 
 - Semua log yang dianalisis dibuat sebelum fix terakhir. Belum ada bukti
   runtime setelah commit.
-- Dokumen ini tidak mengubah kode. Perubahan tetap harus melalui commit
-  `6.18:` di repo yang sesuai.
+- Dokumen ini tidak mengubah kode. Perubahan tetap harus melalui commit baru
+  sesuai aturan commit di `AGENTS.md` (prefix `6.18:` di manifest; format
+  kernel dengan akhiran `for 6.18` di repo kernel/vendor bila khusus 6.18).
 - DT di tree tidak dipakai untuk image. `tools/repack-vendor-boot-latest.sh`
   dan `tools/pack-vendor-boot.sh` mempertahankan `dtb` stock secara
   byte-identical. Jangan mengubah `mt6895.dts` untuk mengejar error log.

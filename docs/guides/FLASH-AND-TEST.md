@@ -1,21 +1,21 @@
-# BOOTTEST — Prosedur Uji Boot & Checklist X6871
+# FLASH & TEST — Prosedur Uji Boot & Checklist X6871
 
 > **Status 2026-11-22:** Android 16 berhasil boot sampai launcher pada
 > `gki-kmi6-20261122` dengan GKI resmi Google. Log uji TWRP dan subsistem
-> di [HANDOFF](HANDOFF.md) berasal dari build KMI 5. Dalam
+> berasal dari build KMI 5 (lihat [HANDOFF-HISTORY](../archive/6.12/HANDOFF-HISTORY.md#hasil-uji-perangkat-sebelum-migrasi-kmi-5)). Dalam
 > [catatan rilis](https://github.com/ramabondanp/x6871-kernel-manifest/releases/tag/gki-kmi6-20261122),
 > maintainer mengonfirmasi bahwa fitur yang didokumentasikan berfungsi
 > pada unit yang ia uji langsung.
-> Bug USB cabut-colok tercatat pada GKI kustom; §67–§68 di `PRETEST.md`
+> Bug USB cabut-colok tercatat pada GKI kustom; §67–§68 di [`PRETEST.md`](../archive/6.12/PRETEST.md)
 > tidak memuat log khusus uji cabut-colok pada GKI resmi KMI 6.
-> Gunakan prosedur repack di §2; §9–§10 adalah arsip percobaan repack manual.
+> Untuk arsip percobaan repack manual lama, lihat [REPACK-HISTORY](../archive/6.12/REPACK-HISTORY.md).
 
 Tujuan: memvalidasi **seluruh boot** (recovery + Android system), bukan hanya satu modul.
 
 ## 0. Tiga kenyataan yang menentukan prosedur
 
 1. **Pembagian partisi modul di X6871:**
-   - **`vendor_boot`** (`vendor_ramdisk00/lib/modules/`, flat tanpa subdirektori versi): memuat **222 modul** first-stage/recovery bersama `modules.dep`, `modules.alias`, `modules.softdep`, `modules.load` (165 entri), dan `modules.load.recovery` (216 entri).
+   - **`vendor_boot`** (`vendor_ramdisk00/lib/modules/`, flat tanpa subdirektori versi): memuat **222 modul** first-stage/recovery pada KMI 6 (221 pada 6.18) bersama `modules.dep`, `modules.alias`, `modules.softdep`, `modules.load` (165 entri), dan `modules.load.recovery` (216 entri).
    - **`vendor_dlkm` + `odm_dlkm`** (partisi logis di `super`, format EROFS + AVB hashtree footer): memuat **266 modul** pada KMI 6 (**209** `vendor_dlkm` + **57** `odm_dlkm`, `modules.load` 191/57).
 2. **Kernel dan modul terikat oleh simbol + CRC, bukan release string.**
    Build ini memakai `CONFIG_MODVERSIONS`, dan `same_magic()` di
@@ -46,18 +46,18 @@ Unduh ketiga image X6871 dari [GitHub Release `gki-kmi6-20261122` (eksperimental
 | Artefak | Sumber | Catatan |
 |---|---|---|
 | `boot-lz4.img` & `system_dlkm.erofs.img` | [artefak Google GKI `android16-6.12-2026-09_r16` (build `16901051`, `kernel_aarch64`)](https://ci.android.com/builds/submitted/16901051/kernel_aarch64/latest) | **Wajib** KMI 6 (`6.12.92-android16-6`); flash masing-masing ke partisi `boot` dan `system_dlkm`. |
-| `x6871-twrp-vendor_boot-v19-kmi6.img` | `tools/repack-vendor-boot-latest.sh` | **222** modul source KMI 6 (`md5 91eb249ff001d250fad855c40476f1b5`, kernel `20a8f5d`); dtb/bootconfig/recovery TWRP tetap |
-| `vendor_dlkm.img` | EROFS + AVB (`fastbootd`) | **209** modul source KMI 6 (`md5 5f7b6cecb1c44a1ffc3280dd481fbfcf`, `191` `modules.load`); 3 modul GKI terproteksi dikeluarkan |
-| `odm_dlkm.img` | EROFS + AVB (`fastbootd`) | **57** modul source KMI 6 (`md5 6ee3cadceb5c4750dbbfe3d0056b6ea8`, `57` `modules.load`) |
-| `dtbo.img` | stock, tidak diubah | build tidak menghasilkan dtbo |
-| staging modul | `.../mgk_64_k612_customer_modules_install.user/staging/lib/modules/6.12.92-android16-6-g7cc745542612-4k` | 553 file / 552 nama unik (trimmed via `x6871_modules.bzl`) |
+| `x6871-twrp-vendor_boot-v19-kmi6.img` | `tools/repack-vendor-boot-latest.sh` | **67.108.864 B**, **222** modul source KMI 6 (`md5 91eb249ff001d250fad855c40476f1b5`, kernel `20a8f5d`/`fa18f7f`, vermagic `6.12.92-android16-6-g7cc745542612-4k`); `dtb`/`bootconfig`/`vendor_ramdisk01` identik TWRP; `modules.load` 165, `modules.load.recovery` 216, `modules.dep` 0 referensi menggantung. |
+| `vendor_dlkm.img` | EROFS + AVB (`fastbootd`) | **209** modul source KMI 6 (`md5 5f7b6cecb1c44a1ffc3280dd481fbfcf`, `191` `modules.load`); 3 modul GKI terproteksi dikeluarkan. |
+| `odm_dlkm.img` | EROFS + AVB (`fastbootd`) | **57** modul source KMI 6 (`md5 6ee3cadceb5c4750dbbfe3d0056b6ea8`, `57` `modules.load`). |
+| `dtbo.img` | stock, tidak diubah | build tidak menghasilkan dtbo. |
+| staging modul | `.../mgk_64_k612_customer_modules_install.user/staging/lib/modules/6.12.92-android16-6-g7cc745542612-4k` | 553 file / 552 nama unik (trimmed via `x6871_modules.bzl`). |
 
 ## 2. Membuat image vendor_boot & DLKM
 
-Siapkan workspace sesuai [README](../README.md#build-dari-source). Repack
+Siapkan workspace sesuai [README](../../README.md#build-dari-source). Repack
 `vendor_boot` juga membutuhkan image TWRP dasar untuk X6871 (tidak disertakan
 di repo) dan checkout `cfig/Android_boot_image_editor` yang mendukung zstd
-(lihat [catatan patch di §10](#10-ramdisk-zstd-twrp--catatan-tool-historis)).
+(lihat [setup patch zstd di BUILD.md](BUILD.md#setup-patch-zstd-untuk-android_boot_image_editor)).
 Taruh image dasar sebagai `vendor_boot.img` di direktori packer, lalu
 jalankan `./gradlew unpack` dari sana. Pastikan `build/unzip_boot/root.1`
 ada dan dependensi Gradle tersedia untuk `pack --offline`.
@@ -97,7 +97,7 @@ contoh flash di bawah.
 `tools/pack-vendor-boot.sh` adalah tool legacy dan **jangan dipakai untuk
 X6871**: ia memfilter berdasarkan nama stock sehingga modul build-only
 (`adaptive-ts`, `gt9916_common`, `mtk-mmc`, `tran_richtap_haptic_hv`)
-bisa hilang. Detail repack: `HANDOFF.md` §Repack dan `PRETEST.md` §44.
+bisa hilang. Detail repack: [BUILD.md](BUILD.md#repack-vendor_boot-wajib-dari-build-terbaru) dan [`PRETEST.md` §44](../archive/6.12/PRETEST.md).
 
 ## 3. Flash dan rollback
 
@@ -140,10 +140,10 @@ Ambil `dmesg` penuh setelah boot, lalu periksa:
 | Display/panel & AOD | matikan lalu nyalakan layar + uji AOD; `dmesg \| grep -iE 'lcm_prepare\|panel_doze\|underrun'` | resume normal, mode 144/120/60/40 Hz & AOD bersih, 0 underrun |
 | Touch & DT2W | `dmesg \| grep -iE 'goodix\|tran_touch'` | touch normal (`goodix_ts_report_finger`); masuk AOD tidak memicu `drm notify tp resume start`; double-tap memicu `got valid gesture type 0xcc` |
 | Charger/USB | cabut-colok kabel; `dmesg \| grep -iE 'tran_extcon\|ssusb_set_mode\|online=.*type=\|pullup\|gadget RESET'` | cabut → role NONE, colok → `online=1, type=1` (SDP), `pullup D+`, `gadget RESET`; ADB kabel/MTP tersambung kembali |
-| Fuel gauge (build uji KMI 7) | ambil `dmesg` dari awal boot hingga pengisian selesai; cek `X6871 fuelgauged ABI matched`, `FG_DAEMON_CMD_SET_KERNEL_UISOC`, dan `CHG_STAT` | daemon memperbarui UI; catat persentase saat `DONE` (`0x07`) secara terpisah. Lihat [PRETEST §70](PRETEST.md#70-uji-fuel-gauge-mt6375--kmi-7). |
+| Fuel gauge (build uji KMI 7) | ambil `dmesg` dari awal boot hingga pengisian selesai; cek `X6871 fuelgauged ABI matched`, `FG_DAEMON_CMD_SET_KERNEL_UISOC`, dan `CHG_STAT` | daemon memperbarui UI; catat persentase saat `DONE` (`0x07`) secara terpisah. Lihat [PRETEST §70](../archive/6.12/PRETEST.md#70-uji-fuel-gauge-mt6375--kmi-7). |
 | Audio | `dmesg \| grep -iE 'mt6895-afe\|fs15xx\|snd'`; uji speaker | card terdaftar, PA aktif, tidak ada timeout IPI |
 | Kamera & Video | foto + rekam video 1080p lalu simpan; `dmesg \| grep -iE 'check_codec_id\|venc\|LARB7'` | `check_codec_id ipi id 1 is correct`, `slbc_request 1`, `mtk_vcodec_enc_clock_on`, **0** fault `LARB7_PORT24`/`mva=0x0` |
-| OTP kamera (build uji KMI 7) | uji S5KHM6SX dan GC32E1, lalu cek log HAL untuk jalur kalibrasi | catat operasi kamera dan pemakaian data OTP secara terpisah; kamera normal saja tidak membuktikan HAL tidak memakai fallback. Lihat [PRETEST §69](PRETEST.md#69-uji-kamera-dengan-port-otp--kmi-7). |
+| OTP kamera (build uji KMI 7) | uji S5KHM6SX dan GC32E1, lalu cek log HAL untuk jalur kalibrasi | catat operasi kamera dan pemakaian data OTP secara terpisah; kamera normal saja tidak membuktikan HAL tidak memakai fallback. Lihat [PRETEST §69](../archive/6.12/PRETEST.md#69-uji-kamera-dengan-port-otp--kmi-7). |
 | Connectivity | `dmesg \| grep -iE 'wlan\|wmt\|bt'`; `ip link` | `wlan0` ada dan tersambung |
 | Sensor/thermal | `dmesg \| grep -iE 'thermal\|lvts\|sensorhub'` | tidak ada trip panic |
 | RTC/PMIC | `dmesg \| grep -iE 'mt6685\|rtc\|spmi'` | RTC jalan, tidak ada error SPMI |
@@ -151,7 +151,7 @@ Ambil `dmesg` penuh setelah boot, lalu periksa:
 | Fingerprint (FOD) | `ls -l /dev/goodix_fp`; `cat /sys/kernel/tran_fp/vendor_name`; `dmesg \| grep -iE 'tran_fp\|fp key finger\|notify fingerprint'` | `/dev/goodix_fp` ada, `vendor_name=goodix_opt_tee`, sentuh ikon FOD memicu `fp key finger` (key `195`) + HBM uevent `TRAN_FULL_HBM_EVENT=FULL_HBM_SET` |
 | tkv | `/proc/tkv` | ada, atau log `refusing to map` (aman) |
 | tnek | `/dev/tnek` | ada |
-| LED AW22XXX | cek `aw22xxx_i2c_probe probe completed successfully!` di `dmesg` dan `/sys/class/leds/aw22xxx*`; coba efek dari UI | catat probe dan efek secara terpisah: node sysfs tidak membuktikan LED menyala. Lihat [PRETEST §71](PRETEST.md#71-uji-probe-aw22xxx--kmi-7). |
+| LED AW22XXX | cek `aw22xxx_i2c_probe probe completed successfully!` di `dmesg` dan `/sys/class/leds/aw22xxx*`; coba efek dari UI | catat probe dan efek secara terpisah: node sysfs tidak membuktikan LED menyala. Lihat [PRETEST §71](../archive/6.12/PRETEST.md#71-uji-probe-aw22xxx--kmi-7). |
 | Reboot/suspend | `reboot`; `echo mem > /sys/power/state` | tidak hang |
 
 ### Uji fokus USB replug
@@ -176,7 +176,7 @@ Ambil `dmesg` penuh setelah boot, lalu periksa:
    ```
 
    `new device session without pullup (gadget bound=0)` menunjukkan tidak
-   ada gadget aktif saat replug. Lihat `PRETEST.md` §65 untuk pembeda
+   ada gadget aktif saat replug. Lihat [`PRETEST.md` §65](../archive/6.12/PRETEST.md) untuk pembeda
    dari kegagalan pullup dengan gadget masih terikat.
 
 ## 5. Delta yang **wajar** terlihat (bukan bug)
@@ -216,24 +216,7 @@ Ambil `dmesg` penuh setelah boot, lalu periksa:
 5. Ambil `pstore`/`ramoops` (`/sys/fs/pstore`) atau UART untuk panic.
 6. Rollback dengan image stock sebelum mencoba varian berikutnya.
 
-## 7. Artefak terbaru (`gki-kmi6-20261122`)
-
-```text
-x6871-twrp-vendor_boot-v19-kmi6.img
-  ukuran : 67108864 (sama dengan partisi stock)
-  md5    : 91eb249ff001d250fad855c40476f1b5
-  modul  : 222, semuanya hasil build sendiri (kernel 20a8f5d / fa18f7f)
-  dtb / bootconfig / vendor_ramdisk01 : identik dengan base TWRP
-  modules.load           : 165 entri
-  modules.load.recovery  : 216 entri
-  modules.dep            : hasil depmod, 0 referensi menggantung
-  vermagic semua modul   : 6.12.92-android16-6-g7cc745542612-4k
-```
-
-Catatan historis: image awal 217 modul (`vendor_boot-new.img`), 240 modul
-campuran stock (`cfig` §9–§10), serta `v1`–`v18` (KMI 5) sudah digantikan oleh `v19-kmi6` (KMI 6).
-
-## 8. Kalau modul gagal load: cek `modules.dep`
+## 7. Kalau modul gagal load: cek `modules.dep`
 
 Gejala di `pstore`/`dmesg`:
 
@@ -279,115 +262,3 @@ stock berhasil boot. Kegagalan yang dibahas di bagian ini ditelusuri ke
 dependensi yang hilang dari `modules.dep`. Jangan anggap peringatan CRC/BTF
 pada build lain aman; gunakan pasangan GKI yang sesuai dan jalankan
 verifikasi di §2.
-
-## 9. Repack dengan cfig/Android_boot_image_editor (historis)
-
-Selain `tools/pack-vendor-boot.sh`, image bisa direpack dengan
-[`cfig/Android_boot_image_editor`](https://github.com/cfig/Android_boot_image_editor)
-(commit `f692aff`) — dipakai untuk uji boot ketiga karena lebih ketat soal
-format ramdisk.
-
-```bash
-cd ~/tmp
-git clone --depth 1 https://github.com/cfig/Android_boot_image_editor.git vbwork
-cd vbwork
-cp /path/stock/vendor_boot.img .          # nama harus vendor_boot.img
-./gradlew unpack                          # -> build/unzip_boot/
-
-# ganti modul: root.1 = fragment PLATFORM (tempat lib/modules), root.2 = RECOVERY
-M=build/unzip_boot/root.1/lib/modules
-rm -f $M/*.ko
-cp <staging-217>/*.ko $M/
-cp <staging-217>/modules.{dep,alias,softdep,load,load.recovery} $M/
-
-./gradlew pack                            # menimpa ./vendor_boot.img
-```
-
-Hasil pack sudah dipad sampai ukuran partisi (67.108.864 byte). Yang perlu
-diperiksa setelahnya:
-
-```bash
-unpack_bootimg.py --boot_img vendor_boot.img --out chk
-md5sum chk/dtb chk/bootconfig chk/vendor_ramdisk01     # harus sama dengan stock
-lz4 -d -c chk/vendor_ramdisk00 | cpio -it | wc -l      # 720 entri
-lz4 -d -c chk/vendor_ramdisk00 | cpio -it | grep -c '\.ko$'   # 217
-```
-
-Catatan dari uji ketiga (`pstore3.txt`): kernel berhenti di **0.41 detik**,
-sebelum init, dengan `rootfs image is not initramfs (broken padding)` lalu
-`RAMDISK: incomplete write (-28 != 8388608)` dan panic `VFS: Unable to mount
-root fs`. Artinya initrd ditolak sebagai initramfs sehingga **tidak ada satu
-modul pun yang dimuat** — kegagalan packaging, bukan driver. Repack dengan
-tool ini menghasilkan arsip newc yang sah (diawali entri `adb_keys` seperti
-stock, `TRAILER!!!` + padding nol, magic lz4 legacy `02 21 4c 18`).
-
-## 10. Ramdisk zstd (TWRP) — catatan tool (historis)
-
-Image TWRP untuk X6871 memakai ramdisk **zstd** (`28 b5 2f fd`), bukan lz4.
-`cfig/Android_boot_image_editor` (commit `f692aff`) belum mengenalnya:
-`./gradlew unpack` berhenti dengan `ramdisk is in unknown format`.
-
-Patch: [`patches/abie-zstd-ramdisk.patch`](../patches/abie-zstd-ramdisk.patch)
-(dibuat terhadap `f692aff`).
-
-```bash
-git apply "$HOME/x6871-kernel-manifest/patches/abie-zstd-ramdisk.patch"
-```
-
-Isinya:
-
-- `helper/.../ZipHelper.kt` — `getZstdProg()`, `hasZstd`, `isZstd()` (deteksi
-  lewat magic, bukan binary), `zstdcat()`, `zstd()` (kompres `-15 -T0`)
-- `bbootimg/.../Common.kt` — cabang `isZstd` di `dumpRamdisk` (suffix `.zst`)
-  dan cabang `.zst`/`.zstd` di kedua `packRootfs`
-- `bbootimg/.../cpio/AndroidCpio.kt` — `fis.skip(bytesRead - 128)` melempar
-  `IOException: Invalid argument` untuk ramdisk kosong (fragment TWRP
-  `emptyrecovery` 60 byte); sekarang di-skip hanya kalau nilainya positif
-
-### Repack TWRP dengan modul kita
-
-```bash
-cd vbwork-twrp           # clone editor + patch, taruh vendor_boot.img
-./gradlew unpack
-# root.1 = fragment PLATFORM (berisi lib/modules), root.2 = emptyrecovery
-M=build/unzip_boot/root.1/lib/modules
-rm -f $M/*.ko
-cp <set-modul>/*.ko $M/ && cp <set-modul>/modules.{dep,alias,softdep,load,load.recovery} $M/
-./gradlew pack
-```
-
-Untuk X6871 hasilnya: 240 modul, `modules.load.recovery` 236 entri,
-ramdisk tetap zstd, `dtb`/`bootconfig` identik TWRP asli, fragment
-`emptyrecovery` isinya sama (hanya ukuran terkompresi 60 → 61 byte), image
-dipad ke 67.108.864 byte.
-
-Catatan komposisi: set TWRP = 237 modul stock + `adaptive-ts`,
-`gt9916_common`, `tran_richtap_haptic_hv`. Modul yang kita build diganti versi
-kita (termasuk panel `panel-rm69220-vdo-x6871.ko` menggantikan
-`rm69220_fhdp_dsi_vdo_dsc_csot_csot_144hz_x6871.ko`), sisanya tetap versi
-TWRP/stock — `adaptive-ts` butuh `cloudengine_*` dari `transsion_tranlog`
-yang tidak kita build, jadi modul itu harus tetap ada agar sentuhan hidup.
-
-## 11. DLKM 100% Source (2026-11-20 s.d. 2026-11-22)
-
-`vendor_dlkm` (**209** modul pada KMI 6 setelah mengeluarkan 3 modul GKI terproteksi `rfkill`/`bluetooth`/`libarc4`, `modules.load` 191; sebelumnya 212 modul pada KMI 5) dan `odm_dlkm` (**57** modul,
-`modules.load` 57) dibangun 100% dari source menggunakan EROFS dengan opsi
-identik stock + AVB hashtree footer yang dipertahankan. Template konfigurasi EROFS (`fs_config`, `file_contexts`, `/etc`, daftar modul) dibundel di `tools/dlkm/` dan direpack otomatis oleh `tools/repack-dlkm-latest.sh`.
-
-Artefak DLKM terbaru (`gki-kmi6-20261122`, kernel `20a8f5d` / `fa18f7f`, raw `.img` untuk `fastbootd`):
-
-```text
-x6871-twrp-vendor_boot-v19-kmi6.img  md5 91eb249ff001d250fad855c40476f1b5  67.108.864 B
-vendor_dlkm.img                      md5 5f7b6cecb1c44a1ffc3280dd481fbfcf  24.551.424 B
-odm_dlkm.img                         md5 6ee3cadceb5c4750dbbfe3d0056b6ea8   4.206.592 B
-```
-
-Ringkasan perbaikan DLKM + `vendor_boot` yang sudah masuk hingga `v19-kmi6`:
-
-- **Boot system dasar (`dlkm-20261120`..`gpu3`)**: `SCP_IPI_COUNT` 56→59, GPU Mali r54p1-11eac0 donor OPPO + fix padding `gpufreq_shared_status` (`power_count` 0x24..`active_count` 0x34, `temperature` 0x38, `shader_present` 0xe0).
-- **Battery OC & layar (`v2`–`v3`)**: `rfg-mtk-tran-conf-diff`, timing/VFP 144/120/60/40 Hz, C3D dual-pipe SRAM, dan `PQ_VIRTUAL_SET_PROPERTY` 12 B — **layar terverifikasi normal penuh**.
-- **Audio, AOD & kamera (`v4`–`v6`)**: FS1599 PA + `tran_audio_control`, AOD RM69220, 4 sensor kamera X6871 (`s5khm6sx`/`gc32e1`/`gc02m3`/`gc02m3macro`) + `camera_eeprom_v4l2`, `mtk-cam-isp` inline `sink_fmt`, dan flashlight `ocp81375_v4l2`.
-- **VENC, DT2W & FOD (`v7`–`v10`)**: QP ABI 6-field, `VENC_H264 = 1`, `mtk_codec_capability` 24 B + ADAB 4x `U32`, `slbc_request`, enum notifier AOD/HBM DRM, `adaptive-ts` resume khusus `AOD_NOTIFY`, Goodix cmd `0x30` + FOD key `195`, dan `/dev/goodix_fp` + HBM uevent `TRAN_FULL_HBM_EVENT=FULL_HBM_SET` — **rekam video & FOD normal terverifikasi lulus**.
-- **FOD saat AOD, screen-off FOD, DT2W & flashlight (`v11`–`v12`)**: hapus `0x39`/`0x38` idle mode + tabel alpha stock RM69220 (**FOD di AOD terverifikasi lulus**), pertahankan `vddi-gpios` HIGH saat panel power-off (`0d456ba`), `simple_read_from_buffer()` + isolasi `0xcc` dari `"al2"` (`e4ed999`), V4L2 `flash_sgm37864` + nonaktifkan PT throttling di `flashlight-core.h` sesuai stock (`ebca3e1`).
-- **Fast charging HVDCP20, boot race `mtk_iommu`, earpiece `RCV Mux`, penyelarasan `mtu3`, & GKI KMI 6 (`v13`–`v19-kmi6`)**: 6 entri `alg_name_array` + guard (`0af45b1`), inisialisasi `hw_list` sebelum `iommu_device_register` (`5f569d0`), rute `RCV Select=Playback_R_DAC` (`22efa7e`, `aca5276`), penyelarasan `mtu3.ko` dengan stock (`32a8db7`), serta migrasi bersih ke GKI AOSP `android16-6.12-2026-09_r16` (KMI 6) + safeguard `verify-kmi-abi.py` (`96b299e`, `20a8f5d`, `fa18f7f`).
-- Fitur dari 25 modul stock tanpa source (`transsion_tranlog`, `thd`, dll.) tidak disertakan. Detail lengkap ada di `HANDOFF.md` dan `PRETEST.md` §45–§68.

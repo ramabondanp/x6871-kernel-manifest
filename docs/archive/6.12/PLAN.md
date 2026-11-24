@@ -1,8 +1,8 @@
 # PLAN — Port driver ke sumber X6871 (Infinix GT 20 Pro)
 
 Dokumen ini mengarsipkan rencana porting awal dan temuan teknis (§6.x).
-Untuk build, mulai dari [README](../README.md#build-dari-source). Untuk status
-rilis dan panduan pemeliharaan, lihat [HANDOFF](HANDOFF.md).
+Untuk build, mulai dari [README](../../../README.md#build-dari-source). Untuk panduan
+build dan pemeliharaan aktif, lihat [BUILD](../../guides/BUILD.md) (dan [HANDOFF-HISTORY](HANDOFF-HISTORY.md) untuk arsip rilis).
 
 > **Status 2026-11-22:** Seluruh **488 modul `.ko`** dalam `vendor_boot` (222),
 > `vendor_dlkm` (209), dan `odm_dlkm` (57) dibangun dari kode sumber port dan GKI;
@@ -14,8 +14,8 @@ rilis dan panduan pemeliharaan, lihat [HANDOFF](HANDOFF.md).
 > Pengujian TWRP dan fitur perangkat yang dirangkum di §10 berasal dari KMI 5.
 > Angka 688/806 `.ko` di bagian awal dokumen ini adalah snapshot historis; angka build
 > saat ini (setelah trim allowlist `x6871_modules.bzl`) adalah **553** file / **552** nama unik
-> di staging dan **419** flat customer install (919 action Bazel). Untuk status terkini,
-> mulai dari `HANDOFF.md`.
+> di staging dan **419** flat customer install (919 action Bazel). Untuk panduan terkini,
+> mulai dari `docs/guides/BUILD.md`.
 
 ---
 
@@ -1925,19 +1925,19 @@ bisa dipakai membandingkan `CONFIG_*` kita vs device.
 
 - **KMI 6 (`gki-kmi6-20261122`):** Android 16 boot sampai launcher dengan GKI resmi Google `android16-6.12-2026-09_r16`. `vendor_boot` (222 modul), `vendor_dlkm` (209), dan `odm_dlkm` (57) dibangun dari source; audit mencatat 0 mismatch CRC, 0 kolisi `CONFIG_MODULE_SIG_PROTECT`, dan 0 simbol tak terselesaikan.
 - **KMI 7 (Google CI `16987858`):** maintainer melaporkan operasi kamera normal setelah menguji build dengan port OTP di X6871. Lihat [hasil uji dan cakupan port](#11-kalibrasi-kamera-x6871--kmi-7).
-- **KMI 5 (build sebelumnya):** TWRP, GPU, Wi-Fi, storage, haptic, fast charging, audio speaker dan earpiece, layar hingga 144 Hz dan AOD, touch dan DT2W, sidik jari dalam layar, senter, serta kamera foto dan video 1080p telah diuji. Lihat [HANDOFF](HANDOFF.md#hasil-uji-perangkat-sebelum-migrasi-kmi-5) untuk rincian dan status USB.
+- **KMI 5 (build sebelumnya):** TWRP, GPU, Wi-Fi, storage, haptic, fast charging, audio speaker dan earpiece, layar hingga 144 Hz dan AOD, touch dan DT2W, sidik jari dalam layar, senter, serta kamera foto dan video 1080p telah diuji. Lihat [HANDOFF-HISTORY](HANDOFF-HISTORY.md#hasil-uji-perangkat-sebelum-migrasi-kmi-5) untuk rincian dan status USB.
 
 Belum / sengaja dilewati:
 
 - Sumber kalibrasi OTP `camera_eeprom_v4l2` dan patch Ext-ISP tidak tersedia di donor. Lihat audit dan cakupan port X6871 di §11.
 - 25 modul stock tanpa source (`transsion_tranlog`, `thd`, dll.) dan 7 modul fork storage `fs/atomic_storage/` (diganti baseline GKI/MTK yang sudah terbukti boot).
 - Tingkat B rename `fpsgo`/`game` belum dikerjakan; target build di `mgk_64.bzl` kini sudah di-trim ke allowlist 413 target OOT X6871 (`kernel/kleaf/x6871_modules.bzl`).
-- Target ABI `user_customer_abi` tidak bisa lulus (328 simbol duplikat antar varian driver, gagal di `stg merge`); sebagai gantinya verifikasi KMI/ABI resmi dilakukan oleh `./tools/verify-kmi-abi.py` (8 gerbang). Lihat `HANDOFF.md`.
+- Target ABI `user_customer_abi` tidak bisa lulus (328 simbol duplikat antar varian driver, gagal di `stg merge`); sebagai gantinya verifikasi KMI/ABI resmi dilakukan oleh `./tools/verify-kmi-abi.py` (8 gerbang). Lihat `docs/guides/BUILD.md`.
 
 ## 11. Kalibrasi kamera X6871 — KMI 7
 
 Gunakan GKI 6.12.96 (4 KB) dari Google CI `16987858`, lewat
-[`local_manifest-kmi7.xml`](../local_manifest-kmi7.xml). Baseline port sensor
+[`local_manifest-kmi7.xml`](../../../local_manifest-kmi7.xml). Baseline port sensor
 dan probe EEPROM ada di [PRETEST §51](PRETEST.md#51-port-driver-kamera-x6871-imgsensorko--camera_eeprom_v4l2ko).
 
 Angka **46** di [audit awal](PRETEST.md#modul-kamera-yang-beda) adalah jumlah

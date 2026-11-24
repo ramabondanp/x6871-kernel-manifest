@@ -1,7 +1,7 @@
 #!/bin/bash
 # [HISTORIS — sudah ter-commit di alps-kernel_device_modules-6.12 branch x6871-android16-6.12]
 # Pasang Pixelworks Iris ke tree kernel, lalu patch supaya compile di 6.12.
-# Jalankan dari root workspace. Lihat docs/PLAN.md §7.5.
+# Jalankan dari root workspace. Lihat docs/archive/6.12/PLAN.md §7.5.
 #
 #   ./scripts/add-iris.sh /path/ke/iris-src
 #

@@ -23,7 +23,7 @@ Kolom **Asal** dihasilkan otomatis:
 Contoh ini mereproduksi snapshot KMI 5 dengan dump DT dan direktori modul
 lokal; input tersebut tidak disertakan di repo. Untuk memetakan build lain,
 sesuaikan `W`, `KD`, dan direktori modul dengan artefak yang ingin diaudit.
-Tabel ini memetakan driver, bukan hasil uji runtime (lihat [HANDOFF](HANDOFF.md)).
+Tabel ini memetakan driver, bukan hasil uji runtime (lihat [riwayat hasil uji](../archive/6.12/HANDOFF-HISTORY.md)).
 
 ```sh
 cd ~

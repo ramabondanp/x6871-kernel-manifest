@@ -26,7 +26,7 @@ tidak mengubah `kernel-6.18` (gate #7 tetap bersih).
 
 ## Isi patch
 
-[`patches/selinux-x6871-6.18.patch`](../patches/selinux-x6871-6.18.patch):
+[`patches/selinux-x6871-6.18.patch`](../../patches/selinux-x6871-6.18.patch):
 
 1. `plat_sepolicy.cil` — tambah `firmware_load` ke
    `(class system (...))`.
@@ -41,7 +41,7 @@ tidak mengubah `kernel-6.18` (gate #7 tetap bersih).
 Kalau `selinux-x6871-6.18.patch` versi lama sudah terpasang (baru
 mengizinkan `same_process_hal_file`/`vendor_file`), tambahkan allow
 `connsys_vendor_file` dengan patch inkremental
-[`patches/selinux-x6871-6.18-connsys.patch`](../patches/selinux-x6871-6.18-connsys.patch):
+[`patches/selinux-x6871-6.18-connsys.patch`](../../patches/selinux-x6871-6.18-connsys.patch):
 
 ```bash
 cd <dir-berisi-vendor_sepolicy.cil-hasil-patch>
@@ -108,4 +108,4 @@ WiFi/Bluetooth bisa dinyalakan.
   **WiFi dan Bluetooth PASS** (dikonfirmasi pengguna 2026-11-23).
 - TWRP touch/vibrator tidak memakai patch ini; itu diperbaiki lewat
   policy TWRP di `vendor_boot` (lihat
-  [`PLAN-6.18-STATUS.md`](PLAN-6.18-STATUS.md#twrp-touch--vibrator-test12)).
+  [`BRINGUP-LOG.md`](../archive/6.18/BRINGUP-LOG.md#twrp-touch--vibrator-test12)).

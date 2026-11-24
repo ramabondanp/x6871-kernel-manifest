@@ -1,35 +1,22 @@
-# Status Eksekusi PLAN-6.18
+# Arsip Kronologi Bringup 6.18 (test1–test13 & Analisa Selesai)
 
-Diperbarui: 2026-11-23 (UTC)
-
-> Dokumen ini melacak eksekusi [`PLAN-6.18.md`](PLAN-6.18.md). Baseline
-> produksi 6.12 (`gki-kmi6-20261122`) tidak berubah.
+> **Arsip historis (read-only).** Dokumen ini menggabungkan log eksekusi fase awal
+> dan uji `test1`–`test13` (sebelumnya di `PLAN-6.18-STATUS.md`) serta analisa
+> mendalam MIUMPU/APU IOMMU, audio DPCM, dan eksperimen awal VP9 (sebelumnya di
+> `SARAN.md`). Tautan unduhan temporer sudah dihapus; MD5 dan hash commit tetap
+> dicatat sebagai referensi.
 >
-> Log mentah dan image uji disimpan lokal, tidak disertakan di repo.
-> Bukti di dokumen ini dikutip sebagai baris log, bukan nama file lokal.
->
-> Rencana lanjutan dan prioritas perbaikan: [`PLAN-6.18-LANJUTAN.md`](PLAN-6.18-LANJUTAN.md).
->
-> Per 2026-11-24: fix thermal LVTS sudah dibangun dan image
-> `vendor_dlkm` sudah direpack. Uji boot di device belum dilakukan karena
-> maintainer sedang di luar.
+> Untuk status terkini, perintah kerja, dan isu terbuka 6.18, lihat
+> [`STATUS.md`](../../6.18/STATUS.md) dan [`TRACKER.md`](../../6.18/TRACKER.md).
 
-## Ringkasan
+---
 
-| Fase | Status | Catatan |
-|---|---|---|
-| 0 — Manifest, branch, workspace | **Selesai** | Workspace 6.18 terisolasi dari baseline 6.12 |
-| 1 — Kleaf/MGK + device tree 6.18 | **Selesai** | Kernel 6.18.32 target `mgk_64_k618` |
-| 2 — Codemod API 6.13–6.18 | **Selesai** | Build penuh 546 `.ko` berhasil |
-| 3 — Milestone `vendor_boot` | **Selesai (build)** | 221 modul, image terverifikasi |
-| Gerbang boot #1 | **Lulus** | TWRP PASS (touch + vibrator); boot sistem PASS setelah patch SELinux; WiFi/BT PASS |
-| 4 — DLKM berat | **Selesai (build)** | Sched, Mali, WLAN, cam/vcodec/audio |
-| 5 — Repack + verifier 8 gerbang | **Selesai** | 8/8 PASS, 487 modul |
+# Bagian 1 — Log Eksekusi Fase 0–2, Build Penuh, dan Uji Boot `test1`–`test13`
 
 ## Referensi donor 6.18
 
 Dump OPPO PMX110 (MediaTek 6.18) sudah dianalisis; lihat
-[`PMX110-6.18-REFERENCE.md`](PMX110-6.18-REFERENCE.md). Bukti utamanya:
+[`PMX110-REFERENCE.md`](../../6.18/PMX110-REFERENCE.md). Bukti utamanya:
 `clk-common.ko` OOT mengekspor `mtk_alloc_clk_data`/`mtk_clk_register_plls`,
 dan modul 6.18 memakai `hrtimer_setup`, `timer_delete`,
 `wakeup_source_register`, `devm_power_supply_get_by_reference`,
@@ -55,7 +42,7 @@ serta `for_each_kernel_tracepoint`.
   `tools/repack-vendor-boot-latest.sh`, `tools/repack-dlkm-latest.sh`,
   `tools/verify-kmi-abi.py --kver 6.18`.
 
-## Fase 1 — berjalan
+## Fase 1 — Kleaf/MGK & device tree 6.18 (arsip)
 
 - `patches/bazel_mgk_rules-6.18.patch`:
   - target `mgk_64_k618`, path GKI `common`, device tree
@@ -103,10 +90,7 @@ serta `for_each_kernel_tracepoint`.
     sudah diperbaiki menjadi `# CONFIG_COMMON_CLK_MT8196 is not set`.
 - `X6871.config` juga menonaktifkan dua modul in-tree yang duplikat
   dengan OOT: `CONFIG_MTK_DVFSRC` dan `CONFIG_REGULATOR_RT5133`.
-- Build target:
-  `//kernel_device_modules-6.18:mgk_64_k618_customer_modules_install.user`
-  sedang dijalankan di `out_bazel_test`.
-- Iterasi kompilasi: modul sudah mulai dibangun. Perbaikan yang masuk:
+- Iterasi kompilasi: modul mulai dibangun. Perbaikan yang masuk:
   alarmtimer callback `void`, `hrtimer_setup` 209 call site, `.remove`,
   IDA API, `napi->gro`, `ioremap_prot(pgprot_t)`, `pt_regs.pmr`,
   `dma_fence`, dma-buf attachment privat, `bin_attribute` const,
@@ -114,7 +98,7 @@ serta `for_each_kernel_tracepoint`.
   UFS trace hooks, dan cluster OOT DVFSRC/MMDVFS
   (`MTK_DVFSRC_HELPER`, `DEVICE_MODULES_REGULATOR_MTK_DVFSRC`,
   `MTK_MMDVFS`).
-- Error yang sudah dilewati: repo sync tidak lengkap
+- Error yang dilewati: repo sync tidak lengkap
   (`prebuilts/kernel-build-tools`), `gbl` override, `py_binary` Bazel 8,
   glob kosong, trap `build.config`, `DEFCONFIG` deprecated, dan
   modpost `clk-mt8196-*`.
@@ -142,7 +126,7 @@ Referensi OPPO PMX110 mengonfirmasi kelas-kelas ini dan menambah
 
 Build `//kernel_device_modules-6.18:mgk_64_k618_customer_modules_install.user`
 dijalankan dengan `--keep_going`; setiap putaran error dikelompokkan dan
-diperbaiki per kategori. Commit terbaru (device modules):
+diperbaiki per kategori. Commit device modules:
 
 | Commit | Cakupan |
 |---|---|
@@ -160,7 +144,7 @@ Commit vendor modules: `d626fe8`, `2bebd04`, `6742b41`, `ed93bfa`,
 `59df9af`, `4c25e6d`, `269be18`, `7daa323` (namespace `close_fd`,
 `v4l2_fh`, inisialisasi `dev_slave` di camsys).
 
-Kelas error 6.18 yang sudah tertangani antara lain: API privat
+Kelas error 6.18 yang tertangani antara lain: API privat
 `io-pgtable-arm`, `MODULE_IMPORT_NS("DMA_BUF_HEAP")`,
 `netif_receive_skb_list_internal` (diganti jalur publik), DBC xHCI yang
 tidak diekspor GKI, `hrtimer_init` tersisa, `ufshcd_config_pwr_mode`
@@ -183,7 +167,7 @@ memakai `cpufreq_cpu_get`, `mtk-mmc` memakai `mmc_host_can_gpio_cd`,
 heap memakai `DMA_BUF_HEAP`, `scheduler` memakai `pick_task(rq, rf)`
 tanpa `entity_eligible`, GED tanpa notifier fbdev, dan `apu_top` memakai
 `devfreq_add_governor` + header privat `governor.h`. Detail ada di
-[`PMX110-6.18-REFERENCE.md`](PMX110-6.18-REFERENCE.md).
+[`PMX110-REFERENCE.md`](../../6.18/PMX110-REFERENCE.md).
 
 ## Hasil build penuh 6.18 (2026-11-23)
 
@@ -198,7 +182,7 @@ selesai tanpa error:
   `gki-kmi7-aw22xxx-20261122`, kecuali `mkp.ko` (sengaja tidak ada di
   6.18).
 
-### Image hasil repack
+### Image hasil repack awal (`test1`–`test5`)
 
 | Image | Ukuran | MD5 |
 |---|---:|---|
@@ -210,29 +194,18 @@ selesai tanpa error:
 | `vendor_dlkm.img` | 24.551.424 B | `e3a23e686d4ba08646c4d0b763c7c05d` |
 | `odm_dlkm.img` | 4.206.592 B | `da2c64a1572ff27382128beb4bbcba8b` |
 
-`vendor_boot-6.18-test5-dbg.img` adalah image diagnostik terbaru:
-sama dengan test4 ditambah pembatas log badai MIUMPU. `test4` adalah
-image boot normal terakhir. Image test3/test2/test1 jangan dipakai lagi.
-
-`vendor_dlkm.img` di-repack ulang setelah perbaikan `met.ko` (md5 baru
-`e3a23e686d4ba08646c4d0b763c7c05d`); `odm_dlkm.img` tidak berubah.
-
 Uji hardware dengan `vendor_boot-6.18-test3.img`: **TWRP berhasil
-boot**. Boot ke sistem berikutnya panic di `atf_logger.ko`; lihat
-bagian "Panic atf_logger 6.18".
+boot**. Boot ke sistem berikutnya panic di `atf_logger.ko` (lihat bagian
+"Panic atf_logger 6.18").
 
 Ukuran ketiga image sama dengan rilis 6.12; hash berbeda karena
-vermagic/isi modul 6.18.
+vermagic/isi modul 6.18:
 
-| Image | Rilis `gki-kmi7-aw22xxx-20261122` | Build 6.18 |
+| Image | Rilis `gki-kmi7-aw22xxx-20261122` | Build 6.18 awal |
 |---|---|---|
 | `vendor_boot.img` | `ca163b1a031658b156dbd5d856e8bad2` | `fbd70f65be1d76c01177320e5d7043c2` |
 | `vendor_dlkm.img` | `d54910f726bbdba0630869855be178d9` | `e3a23e686d4ba08646c4d0b763c7c05d` |
 | `odm_dlkm.img` | `3b13699addae11e4ddc074013e129f23` | `da2c64a1572ff27382128beb4bbcba8b` |
-
-Perbandingan nama modul: 221/209/57 identik dengan rilis; satu-satunya
-selisih adalah `mkp.ko` (222 → 221 di `vendor_boot`, sengaja dihapus).
-`modules.load` dan `modules.dep` juga identik selain entri `mkp.ko`.
 
 ### Verifikasi 8 gerbang
 
@@ -258,15 +231,12 @@ di `8250_mtk.ko` (diganti `pm_runtime_*` langsung) dan
 `__hw_protection_trigger` di `mtk_low_battery_throttling.ko` (diganti
 `orderly_poweroff(true)`).
 
-### Artefak dan commit
+### Artefak dan commit awal
 
 - Device modules (`kernel_device_modules-6.18`, branch
   `x6871-android17-6.18`): `f09133d503df`
 - Vendor modules (`vendor/mediatek/kernel_modules`, branch
   `x6871-android17-6.18`): `d500e72bea0b`
-- Manifest: commit dokumentasi ini
-- Image uji dan log build tidak disertakan di repo; unggahan publik
-  dicantumkan pada bagian artefak terkait.
 
 ### Panic mrdump 6.18
 
@@ -342,7 +312,7 @@ perubahan ini untuk mengidentifikasi master/IOMMU yang fault.
 
 Audit perubahan API 6.13–6.18 yang tidak tertangkap compiler (memakai
 hasil build 6.12 dan 6.18) dicatat di
-[`API-6.18-AUDIT.md`](API-6.18-AUDIT.md).
+[`API-AUDIT.md`](../../6.18/API-AUDIT.md).
 
 ### Panic atf_logger 6.18
 
@@ -362,18 +332,13 @@ untuk proteksi kernel. Kode lama memberi
 NULL, tetapi `IS_ERR(NULL)` bernilai false dan
 `lookup_runtime_log()` langsung dereference `info.vaddr`.
 
-Perbaikan: pakai `ioremap_wc()` (atribut write-combine yang sama) dan
-tolak vaddr NULL. Panggilan `ioremap_prot(PAGE_KERNEL)` di `tkv.c` juga
-diganti `ioremap_cache()`.
+Perbaikan awal memakai `ioremap_wc()`, lalu diperbaiki tuntas dengan
+`memremap(..., MEMREMAP_WC)` (`326be9e98f91` / `54d86b4eb545`). Panggilan
+`ioremap_prot(PAGE_KERNEL)` di `tkv.c` juga diganti `ioremap_cache()`.
 
 Pesan commit 6.18 ditulis ulang ke format kernel (`subsystem: ringkasan
-imperatif ... for 6.18`, body 72 kolom, `Signed-off-by`), dan sudah
-diperiksa dengan `common/scripts/checkpatch.pl`: 0 error/warning pesan.
-
-**Berikutnya:** TWRP sudah PASS; uji boot sistem dengan
-`vendor_boot-6.18-test4.img` (GKI `boot.img` + `system_dlkm.img` resmi
-6.18 4KB), lalu lanjutkan validasi early-init sesuai
-[`BOOTTEST.md`](BOOTTEST.md).
+imperatif ... for 6.18`, body 72 kolom, `Signed-off-by`), dan diperiksa
+dengan `common/scripts/checkpatch.pl` (0 error/warning pesan).
 
 ## Rencana codemod (arsip)
 
@@ -389,39 +354,10 @@ Skrip: `scripts/port-6.18-mechanical.py` (dry-run default; `--apply`,
 | 5 | `no_llseek` | 54 | hapus `.llseek = no_llseek` |
 | 6 | `power_supply_reference` | 43 | `*_get_by_phandle` → `*_get_by_reference` |
 | 7 | `dapm_rename` | 41 | `dapm_*` → `snd_soc_dapm_*` |
-| 8 | `wakeup_source` | 18 | create/add | remove/destroy → register/unregister |
+| 8 | `wakeup_source` | 18 | create/add \| remove/destroy → register/unregister |
 
 Transformasi 1–5 aman secara mekanis; 6–8 memerlukan pemeriksaan
 argumen/manual setelah kompilasi pertama.
-
-## Perintah kerja
-
-```bash
-cd "$HOME/x6871-6.18/ws"
-
-# build
-KVER=6.18 OUT_DIR="$PWD/out_bazel_6.18" \
-  "$HOME/x6871-kernel-manifest/build.sh" user
-
-# codemod (dry-run)
-python3 "$HOME/x6871-kernel-manifest/scripts/port-6.18-mechanical.py"
-
-# verifikasi akhir
-cd "$HOME/x6871-kernel-manifest"
-./tools/verify-kmi-abi.py --kver 6.18 \
-  --ws "$HOME/x6871-6.18/ws" \
-  --vb-dir ... --vd-dir ... --od-dir ...
-```
-
-## Catatan risiko
-
-- `X6871.config` menonaktifkan simbol config yang **namanya dipakai
-  bersama** Kconfig in-tree dan OOT. Target OOT yang diperiksa
-  (`clk-*`, `pinctrl-*`) tidak memakai `kconfig`/`defconfig`, jadi tetap
-  dibangun; tetap wajib diverifikasi lewat 8 gerbang dan uji boot.
-- Jangan pernah mencampur image KMI 6 dan KMI 7/6.18.
-- `kernel-6.18`/`common` tidak boleh diedit; semua perubahan di device
-  modules dan overlay manifest.
 
 ## Temuan boot 6.18 (2026-11-23)
 
@@ -430,7 +366,7 @@ cd "$HOME/x6871-kernel-manifest"
   kegagalan boot bukan karena DT/DTB.
 - Log pstore uji test3 berisi log 6.18 lengkap 0.0–4.68 s. Panic test3
   berasal dari `tfa_debug_probe` di `atf_logger`:
-  `pc : tfa_debug_probe+0x6c/0x218 [atf_logger]`; sudah diperbaiki oleh
+  `pc : tfa_debug_probe+0x6c/0x218 [atf_logger]`; diperbaiki oleh
   `54d86b4eb545` untuk test4 dan sesudahnya.
 - Di log yang sama, 91 modul GKI gagal dimuat:
   `.gnu.linkonce.this_module section size must match ...`
@@ -451,9 +387,6 @@ cd "$HOME/x6871-kernel-manifest"
   `tools/modules.load-6.18`, dan `md_handler` dibatasi dengan `show`.
 - Uji berikutnya: `vendor_boot-6.18-test9-emihook.img`
   (md5 `84522556a4006d2ba78f531b150e2707`), tanpa panic buatan.
-  Uji ini untuk melihat apakah badai MIUMPU berhenti dan sistem bisa
-  melewati 31 detik. Jika masih hang, langkah berikutnya adalah
-  diagnostik `hrtimer` (bukan `delayed_work`).
 
 ## Hasil uji test9
 
@@ -479,14 +412,9 @@ cd "$HOME/x6871-kernel-manifest"
   6.18, bukan di urutan modul atau source APU.
 - Uji konfirmasi APU: `vendor_dlkm.img` tanpa APU
   (md5 `64e8aa756fa72ff150b68a1cb50cf693`, 206 modul, tanpa
-  `apusys`/`apu_top`/`mtk_apu_power_throttling`),
-  https://gofile.io/d/EclhAxEP. Jika sistem boot melewati 31 s,
-  penyebab hang terkonfirmasi APU; kamera/AI/MDLA/MVPU tidak aktif
-  pada image ini.
+  `apusys`/`apu_top`/`mtk_apu_power_throttling`).
 
-
-
-## Penerapan SARAN §5.3 (2026-11-23)
+## Penerapan perbaikan APU IOMMU (test11)
 
 - `mtk_iommu.c`: `mtk_iommu_hw_program()` dipisah dari `mtk_iommu_hw_init()`
   (request IRQ tidak idempoten). Suspend menandai `apu_pm_sta = OFF`;
@@ -504,19 +432,17 @@ cd "$HOME/x6871-kernel-manifest"
   `ccci_md_all`/`mtk_pbm`/`mtk_mdpm`; selain itu
   `mt6895_apu_top_pb()` tidak memanggil `__apu_wake_rpc_rcx()` (hanya
   `mt6895_apu_top_on()` saat apusys power-on), sehingga premisnya tidak
-  tercapai. Rincian ada di [`SARAN.md` §6.2](SARAN.md).
+  tercapai (rincian di Bagian 2).
 - Build ulang sukses: `mtk_iommu.ko`, `apusys.ko`, dan target penuh
   `mgk_64_k618_customer_modules_install.user`.
 
-### Image test11 (SARAN 5.3)
+### Image test11
 
 | Image | Ukuran | MD5 |
 |---|---:|---|
 | `vendor_boot-6.18-test11-iommu.img` | 67.108.864 B | `0ee453c16ae20b6dfbf2cc4bf0db492e` |
 | `vendor_dlkm.img` (dengan fix ipesys + v4l2) | 24.551.424 B | `70144e66a846b1de359d99c82afbd264` |
 | `odm_dlkm.img` | 4.206.592 B | `da2c64a1572ff27382128beb4bbcba8b` (tidak berubah) |
-
-Unduhan: https://gofile.io/d/oTgnm1xd
 
 Verifikasi `tools/verify-kmi-abi.py --kver 6.18` untuk image ini: 8/8
 PASS, 487 modul (221/209/57), 0 mismatch. Image berisi 221 modul
@@ -554,10 +480,8 @@ di `vendor_dlkm`.
 - Dua bug V4L2 6.18 muncul setelah userspace membuka node video:
   1. `v4l2_open+0x12c` WARN untuk node DPE: `dpe_fop_open()` tidak
      memakai `v4l2_fh`, sehingga 6.18 memanggil `release` dan
-     mengembalikan `-ENODEV`. Diperbaiki di
-     `vendor/mediatek/kernel_modules` commit `8f77ce0001`:
-     `struct v4l2_fh` menjadi anggota pertama
-     `DPE_USER_INFO_STRUCT`, di-init di open dan di-teardown di release.
+     mengembalikan `-ENODEV`. Fix awal di `vendor/mediatek/kernel_modules`
+     commit `8f77ce0001` (lalu diperbaiki untuk varian `isp_70` oleh `b83dca0`).
   2. `vidioc_vdec_querycap+0x1c` Oops pada `t = 14.167 s`:
      `v4l_querycap()` 6.18 memanggil `vidioc_querycap(file, NULL, cap)`,
      sedangkan driver memakai `fh_to_ctx(priv)` → alamat
@@ -625,8 +549,8 @@ Hasil:
   (`vendor_sepolicy.cil`, `vendor_file_contexts`) dipatch untuk
   permission `firmware_load`. Tanpa patch, `mali_csffw.bin` dan
   `haptic_ram.bin` gagal `-13`, SurfaceFlinger/zygote crash, lalu
-  reboot. Prosedur dan patch: [`SELINUX-6.18.md`](SELINUX-6.18.md),
-  [`patches/selinux-x6871-6.18.patch`](../patches/selinux-x6871-6.18.patch).
+  reboot. Prosedur dan patch: [`SELINUX-6.18.md`](../../guides/SELINUX-6.18.md),
+  [`patches/selinux-x6871-6.18.patch`](../../../patches/selinux-x6871-6.18.patch).
 - Tidak ada `enforce=0` global; domain `kernel` permissive hanya di
   policy TWRP. Android memakai policy system/vendor yang sudah dipatch.
 - **WiFi/Bluetooth PASS** setelah `vendor_sepolicy.cil` diberi allow
@@ -636,7 +560,7 @@ Hasil:
   `vendor_sepolicy.cil` hasil patch: md5
   `5b0827a140e928900a4b91006fba301d`.
 - Gerbang boot #1 dinyatakan **LULUS**. Pengujian subsistem lanjutan
-  mengikuti checklist `BOOTTEST.md`.
+  mengikuti checklist [`FLASH-AND-TEST.md`](../../guides/FLASH-AND-TEST.md).
 
 ### Panic V4L2 `priv == NULL` (2026-11-23)
 
@@ -665,7 +589,6 @@ Perbaikan:
 Image baru: `vendor_dlkm.img` md5
 `7d488c2d2d3bff4f5e642ec9dabeaaff` (209 modul, 191 load);
 `odm_dlkm.img` tidak berubah (`da2c64a1572ff27382128beb4bbcba8b`).
-Perlu flash ulang dan uji video/JPEG.
 
 ### Pembersihan debug test9/test10 (2026-11-23)
 
@@ -716,4 +639,76 @@ Image: `vendor_dlkm.img` md5
 `cf926cee4a09c8a75036aceac1cfeddc` (209 modul, 191 load),
 di-upload sebagai `vendor_dlkm-6.18-vdec-oppo.img`.
 `vendor_boot-6.18-test13-clean.img` dan `odm_dlkm.img` tidak berubah.
-Perlu uji FB story setelah flash; belum diverifikasi di perangkat.
+
+---
+
+# Bagian 2 — Analisa Mendalam yang Sudah Ditutup (eks `SARAN.md`)
+
+> Bagian ini mengarsipkan analisa akar masalah MIUMPU/APU IOMMU, regresi audio
+> DPCM 17 link, dan kronologi eksperimen awal FB Story VP9. Status isu VP9
+> terkini dirangkum di [`TRACKER.md`](../../6.18/TRACKER.md#51-video-vp9--prioritas-utama-user-facing).
+
+## 1. Konteks Awal `test3`–`test8`
+
+1. **Tiga crash awal sudah teratasi**:
+   - `test1`: `mrdump` `bin_attrs` uninitialized → fixed (`968393e9db35`).
+   - `test2`: KCFI panic di tracepoint UFS/MET akibat ketidakcocokan tipe `enum` vs `int` → fixed pada 97 file (`f94c481c8c5b` di `kernel_device_modules-6.18` & `d500e72bea0b` di `vendor/mediatek/kernel_modules`).
+   - `test3`: `atf_logger` `ioremap_wc()` return `NULL` karena di 6.18 `of_reserved_mem` (`no-map`) tetap mengikat region ke `/proc/iomem` (`IORESOURCE_MEM`), sehingga `ioremap` ditolak oleh `region_is_ram()` → fixed dengan `memremap(..., MEMREMAP_WC)` (`326be9e98f91`).
+2. **Gejala di uji test4**:
+   - Seluruh buffer `console-ramoops-0` (256 KB) penuh dengan badai interupsi di `t = 32.466s – 32.523s` (~18.000 IRQ/detik, setiap ~54 µs) di CPU0 (`[C0]`):
+     ```text
+     emimpu_violation_irq: [MIUMPU]emiid0 [1c0]0;...;[3c0]104;[3c4]0;[3c8]0;[3cc]0;[3d0]7;[3d4]a;[3d8]3;[3dc]0;[3e4]2c06;[3e8]0;
+     ```
+   - Dump pstore uji test5 dan test6 memiliki hash MD5 yang **100% identik** (`f5a681f1a8428e4f0846eb4f15319970`) dengan dump uji test4, yang berarti percobaan test5, test6, dan test7 tidak menulis dump pstore baru ke ramoops.
+
+## 2. Analisa Badai MIUMPU, `system_dlkm`, dan `test8-panic20s`
+
+### Temuan 1: Badai MIUMPU `[3d8]3;[3e4]2c06` adalah IOMMU Translation Fault tanpa hook stage-1
+
+- `[3c0] = 0x104`, `[3d0] = 0x7` (`err_case_r = 7`), `[3d4] = 0xa` (domain 10), **`[3d8] = 0x3` (`srinfo_r = 3`)**, **`[3e4] = 0x2c06` (`axi_id_r = 0x2c06`, port MM)**.
+- Sesuai desain MT6895 di `emi-mpu-v2.c`, `emi-mpu-hook-v1.ko` mendaftarkan `by_plat_isr_hook = emi_mpu_isr_hook` untuk mem-bypass fault `srinfo_r == 3 && !axi_id_is_gpu(axi_id_r)` (`IRQ_HANDLED` + ratelimit 3x/detik).
+- `emi-mpu-hook-v1.ko` sudah ada di `tools/recovery-modules-6.18.txt`, namun absen dari `tools/modules.load-6.18`, sehingga `emi-mpu-v2.ko` berjalan di stage-1 tanpa hook dan terus memanggil `md_handler` / `iommu_handler`.
+
+### Temuan 2–4: Gagalnya 91 modul `system_dlkm`, celah `f09133d503df`, dan `test8-panic20s`
+
+- 91 modul `system_dlkm` gagal dimuat karena mismatch `boot.img` vs `system_dlkm.img`.
+- Celah di `f09133d503df`: `mpu->md_handler` dan `mpu->iommu_handler` tetap dipanggil saat `show == false`.
+- `schedule_delayed_work(..., 20 * HZ)` pada `test8` tidak efektif saat CPU0 terjebak hardirq dan mengaburkan uji `system_dlkm`.
+- **Implementasi (test9):** `emi-mpu-hook-v1.ko` ditambahkan setelah `emi-mpu-v2.ko` di `tools/modules.load-6.18`, `test8` dihapus, dan `md_handler` dibatasi dengan `show` (`be2f658`). Hasil: `vendor_boot-6.18-test9-emihook.img` (md5 `84522556a4006d2ba78f531b150e2707`).
+
+## 3. Root Cause APU IOMMU Pasca-test9 & Solusi Tanpa Disable APU
+
+### 3.1 Bukti Forensik dari Log Uji test3 dan test9
+
+- Tepat 24 µs setelah `apusys_rv` melepas reset uP RISC-V (`mt6895_rproc_start: smc call 11` pada `t = 4.626271s`), terjadi badai `srinfo_r = 3, axi_id_r 11270 (0x2c06)` ~41.150 Hz dengan alamat fisik fault **`0x0`** (`REG_MMU_IVRP_PADDR` dan `REG_MMU_PT_BASE_ADDR` = `0x0`).
+- Pada log test3 (`t = 1.473s`), `APU_IOMMU0 (1,0)` dan `APU_IOMMU1 (1,1)` membaca balik register `0x48..0x124` dan `REG_MMU_PT_BASE_ADDR` sebagai **`0x0`** karena power domain APU RCX masih mati saat `mtk_iommu_attach_device()` dipanggil di stage-1.
+
+### 3.2 Mengapa Ini Terjadi di Kernel 6.18 Tetapi Tidak di Kernel 6.12
+
+- Di 6.12, `__iommu_probe_device()` hanya memproses device yang sudah punya `fwspec`, sehingga device APU baru di-attach di stage-2 setelah `apu_top.ko` dan `apusys.ko` menyalakan RCX.
+- Di 6.18, `iommu_init_device()` (`common/drivers/iommu/iommu.c:448-455`) memanggil `dev->bus->dma_configure(dev)` untuk **semua** device meski `!dev->driver`, sehingga `mtk_iommu_attach_device()` berjalan di stage-1 (`t = 1.473s`) saat RCX mati total, mengeset `data->m4u_dom = dom`, dan seluruh tulis register hilang (`0x0`). Karena `PM_OPS_SKIP` aktif dan `apu_pm_sta[]` tidak pernah diperbarui, `pm_runtime_get_sync()` saat APU menyala tidak memprogram ulang `APU_IOMMU0/1`.
+
+### 3.3 Implementasi (pasca-test10, commit `6ebc4934a74a`)
+
+- **Solusi 1 (diterapkan di `drivers/iommu/mtk_iommu.c`):** pisahkan `mtk_iommu_hw_program()` dari `mtk_iommu_hw_init()`; suspend menandai `apu_pm_sta[id] = POWER_OFF_STA`; resume `APU_IOMMU` memprogram ulang register + `REG_MMU_PT_BASE_ADDR` bila `PT_BASE != ttbr`, lalu set `POWER_ON_STA` setelah read-back `PT_BASE == ttbr`.
+- **Solusi 2 (dibatalkan):** memindahkan `apu_top.ko` ke `vendor_boot` menarik closure 57 modul (termasuk stack modem/CCCI/PBM) dan `mt6895_apu_top_pb()` tidak menyalakan RCX saat probe.
+- **Solusi 3 (diterapkan di `apusys_rv/apu_rproc.c`):** timeout `__apu_run()` mengembalikan `-ETIMEDOUT` dan blok `stop:` memanggil `hw_ops->power_off()` bila `F_FAST_ON_OFF` tidak diset.
+
+## 4. Regresi Audio 6.18 — Flag DPCM pada `mt6895-mt6368` (2026-11-23)
+
+- **Gejala:**
+  ```text
+  [    5.684120] Hostless_LPBK: ASoC error (-22): substream Hostless_LPBK has no playback, no capture
+  [    5.684128] mt6895-mt6368 sound: ASoC: can't create pcm Hostless_LPBK :-22
+  [    5.687676] mt6895-mt6368 sound: mt6895_mt6368_dev_probe snd_soc_register_card fail -22
+  ```
+  (Pesan `adsp_system_bootup fail ret(-14)` juga muncul di 6.12 karena node `adspsys@1e000000` disabled di DT stock, lihat [`PRETEST.md` §52.1](../6.12/PRETEST.md#521-audio-tran_audio_controlko--mt6895-mt6368ko-vendor_dlkm).)
+- **Akar masalah:** commit port `a20a68e37647` mengganti `.dpcm_playback`/`.dpcm_capture` dengan `.playback_only`/`.capture_only` di `sound/soc/mediatek/mt6895/mt6895-mt6368.c`. Di 6.18 `soc_get_playback_capture()` memakai flag `*_only` untuk menonaktifkan arah lawannya, sehingga mengaktifkan keduanya sekaligus menonaktifkan playback maupun capture (`-EINVAL`) pada **17 link dua arah**.
+- **Perbaikan & Verifikasi:** hapus pasangan `.playback_only = 1` + `.capture_only = 1` dari 17 link dua arah di `mt6895-mt6368.c`. Build & repack `vendor_dlkm-6.18-audio-dpcm.img` (md5 `ad24e0ac5d51c070fe3db2e41f4e18e8`, 8/8 PASS). **Terkonfirmasi di perangkat:** kartu suara terdaftar dan amplifier speaker FS1599 aktif (`spk_amp_event 2/4`).
+
+## 5. Kronologi Eksperimen Awal Facebook Story (H.264 IOMMU & VP9)
+
+- Pada uji awal Story, log mencatat `vdec_vcp_decode() - unsupported (-1,-1)` untuk VP9 dan fault `LAT_WDMA`/`CORE/VLD mva 0x31c00000` untuk H.264.
+- **Uji 1 (`vendor_boot-6.18-vdec-test.img` md5 `04e34410592666fc0050264a205af9bb` + `vendor_dlkm.img` md5 `4f8dc3fe049200af443f122030cf1c78`):** `mtk_iommu.ko` memakai ID tabel `MM_TABLE=0` untuk invalidasi HypMMU Type-2, ditambah log diagnostik `VP9 header rejected`. Hasil: H.264 melewati `Init Vdec OK` tanpa `TF larb` pada cuplikan uji, sementara VP9 masih ditolak `changed=0x4`.
+- **Uji 2 (`vendor_dlkm.img` md5 `e6fa2cd59b3267f0f0c79595b780c33a`, commit `7c48ebd`):** sinkronisasi scatterlist DMA-BUF + `dma_wmb()` sebelum `DEC_START`. Hasil: Story tetap hitam (`changed=0x4`), sehingga `7c48ebd` di-revert oleh `213a184315ef`.
+- **Debug lanjutan (`mtk_v4l2_dbg_level=3`):** header keyframe VP9 Profile 0 terbaca valid oleh CPU (`49 83 42`, `540×960` dan `720×1280`), IOVA `0x12fe00000` di aperture `0x110000000..0x12fffffff`, buffer kerja `MEM_TYPE_FOR_SW`/`MEM_TYPE_FOR_HW_CACHE` nonzero, dan VCP membalas `B001` (`DEC_START_DONE`) status `-1`. Analisa lanjutan & rencana A/B stock SP20 dicatat di [`TRACKER.md`](../../6.18/TRACKER.md#51-video-vp9--prioritas-utama-user-facing).

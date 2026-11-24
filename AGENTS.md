@@ -88,12 +88,33 @@ Jangan commit file donor, tarball, atau dump firmware ke repo.
 ## 5. Dokumentasi dan bukti
 
 - Jangan menulis nama file log lokal (`pstoreX`, `dmesgX`, `logcatX`,
-  `twrpX`) atau path lokal di repo.
+  `twrpX`) atau path lokal di repo (aturan ketat pada seluruh dokumen aktif;
+  arsip historis lama di `docs/archive/` bersifat read-only).
+- Jangan menyertakan URL unduhan sementara (seperti `gofile.io`) di repo;
+  cukup catat nama artefak, MD5/commit, dan kutipan baris log.
 - Bukti log harus dikutip sebagai baris log.
 - Log mentah dan image uji disimpan lokal, tidak disertakan di repo.
-- Temuan dan saran fix dicatat di `docs/PLAN-6.18-LANJUTAN.md`.
-- Analisa, hasil build, dan status uji dicatat sebagai commit baru, bukan
-  amend.
+- **Struktur wajib `docs/`:**
+  - Hanya `docs/README.md` yang boleh berada di root `docs/`; **jangan**
+    menaruh file dokumen baru langsung di root `docs/`.
+  - `docs/guides/` — panduan operasional hidup (build, repack, flash,
+    SELinux).
+  - `docs/hardware/` — pemetaan hardware dan DT/DTBO stock lintas versi.
+  - `docs/6.18/` — status (`STATUS.md`), tracker temuan/prioritas
+    (`TRACKER.md`), dan referensi teknis aktif 6.18.
+  - `docs/archive/<versi>/` — arsip historis *read-only* (rencana awal,
+    riwayat rilis lama, log bringup yang sudah ditutup).
+- **Disiplin penambahan & pembaruan dokumen:**
+  - Satu topik = satu file; jangan membuat file catatan ad-hoc campur aduk.
+  - Temuan baru, prioritas fix, dan known limitation 6.18 dicatat di
+    `docs/6.18/TRACKER.md`; ringkasan status di `docs/6.18/STATUS.md`;
+    kronologi bringup yang sudah selesai dipindahkan ke
+    `docs/archive/6.18/BRINGUP-LOG.md`.
+  - Analisa, hasil build, dan status uji dicatat sebagai commit baru, bukan
+    amend.
+  - Setiap menambah, memindahkan, atau menghapus dokumen di `docs/`, wajib
+    memperbarui `docs/README.md` (serta `README.md` dan `AGENTS.md` bila
+    relevan) dan memastikan tidak ada broken link relatif.
 
 ## 6. DTB, DTBO, dan image
 
@@ -122,11 +143,13 @@ Jangan commit file donor, tarball, atau dump firmware ke repo.
 - Uji yang belum dilakukan harus dicatat di dokumen.
 - Jangan commit log, image, atau artefak uji ke repo.
 - Perintah build, repack, flash, dan verifikasi ada di `docs/`:
-  - `docs/PLAN-6.18-STATUS.md` — status eksekusi dan perintah kerja
-  - `docs/PLAN-6.18-LANJUTAN.md` — temuan dan rencana fix
-  - `docs/HANDOFF.md` — build, repack, troubleshooting
-  - `docs/BOOTTEST.md` — flash dan rollback
-  - `docs/DEVICES.md` — pemetaan hardware
+  - `docs/README.md` — peta/indeks dokumentasi
+  - `docs/6.18/STATUS.md` — status eksekusi dan perintah kerja 6.18
+  - `docs/6.18/TRACKER.md` — temuan, prioritas fix, dan checklist verifikasi 6.18
+  - `docs/guides/BUILD.md` — build, repack, konfigurasi, troubleshooting
+  - `docs/guides/FLASH-AND-TEST.md` — flash, rollback, dan checklist uji
+  - `docs/guides/SELINUX-6.18.md` — patch SELinux `firmware_load` untuk boot 6.18
+  - `docs/hardware/DEVICES.md` — pemetaan hardware
 
 ## 9. Checklist agen
 
@@ -139,4 +162,5 @@ Jangan commit file donor, tarball, atau dump firmware ke repo.
 - [ ] `Signed-off-by` ada.
 - [ ] Checkpatch commit message bersih.
 - [ ] Dokumentasi memakai kutipan log, bukan nama file lokal.
+- [ ] Struktur `docs/` rapi sesuai aturan, tanpa URL temporer, dan `docs/README.md` terbarui bila file berubah.
 - [ ] Testing yang belum dilakukan dicatat.

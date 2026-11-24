@@ -3,7 +3,7 @@
 Catatan kronologis, termasuk reverse engineering modul kernel (`.ko`)
 dari firmware bawaan X6871. Log rilis KMI 6 di bawah memakai tree modul perangkat
 `fa18f7f`. Refaktor konfigurasi setelah rilis (`f8198be`) dicatat di
-[HANDOFF](HANDOFF.md#konfigurasi-x6871).
+[BUILD](../../guides/BUILD.md#konfigurasi-x6871).
 
 > **Status 2026-11-22:** Rilis terbaru adalah **`gki-kmi6-20261122`**
 > (`x6871-twrp-vendor_boot-v19-kmi6.img` + `vendor_dlkm.img` + `odm_dlkm.img`,
@@ -17,7 +17,7 @@ dari firmware bawaan X6871. Log rilis KMI 6 di bawah memakai tree modul perangka
 > §68 mencatat verifikasi modul dan konfirmasi boot KMI 6, bukan log uji
 > rinci tiap fitur. Konfirmasi uji langsung oleh maintainer ada di
 > [GitHub Release](https://github.com/ramabondanp/x6871-kernel-manifest/releases/tag/gki-kmi6-20261122).
-> Untuk alur flash dan repack, gunakan [BOOTTEST](BOOTTEST.md).
+> Untuk alur flash dan repack, gunakan [FLASH-AND-TEST](../../guides/FLASH-AND-TEST.md).
 
 Indeks bagian penting:
 - §23–§26: komposisi 222 modul recovery, set DLKM, storage fork, dan audit kamera
@@ -234,7 +234,7 @@ selama `modules.dep`/`modules.alias` diregenerasi untuk tree staging.
 ## 8. Reproduksi
 
 Perintah di bawah mereproduksi build historis sebelum `X6871.config` dibuat.
-Untuk build port saat ini, ikuti [HANDOFF](HANDOFF.md#perintah-build).
+Untuk build port saat ini, ikuti [BUILD](../../guides/BUILD.md#perintah-build).
 
 ```bash
 # build
@@ -4023,7 +4023,7 @@ Target: memindahkan seluruh modul X6871 ke GKI upstream AOSP murni **`android16-
 
 5. **Hasil uji boot (`gki-kmi6-20261122`)**:
    - Pengguna mengonfirmasi **sukses boot** di X6871 dengan `x6871-twrp-vendor_boot-v19-kmi6.img`, `vendor_dlkm.img`, `odm_dlkm.img`, bersama `boot-lz4.img` + `system_dlkm.erofs.img` GKI resmi Google `android16-6.12-2026-09_r16` (KMI 6).
-   - Seluruh safeguard verifikasi & repack dikemas ulang ke manifest sebagai [`tools/verify-kmi-abi.py`](../tools/verify-kmi-abi.py) dan [`tools/repack-dlkm-latest.sh`](../tools/repack-dlkm-latest.sh) + aturan keras #15–#18 di `docs/HANDOFF.md`.
+   - Seluruh safeguard verifikasi & repack dikemas ulang ke manifest sebagai [`tools/verify-kmi-abi.py`](../../../tools/verify-kmi-abi.py) dan [`tools/repack-dlkm-latest.sh`](../../../tools/repack-dlkm-latest.sh) + aturan keras #15–#18 di `docs/guides/BUILD.md`.
    - **Trimming target modul khusus X6871 (`fa18f7f`)**: ditambahkan `kernel/kleaf/x6871_modules.bzl` (allowlist **413** target OOT X6871) + filter `_filter_x6871_modules()` di akhir `kernel/kleaf/mgk_64.bzl`, memangkas **260** target multi-varian/SoC lain yang tidak dipakai (termasuk seluruh 3 modul prebuilt `.o` `sched_cus`). Output staging turun dari **813 → 553** berkas `.ko` (`552` unik), flat install **679 → 419** `.ko`, dan jumlah action Bazel turun **4.867 → 919 (-81,1%)** dengan **429/429** modul unik runtime X6871 tetap lengkap dan lulus penuh 8 gerbang `verify-kmi-abi.py`.
 
 ### Artefak uji (`gki-kmi6-20261122`)
