@@ -148,28 +148,54 @@ tetap berfungsi.
 
 ```text
 vdec_vcp_decode() - unsupported (-1,-1)
-vdec_vcp_decode() VP9 header rejected: changed=0x4 payload=... length=... offset=0 flags=0x0
+vdec_vcp_decode() VP9 header rejected: changed=0x4 payload=644324 length=2094080 offset=0 flags=0x0
 vb2ops_vdec_buf_queue: Error!! Codec driver not support the file!
 vidioc_vdec_qbuf: Call on QBUF after unrecoverable error   (15x)
 mtk_vdec_g_v_ctrl: Error!! Cannot get param                (7x)
 ```
 
-**Temuan:** logcat menunjukkan `c2.mtk.avc.decoder` (H.264) start/stop
-normal. Yang gagal spesifik jalur VP9. Fix `7c48ebd` menambah sync DMA-BUF
-header VP9 sebelum VCP `DEC_START`, tetapi belum ada log setelah commit itu.
+**Temuan dan hasil uji perangkat:**
+
+- Uji build DMA-BUF sync VP9 (`7c48ebd`, sync scatterlist + `dma_wmb()`
+  sebelum `DEC_START`) tetap gagal di perangkat (Story tetap hitam;
+  VP9 masih ditolak `changed=0x4`, `offset=0`, payload berisi data).
+  Karena tidak efektif dan modul stock juga tidak melakukannya, `7c48ebd`
+  di-revert oleh commit `213a184315ef`.
+- Debug runtime dengan `mtk_v4l2_dbg_level=3` memastikan CPU membaca header
+  keyframe VP9 Profile 0 yang valid (sync code `49 83 42`) dengan dimensi
+  `540×960` dan `720×1280`, bitstream IOVA `0x12fe00000` di dalam aperture
+  Video uP VDEC `0x110000000..0x12fffffff`, serta alokasi 3×
+  `MEM_TYPE_FOR_SW` dan 3× `MEM_TYPE_FOR_HW_CACHE` berhasil dengan IOVA
+  nonzero. VCP mengirim `B001` (`DEC_START_DONE`) dengan status `-1`.
+- Audit biner modul stock SP20 (`vcp.ko`, `vcp_status.ko`,
+  `mtk_iommu.ko`, `mtk-vcodec-common.ko`, `mtk-vcodec-dec.ko`) dibanding
+  build 6.18 menunjukkan paritas pada tabel `vcp_reserve_mblock`,
+  `feature_table`, `vcp_io_devs`, `mt6895_multi_dom_mm`, `flags` IOMMU
+  MT6895, `vdec_vsi`/IOCTL/VCP probe, dan helper map DMA-BUF (selisih di
+  `vcp.ko` hanya ukuran `vcp_ipidev` 136 vs 128 B, PM/logger ops, dan
+  wrapper API 6.18).
+- Ditemukan bug terpisah pada `mtk_vcodec_drv.h`: reset `VENC_H264 = 1`
+  memperkecil `VDEC_VENC_MAX` menjadi `8`, sehingga `mtk_dec_tput_init()`
+  selalu gagal memuat 12 entri `max-op-rate-table` dan `throughput-table`
+  dari DTB stock. Diperbaiki oleh commit `a719a23cee6d` dengan memulihkan
+  `VDEC_VENC_MAX = 20` tanpa mengubah ID `VENC_H264..VENC_H263` (build dan
+  uji perangkat belum dijalankan).
 
 **Rencana fix:**
 
-1. Build dengan `7c48ebd`, ulangi playback file VP9 yang sama.
-2. Cek apakah `VP9 header rejected`, `unsupported (-1,-1)`, dan
-   `QBUF after unrecoverable error` masih muncul.
-3. Kalau masih: periksa `vdec_vcp_if.c`, terutama nilai `changed=0x4`,
-   `payload`, `length`, `offset`, dan `flags`; bandingkan dengan donor dan
-   pastikan cache/IOMMU header sudah sinkron.
-4. Kalau hilang: update status video di README dan dokumen status.
+1. Jangan menambah patch spekulatif lagi di sisi AP sebelum ada bukti dari
+   sisi VCP.
+2. Tangkap log sisi VCP (`mtk_vdec_vcp_log`) saat VP9 ditolak untuk melihat
+   alasan firmware mengembalikan `changed=0x4` pada frame Profile 0.
+3. Bandingkan A/B satu sampel VP9 yang sama antara stock SP20 dan port 6.18
+   dengan `mtk_v4l2_dbg_level=3` (`DEC_START_DONE`, device DMA, dan rentang
+   IOVA bitstream/working buffer).
+4. Setelah playback VP9 lulus, update status video di README dan dokumen
+   status.
 
 **Verifikasi:** playback VP9 selesai, tidak ada error qbuf, dan decoding
-tidak berhenti di tengah.
+tidak berhenti di tengah. (Uji build/repack untuk `213a184315ef` dan
+`a719a23cee6d` belum dilakukan.)
 
 ### 5.2 DPE `v4l2_fh` — fixed di isp_70
 
