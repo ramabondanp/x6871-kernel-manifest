@@ -7,6 +7,8 @@ Diperbarui: 2026-11-23 (UTC)
 >
 > Log mentah dan image uji disimpan lokal, tidak disertakan di repo.
 > Bukti di dokumen ini dikutip sebagai baris log, bukan nama file lokal.
+>
+> Rencana lanjutan dan prioritas perbaikan: [`PLAN-6.18-LANJUTAN.md`](PLAN-6.18-LANJUTAN.md).
 
 ## Ringkasan
 
