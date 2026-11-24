@@ -28,7 +28,7 @@ Diperbarui: 2026-11-24 (UTC)
 | CMDQ/GCE + MML | **Noise, prioritas rendah** | Jangan tambah event DT; perbaiki fallback driver |
 | Thermal `lvts`/`soc_max` | **Fixed, build lolos; uji device tertunda** | Tabel sensor disamakan dengan stock ko; maintainer sedang di luar |
 | `tranhalconfig` | **Terbuka, userspace** | Service/sepolicy vendor, bukan kernel |
-| `fpsgo`/`msync2` | **Terbuka, build/init** | Tambah module atau hapus `insmod` |
+| `fpsgo`/`trans_sched` | **Terbuka; msync2 bukan regresi** | RE interface `trans_sched`; `fpsgo` wrapper prioritas rendah |
 | TEE/Widevine | **Terbuka, vendor security** | Provisioning/TA/HDCP, bukan DT |
 | Error minor | **Rendah** | Catat, tangani setelah prioritas utama |
 
@@ -364,7 +364,7 @@ service/sepolicy, bukan kernel.
 **Verifikasi:** lookup service berhasil, `TranFwkHalClient` tidak
 `No Binder`, dan `audit_lost` tidak muncul.
 
-### 5.6 `fpsgo`/`msync2` — build/init
+### 5.6 `fpsgo`/`trans_sched`/`msync2` — module stock yang belum ada di 6.18
 
 **Gejala:**
 
@@ -373,20 +373,66 @@ init: Command 'insmod /vendor/lib/modules/fpsgo.ko' ... failed: No such file or 
 init: Command 'insmod /vendor/lib/modules/msync2_dms.ko' ... failed ...
 init: Command 'insmod /vendor/lib/modules/msync2_frd.ko' ... failed ...
 uas-service: trans sched init falied!   (50x)
+uas-service: trans sched don't support!
+SystemBinderSchedUxFeature: setTranSchedUxTags fail
 ```
 
-**Temuan:** init masih mencoba memuat module yang tidak ada di build.
-`uas-service` dan `setTranSchedUxTags` juga gagal, jadi fitur performance
-Transsion tidak aktif.
+**Inventaris stock vs build 6.18:**
 
-**Rencana fix:** pilih salah satu:
+| Module | Stock | Build 6.18 | Sumber |
+|---|---|---|---|
+| `mtk_fpsgo_v8.ko` | vendor_dlkm | ada, terpasang | source fpsgo_v8 |
+| `fpsgo.ko` | vendor_dlkm | tidak ada | tidak ada |
+| `trans_sched.ko` | odm_dlkm | tidak ada | tidak ada |
+| `msync2_dms.ko` | tidak ada | tidak ada | tidak ada |
+| `msync2_frd.ko` | tidak ada | tidak ada | tidak ada |
 
-- Tambahkan `fpsgo.ko`, `msync2_dms.ko`, `msync2_frd.ko` ke build dan
-  pastikan ABI 6.18 cocok; atau
-- Hapus baris `insmod` dan nonaktifkan fitur terkait agar log bersih.
+**Temuan:**
 
-**Verifikasi:** tidak ada `insmod ... No such file`, dan tidak ada
-`uas-service` error berulang.
+- `mtk_fpsgo_v8.ko` adalah core FPSGO dan sudah dibangun/dipasang di
+  `vendor_dlkm`.
+- `fpsgo.ko` stock adalah wrapper kecil (70 KB) yang bergantung pada
+  `mtk_fpsgo_v8`; ia mengekspor helper touch latency/legacy FPSGO.
+  Source-nya tidak ada di tree port, donor MT6896, maupun tarball MT6897.
+- `trans_sched.ko` stock (518 KB) adalah fork scheduler Transsion. Modul ini
+  mengisi `g_trans_sched_interface` dan membuat `/dev/trans_sched`.
+  Source-nya tidak ada.
+- HAL `vendor.transsion.performance.sched.ITransSched/default` membuka
+  `/dev/trans_sched`. Karena module tidak ada, HAL gagal dan
+  `uas-service` melaporkan `trans sched don't support!`.
+- `msync2_dms.ko` dan `msync2_frd.ko` **tidak ada di firmware stock X6871**
+  (`all_files` stock tidak memuatnya), walaupun init stock tetap mencoba
+  `insmod`. Jadi error kedua module itu bukan regresi 6.18; jangan dikejar
+  dengan menambah module palsu.
+
+**Kenapa tidak bisa pakai stock `.ko`:** module stock dibangun untuk 6.12
+(vermagic dan modversions 6.12). Tidak bisa dimuat di 6.18. Source 6.12 di
+tree juga hasil port, bukan source stock.
+
+**Rencana RE:**
+
+1. `fpsgo.ko` — prioritas rendah. Rekonstruksi wrapper dari simbol stock
+   (`fpsgo_touch_latency_ko_init`, `notify_fpsgo_touch_latency_ko_ready`,
+   `xgf_get_process_id`) di atas export `mtk_fpsgo_v8.ko`. Kalau wrapper
+   tidak dibutuhkan userspace, core `mtk_fpsgo_v8.ko` tetap jalan.
+2. `trans_sched.ko` — prioritas utama. Full RE 518 KB scheduler fork tidak
+   realistis. Lakukan RE terarah pada interface HAL:
+   - Perangkat: `/dev/trans_sched` (misc device).
+   - Command HAL yang terlihat: `0x40185403` (24 byte write),
+     `0x40085412` (8 byte write), `0x80185415` (24 byte read/write),
+     `0x5416`, dan command state/scene.
+   - Implementasi minimal: misc device `/dev/trans_sched`, handler ioctl,
+     proc node `trans_scheduler`, dan bookkeeping state/ux tag. Hook
+     scheduler tidak diaktifkan dulu.
+   - Efek: HAL mulai jalan dan error `uas-service` berhenti; tuning
+     scheduler Transsion belum aktif.
+3. Kalau nanti dibutuhkan perilaku penuh, lanjutkan RE hook
+   `g_trans_sched_interface` dan tracepoint scheduler.
+
+**Verifikasi:** `/dev/trans_sched` ada, HAL
+`vendor.transsion.performance.sched` start, tidak ada
+`trans sched don't support!`, dan `setTranSchedUxTags` tidak gagal.
+`msync2` tetap dibiarkan karena stock juga tidak punya.
 
 ### 5.7 TEE/Widevine — vendor security
 
@@ -450,7 +496,9 @@ Urutan verifikasi yang disarankan:
 6. Cek `/sys/class/thermal`: jumlah zone sesuai stock (38 base + 4 camera),
    `soc_max` ada, suhu valid, dan tidak ada `Failed to register lvts tz 26`.
 7. Cek service `tranhalconfig` ditemukan; tidak ada `audit_lost`.
-8. Cek tidak ada `insmod ... No such file` untuk `fpsgo`/`msync2`.
+8. Cek `/dev/trans_sched` ada dan `uas-service` tidak lagi melaporkan
+   `trans sched don't support!`. `msync2` dibiarkan karena stock juga tidak
+   punya.
 9. Jalankan playback DRM/HDCP dan cek TEE/Widevine.
 
 ## 8. Urutan Kerja yang Disarankan
@@ -464,7 +512,7 @@ Urutan verifikasi yang disarankan:
 | P1 | `tranhalconfig` | Log storm, audit loss, dan lookup lambat |
 | P2 | DPE `v4l2_fh` | Warning 2x per boot; node V4L2 DPE tidak berfungsi |
 | P2 | CMDQ/GCE + MML | Noise; perbaiki fallback driver |
-| P2 | `fpsgo`/`msync2` | Fitur performance; pilih tambah module atau hapus init |
+| P2 | `trans_sched`: RE interface `/dev/trans_sched` | Error `uas-service`; full scheduler RE terlalu besar |
 | P2 | TEE/Widevine | DRM/Play Integrity; butuh provisioning vendor |
 | P3 | Error minor | Bersihkan setelah prioritas utama selesai |
 
