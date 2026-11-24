@@ -315,12 +315,12 @@ bukan dari keluaran default `out_bazel/`. Pakai `--out-dir
 `pretimeout_dump.ko` ditambahkan oleh GKI KMI 7 dan sudah tersedia di
 `system_dlkm.erofs.img` Google; tidak perlu disalin ke image modul X6871.
 
-#### Profil uji `6.18-lts` (`android17-6.18-lts`, `6.18.63`, KMI 6, build GKI lokal)
+#### Profil uji `6.18-lts` (`android17-6.18-lts`, `6.18.64`, KMI 6, build GKI lokal)
 
 Default `local_manifest-6.18.xml` tetap pada tag pure-GKI
 `android17-6.18-2026-09_r13` (`6.18.32`, KMI 5). Profil uji
 `local_manifest-6.18-lts.xml` mem-pin `kernel/common` ke
-`17b8bfe5ce7568445def263dc609f839f3b469f6` (`android17-6.18-lts`, `6.18.63`,
+`aeb47e4961274be51dd582e00796110922f558e7` (`android17-6.18-lts`, `6.18.64`,
 KMI 6) sebagai **profil build GKI lokal (*self-built*)**:
 
 ```bash
@@ -341,14 +341,16 @@ Catatan penting profil ini:
   ephemeral dari build tersebut. Flash kelima image (`boot`, `vendor_boot`,
   `system_dlkm`, `vendor_dlkm`, `odm_dlkm`) sekaligus di `fastbootd` dan jangan
   dicampur dengan image Google CI atau KMI 5.
-- **Patch sementara `common` (`17b8bfe5ce75`):** `6.18.63` upstream sempat
-  menghapus guard NULL di `blk_plug_invalidate_ts()` sehingga preemption IRQ di
-  dalam `blk_finish_plug+0x54/0x78` memicu
+- **Patch sementara `common` (`17b8bfe5ce75` / `aeb47e496127`):** `6.18.63+`
+  upstream sempat menghapus guard NULL di `blk_plug_invalidate_ts()` sehingga
+  preemption IRQ di dalam `blk_finish_plug+0x54/0x78` memicu
   `Unable to handle kernel NULL pointer dereference at virtual address 0000000000000020`.
   `setup.sh` menerapkan `patches/common-6.18-blk-plug-invalidate-ts.patch`
-  lewat `git am` **hanya** bila `common` berada di `17b8bfe5ce75` agar tree
-  tetap bersih (tanpa `-dirty`), dan tidak menyentuh `r13` maupun revisi LTS
-  yang lebih baru.
+  lewat `git am` **hanya** bila `common` berada di SHA yang terdampak
+  (`17b8bfe5ce75` atau `aeb47e496127`) agar tree tetap bersih (tanpa `-dirty`),
+  dan tidak menyentuh `r13` maupun revisi LTS yang lebih baru. Maintainer
+  mengonfirmasi patch ini menghilangkan panic `blk_plug_invalidate_ts` saat
+  diuji langsung di X6871.
 - `patches/kleaf-localversion-suffix.patch` menambah env var opsional
   `LOCALVERSION_SUFFIX` di `build/kernel/kleaf/workspace_status_stamp.py`
   (tidak aktif bila tidak diset).
