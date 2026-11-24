@@ -1,0 +1,131 @@
+# Aturan Kerja X6871 6.18
+
+Dokumen ini hanya berisi aturan umum untuk agen AI. Detail teknis, temuan,
+perintah build/repack, dan status terbaru ada di `docs/`; jangan menduplikasi
+detail tersebut di sini.
+
+## 1. Scope dan rilis
+
+- Pekerjaan hanya untuk **6.18**. Baseline stabil tetap **6.12**.
+- 6.12 dipakai untuk penggunaan harian; 6.18 masih pratinjau dan belum punya
+  image rilis publik.
+- Jangan mencampur image KMI 6 (6.12) dengan KMI 5/6.18.
+- README bersifat user-facing. Info 6.18 ditulis sederhana.
+
+## 2. Sumber kebenaran
+
+- Perilaku stock X6871 mengikuti **DTB/DTBO stock** dan **module `.ko` stock**
+  dari dump firmware.
+- Source 6.12 di tree adalah hasil port, bukan source stock.
+- Source donor hanya referensi porting, bukan acuan perilaku stock.
+- Jangan mengarang isi stock dari source tree.
+
+## 3. Donor dan sumber eksternal
+
+| Sumber | Link | Kegunaan |
+|---|---|---|
+| OPPO MT6896 modules | <https://github.com/oppo-source/android_kernel_modules_oppo_mt6896/tree/oppo/mt6896_b_16.0_reno12> | Donor driver/media 6.12 |
+| Infinix MT6897 tarball | <https://d1wd32b69guoqm.cloudfront.net/opensource/android15_kernel_modules_and_devicetree_mt6897.tar.gz> | Donor Transsion 6.1 |
+| Infinix Open Source Center | <https://opensource.dev.infinixmobility.com/> | Halaman resmi source Infinix |
+| Stock X6871 GitLab | <https://gitlab.com/rama-firmware-dumps/infinix/Infinix-X6871> | DTB, DTBO, image, dan `.ko` stock |
+| Stock X6871 branch | `X6871-16.3.0.155SP20(OP008PF001AZ)` | Versi referensi stock |
+
+Clone/unduh langsung:
+
+```bash
+mkdir -p donor && cd donor
+
+# Donor OPPO MT6896
+git clone --depth 1 --single-branch \
+  --branch oppo/mt6896_b_16.0_reno12 \
+  https://github.com/oppo-source/android_kernel_modules_oppo_mt6896.git \
+  oppo-mt6896
+
+# Donor Transsion/Infinix MT6897
+curl -L --retry 3 -o infinix-mt6897.tar.gz \
+  https://d1wd32b69guoqm.cloudfront.net/opensource/android15_kernel_modules_and_devicetree_mt6897.tar.gz
+mkdir -p infinix-mt6897
+tar -xzf infinix-mt6897.tar.gz -C infinix-mt6897
+
+# Firmware stock X6871
+git clone --depth 1 --single-branch \
+  --branch 'X6871-16.3.0.155SP20(OP008PF001AZ)' \
+  https://gitlab.com/rama-firmware-dumps/infinix/Infinix-X6871.git \
+  stock-x6871
+```
+
+Jangan commit file donor, tarball, atau dump firmware ke repo.
+
+## 4. Commit dan checkpatch
+
+- Satu commit untuk satu topik. Jangan menggabungkan beberapa bugfix.
+- **Jangan amend commit fix.** Kalau ada perbaikan, buat commit baru.
+- Di **manifest**, fix/analisa juga harus menjadi **commit baru**, bukan amend.
+- Jangan menambahkan prefix `6.18:` kalau bug yang diperbaiki juga ada di 6.12.
+- Untuk commit kernel yang khusus 6.18: tanpa prefix `6.18:`, subjek diakhiri
+  `for 6.18`.
+- Commit manifest/docs memakai prefix `6.18:` dan subjek hanya boleh punya
+  satu `6.18`.
+- Commit kernel/vendor memakai format kernel, body sekitar 72 kolom, dan
+  `Signed-off-by: Rama Bondan Prakoso <ramanarubp@gmail.com>`.
+- Sebelum push, jalankan checkpatch untuk commit.
+- Untuk kernel/vendor, checkpatch difokuskan ke **commit message**, bukan code
+  warning.
+- Warning `MAINTAINERS` di-skip. Code warning checkpatch, DOS line endings, dan
+  MAINTAINERS di luar scope dokumen plan.
+
+## 5. Dokumentasi dan bukti
+
+- Jangan menulis nama file log lokal (`pstoreX`, `dmesgX`, `logcatX`,
+  `twrpX`) atau path lokal di repo.
+- Bukti log harus dikutip sebagai baris log.
+- Log mentah dan image uji disimpan lokal, tidak disertakan di repo.
+- Temuan dan saran fix dicatat di `docs/PLAN-6.18-LANJUTAN.md`.
+- Analisa, hasil build, dan status uji dicatat sebagai commit baru, bukan
+  amend.
+
+## 6. DTB, DTBO, dan image
+
+- **Hard rule:** semua `dtb` dan `dtbo.img` yang dipakai di vendor berasal
+  dari stock.
+- Jangan berasumsi ada DTBO kustom.
+- DT di tree tidak pernah dipakai untuk membuat image; tree hanya untuk build
+  modul.
+- Repack harus mempertahankan `dtb`, `bootconfig`, dan recovery ramdisk
+  byte-identical dengan stock.
+- Node yang disabled di stock tetap disabled.
+- Jangan menambah node, thermal zone, GCE event, atau channel CMDQ yang tidak
+  ada di stock.
+- Fix driver/HAL, bukan DT.
+
+## 7. Branch dan backup
+
+- Default branch repo kernel/vendor: `x6871-android17-6.18`.
+- Branch `android16` dihapus hanya dari repo device.
+- History lama dipertahankan di branch `backup/*`.
+- Repo publik harus bersih dari rujukan log lokal dan dokumentasi 6.18 harus
+  akurat.
+
+## 8. Testing dan artefak
+
+- Uji yang belum dilakukan harus dicatat di dokumen.
+- Jangan commit log, image, atau artefak uji ke repo.
+- Perintah build, repack, flash, dan verifikasi ada di `docs/`:
+  - `docs/PLAN-6.18-STATUS.md` — status eksekusi dan perintah kerja
+  - `docs/PLAN-6.18-LANJUTAN.md` — temuan dan rencana fix
+  - `docs/HANDOFF.md` — build, repack, troubleshooting
+  - `docs/BOOTTEST.md` — flash dan rollback
+  - `docs/DEVICES.md` — pemetaan hardware
+
+## 9. Checklist agen
+
+- [ ] Scope hanya 6.18; 6.12 tidak diubah.
+- [ ] Perubahan hanya pada topik yang diminta.
+- [ ] DTB/DTBO stock tidak diubah.
+- [ ] Tidak menambah node/zone/event yang tidak ada di stock.
+- [ ] Commit baru, bukan amend, untuk fix/analisa.
+- [ ] Prefix/akhiran commit sesuai aturan.
+- [ ] `Signed-off-by` ada.
+- [ ] Checkpatch commit message bersih.
+- [ ] Dokumentasi memakai kutipan log, bukan nama file lokal.
+- [ ] Testing yang belum dilakukan dicatat.
