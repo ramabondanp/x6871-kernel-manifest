@@ -26,7 +26,7 @@ Diperbarui: 2026-11-24 (UTC)
 | Video VP9 | **Terbuka** | Verifikasi fix `7c48ebd`, lanjutkan jika masih gagal |
 | DPE `v4l2_fh` | **Terbuka** | Perbaiki driver atau lepas node V4L2 DPE |
 | CMDQ/GCE + MML | **Noise, prioritas rendah** | Jangan tambah event DT; perbaiki fallback driver |
-| Thermal `lvts`/`soc_max` | **Terbuka** | Periksa registrasi `lvts`, jangan tambah zone |
+| Thermal `lvts`/`soc_max` | **Terbuka, akar masalah ditemukan** | Samakan tabel sensor LVTS dengan stock ko |
 | `tranhalconfig` | **Terbuka, userspace** | Service/sepolicy vendor, bukan kernel |
 | `fpsgo`/`msync2` | **Terbuka, build/init** | Tambah module atau hapus `insmod` |
 | TEE/Widevine | **Terbuka, vendor security** | Provisioning/TA/HDCP, bukan DT |
@@ -239,36 +239,95 @@ region yang sudah diklaim; jangan menghapus node stock.
 
 **Prioritas:** rendah, kecuali muncul gejala MML/video yang spesifik.
 
-### 5.4 Thermal `lvts`/`soc_max` — prioritas menengah
+### 5.4 Thermal LVTS — semua zone hilang karena tabel sensor beda dari stock
 
 **Gejala:**
 
 ```text
 mtk-soc-temp-lvts 10315000.lvts: Error: Failed to register lvts tz 26, ret = -19
 Failed to get thermal zone for soc_max
+Failed to get thermal zone for Vtskin-max
 kernel_thermal_hint: get soc-bot0 thermal zone error   (33x)
 kernel_thermal_hint: get soc-smap0 thermal zone error  (33x)
 kernel_thermal_hint: get soc-smap1 thermal zone error  (33x)
 ```
 
-**Temuan:** DT stock hanya punya `soc_max`, bukan `soc-bot0/smap/Vtskin/
-charger/camera0`. DT tree juga tidak dipakai untuk image, jadi jangan tambah
-zone di tree. Tetapi `soc_max` ada di stock dan tetap gagal ditemukan, plus
-`lvts tz 26` gagal register. Ini kemungkinan masalah driver `lvts` 6.18 atau
-konfigurasi thermal HAL, bukan DTBO. Pembacaan thermal userspace bisa
-`-274000` (invalid), sehingga thermal throttling dan charging limit perlu
-dicek.
+**Hitungan zone stock X6871:**
+
+- DTB `vendor_boot` stock: **38 zone** — 26 zone LVTS (`soc_max` id 0,
+  sisanya id 1..25), 3 NTC (`ap_ntc`, `ltepa_ntc`, `nrpa_ntc`), 8 PMIC,
+  dan `consys`.
+- DTBO stock: menambah `camera0`, `camera1`, `camera2`, `camera4` sehingga
+  total runtime stock **42 zone**.
+- `soc_max` adalah zone LVTS id 0, bukan zone tambahan.
+
+**Akar masalah:** module stock `soc_temp_lvts.ko` dari `vendor_dlkm` stock
+X6871 `16.3.0.155SP20` memakai **25 sensor** LVTS:
+
+| Controller | num_sensor | sensor_map |
+|---|---|---|
+| MCU CTRL0 | 4 | 0,1,2,3 |
+| MCU CTRL1 | 4 | 4,5,6,7 |
+| MCU CTRL2 | 4 | 8,9,10,11 |
+| AP CTRL0 | 2 | 12,13 |
+| AP CTRL1 | 2 | 14,15 |
+| AP CTRL2 | 3 | 16,17,18 |
+| AP CTRL3 | 3 | 19,20,21 |
+| AP CTRL4 | 3 | 22,23,24 |
+
+Module 6.18 hasil port memakai **26 sensor**. Di AP CTRL1 ada placeholder
+`MT6895_TS6_1` di antara `TS6_0` dan `TS6_2`:
+
+```text
+AP CTRL1: num_sensor=3  sensor_map={14,15,16}  on_off={ON,OFF,ON}
+AP CTRL2: num_sensor=3  sensor_map={17,18,19}
+AP CTRL3: num_sensor=3  sensor_map={20,21,22}
+AP CTRL4: num_sensor=3  sensor_map={23,24,25}
+```
+
+Akibatnya semua id setelah 15 bergeser +1, id 16 tidak pernah didaftarkan,
+dan driver mencoba id 26. Stock DTB hanya punya zone LVTS id 0..25, jadi
+`devm_thermal_of_zone_register()` untuk id 26 mengembalikan `-ENODEV` (-19).
+`lvts_probe()` meneruskan error itu, lalu devres melepas zone 0..25 yang
+sudah didaftarkan. Semua zone LVTS hilang; device hanya menyisakan zone
+non-LVTS, sehingga jumlahnya jauh lebih sedikit dari stock.
+
+Tabel 26 sensor yang sama juga ada di module 6.12 hasil port. Perlu dicek
+apakah 6.12 juga kehilangan zone LVTS; sumber donor MT6896 memakai tabel
+yang sama, jadi donor source bukan acuan untuk perilaku stock X6871.
+Acuannya adalah `soc_temp_lvts.ko` stock.
 
 **Rencana fix:**
 
-1. Cek `/sys/class/thermal` di device: apakah `soc_max` terdaftar dan
-   tipenya sesuai.
-2. Periksa `lvts` probe: mengapa tz 26 gagal `-19`; apakah ada sensor yang
-   tidak ada di DT.
-3. Periksa konfigurasi thermal HAL vendor; jangan menambah zone baru.
+1. Di `drivers/thermal/mediatek/soc_temp_lvts.c`, hapus `MT6895_TS6_1`
+   dari enum supaya `TS7_0` kembali ke id 16, `TS8_0` ke 19, `TS9_0` ke 22,
+   dan `MT6895_NUM_TS` menjadi 25.
+2. Ubah AP CTRL1 menjadi `num_sensor=2`,
+   `sensor_map={MT6895_TS6_0, MT6895_TS6_2}`,
+   `sensor_on_off={SEN_ON, SEN_ON}`. Kalibrasi sudah cocok: `TS6_0` dari
+   efuse block 10 dan `TS6_2` dari block 11; tidak ada kalibrasi `TS6_1`.
+3. Tambahkan pengaman di `lvts_register_thermal_zones()`: kalau
+   `devm_thermal_of_zone_register()` mengembalikan `-ENODEV` karena DT tidak
+   punya zone untuk sensor itu, lewati sensor tersebut dan jangan gagalkan
+   seluruh probe.
+4. Jangan menambah zone thermal ke DT. Image memakai DTB/DTBO stock.
 
-**Verifikasi:** `thermal_core` bisa membaca `soc_max` dan suhu tidak
-`-274000`; tidak ada `kernel_thermal_hint` error berulang.
+**Catatan zone opsional:** `Vtskin-max`, `mtk-master-charger`, `soc-bot0`,
+`soc-smap0`, dan `soc-smap1` tidak ada di DTB/DTBO stock X6871, tetapi tetap
+dicari oleh `thermal_interface` yang dipakai bersama. Log gagal untuk nama
+tersebut wajar. Donor MT6897 punya 49 zone termasuk `vtskin*` dan
+`soc-bot1..4`; donor MT6896 hanya 35 zone. Jangan menyalin zone donor ke
+X6871.
+
+`camera0` berbeda: zone ini memang ditambahkan DTBO stock dan bergantung
+pada registrasi thermal dari driver `imgsensor`. Kalau setelah fix LVTS
+`camera0` masih hilang, periksa probe/registrasi thermal `imgsensor`, bukan
+DTBO.
+
+**Verifikasi:** `/sys/class/thermal` menampilkan 38 zone base + 4 camera;
+`soc_max` ada; tidak ada `Failed to register lvts tz 26`; suhu CPU/GPU/APU
+valid dan berubah saat beban naik; tidak ada error `soc_max` berulang dari
+`thermal_interface`.
 
 ### 5.5 `tranhalconfig` — userspace/sepolicy
 
@@ -380,8 +439,8 @@ Urutan verifikasi yang disarankan:
 4. Cek video VP9: tidak ada `VP9 header rejected`, `unsupported (-1,-1)`,
    atau `QBUF after unrecoverable error`.
 5. Cek warning `v4l2_open` sudah hilang.
-6. Cek `/sys/class/thermal`: `soc_max` ada dan suhu valid, bukan
-   `-274000`.
+6. Cek `/sys/class/thermal`: jumlah zone sesuai stock (38 base + 4 camera),
+   `soc_max` ada, suhu valid, dan tidak ada `Failed to register lvts tz 26`.
 7. Cek service `tranhalconfig` ditemukan; tidak ada `audit_lost`.
 8. Cek tidak ada `insmod ... No such file` untuk `fpsgo`/`msync2`.
 9. Jalankan playback DRM/HDCP dan cek TEE/Widevine.
@@ -393,7 +452,7 @@ Urutan verifikasi yang disarankan:
 | P0 | Verifikasi crash/EMI pasca-fix dengan log baru | Memastikan 7 Oops + RCU stall benar-benar hilang |
 | P0 | Video VP9 | Isu user-facing yang masih terbuka |
 | P1 | Pastikan DTB/DTBO stock yang dipakai, bukan DT tree | ADSP dan node disabled lain tidak relevan untuk DT tree |
-| P1 | Thermal `lvts`/`soc_max` | Risiko thermal/charging jika suhu invalid |
+| P1 | Thermal LVTS: samakan tabel sensor dengan stock ko | Semua zone LVTS hilang karena probe gagal di tz 26 |
 | P1 | `tranhalconfig` | Log storm, audit loss, dan lookup lambat |
 | P2 | DPE `v4l2_fh` | Warning 2x per boot; node V4L2 DPE tidak berfungsi |
 | P2 | CMDQ/GCE + MML | Noise; perbaiki fallback driver |
@@ -412,6 +471,10 @@ Urutan verifikasi yang disarankan:
   byte-identical. Jangan mengubah `mt6895.dts` untuk mengejar error log.
 - Jangan mengubah node yang disabled di DTB/DTBO stock. Kalau sebuah fitur
   tidak ada di stock, jangan diaktifkan hanya untuk menghilangkan log.
+- Analisis thermal memakai `soc_temp_lvts.ko` stock X6871
+  `16.3.0.155SP20` dari dump GitLab. Source 6.12 di tree adalah hasil port,
+  bukan source stock, jadi tabel sensornya tidak boleh dijadikan acuan
+  perilaku stock.
 - Code warning checkpatch, DOS line endings, dan MAINTAINERS di luar scope
   dokumen ini.
 - `audit_lost=437` berarti sebagian denial SELinux mungkin tidak terlihat;
