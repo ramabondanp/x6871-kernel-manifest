@@ -75,8 +75,8 @@ hardware setelah `vendor_boot-6.18-test4.img`:
 
 ```sh
 # staging 6.12 dan 6.18
-S12=<workspace-6.12>/out_bazel_kmi7/*/execroot/_main/bazel-out/*/bin/kernel_device_modules-6.12/mgk_64_k612_customer_modules_install.user/staging/lib/modules/6.12.*
-S18=<workspace-6.18>/out_bazel_test/*/execroot/_main/bazel-out/*/bin/kernel_device_modules-6.18/mgk_64_k618_customer_modules_install.user/staging/lib/modules/6.18.*
+S12=<staging-6.12>/lib/modules/6.12.*
+S18=<staging-6.18>/lib/modules/6.18.*
 
 # pemindai KCFI
 tools/scan-cfi-tracepoints.py --vmlinux <vmlinux-6.18> --modules "$S18"

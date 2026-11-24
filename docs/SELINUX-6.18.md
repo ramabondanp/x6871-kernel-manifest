@@ -7,16 +7,14 @@ Kernel 6.18 memeriksa `READING_FIRMWARE` di
 X6871 belum mendefinisikan permission `firmware_load`, sehingga
 firmware yang dibaca `request_firmware()` dari domain `kernel` ditolak.
 
-Gejala tanpa patch (`log pstore uji`/`log pstore uji`):
+Gejala tanpa patch pada uji boot 6.18:
 
 ```text
-mali: loading /vendor/firmware/mali_csffw.bin failed with error -13
-haptic_hv: loading /odm/firmware/haptic_ram.bin failed with error -13
-loading /vendor/firmware/conninfra.cfg failed with error -13
-avc: denied { firmware_load } for ... scontext=u:r:kernel:s0
-     tcontext=u:object_r:vendor_file:s0 tclass=system
-avc: denied { firmware_load } for path="/vendor/firmware/conninfra.cfg"
-     scontext=u:r:kernel:s0 tcontext=u:object_r:connsys_vendor_file:s0
+[    5.798231] (NULL device *): loading /vendor/firmware/conninfra.cfg failed with error -13
+[    5.798370] type=1400 audit(1795443978.936:55): avc:  denied  { firmware_load } for  comm="modprobe" path="/vendor/firmware/conninfra.cfg" dev="dm-6" ino=4038011 scontext=u:r:kernel:s0 tcontext=u:object_r:connsys_vendor_file:s0 tclass=system permissive=0
+[    8.996140][ T1498] mali 13000000.mali: loading /vendor/firmware/mali_csffw.bin failed with error -13
+[   10.470333] haptic_hv 3-005a: loading /vendor/firmware/haptic_ram.bin failed with error -13
+[   43.194293] [MTK-WIFI] WIFI_write_on[E]: WMT turn on WIFI fail!
 ```
 
 Mali firmware gagal termuat → SurfaceFlinger crash berulang → zygote
@@ -47,7 +45,7 @@ mengizinkan `same_process_hal_file`/`vendor_file`), tambahkan allow
 
 ```bash
 cd <dir-berisi-vendor_sepolicy.cil-hasil-patch>
-patch -p1 < $HOME/x6871-kernel-manifest/patches/selinux-x6871-6.18-connsys.patch
+patch -p1 < "$HOME/x6871-kernel-manifest/patches/selinux-x6871-6.18-connsys.patch"
 ```
 
 ## Cara pasang
@@ -64,7 +62,7 @@ mkdir -p selinux-x6871 && cd selinux-x6871
 cp <extract-system>/system/system/etc/selinux/plat_sepolicy.cil .
 cp <extract-vendor>/vendor/etc/selinux/vendor_sepolicy.cil .
 cp <extract-vendor>/vendor/etc/selinux/vendor_file_contexts .
-patch -p1 < $HOME/x6871-kernel-manifest/patches/selinux-x6871-6.18.patch
+patch -p1 < "$HOME/x6871-kernel-manifest/patches/selinux-x6871-6.18.patch"
 ```
 
 Kembalikan ketiga file ke path asalnya, lalu rebuild `system.img` dan
@@ -103,7 +101,7 @@ WiFi/Bluetooth bisa dinyalakan.
 
 - Boot ke sistem 6.18: **PASS setelah patch SELinux** (system plat +
   vendor) dan `vendor_boot-6.18-test12-twrpfix.img`.
-- Uji `log kernel uji` (2026-11-23): boot dan touch jalan, tetapi WiFi dan
+- Uji boot 6.18 (2026-11-23): boot dan touch jalan, tetapi WiFi dan
   Bluetooth sempat gagal karena `conninfra.cfg` berlabel
   `connsys_vendor_file`. Setelah `vendor_sepolicy.cil` (md5
   `5b0827a140e928900a4b91006fba301d`) memakai allow tersebut,

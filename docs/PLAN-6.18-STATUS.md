@@ -4,12 +4,15 @@ Diperbarui: 2026-11-23 (UTC)
 
 > Dokumen ini melacak eksekusi [`PLAN-6.18.md`](PLAN-6.18.md). Baseline
 > produksi 6.12 (`gki-kmi6-20261122`) tidak berubah.
+>
+> Log mentah dan image uji disimpan lokal, tidak disertakan di repo.
+> Bukti di dokumen ini dikutip sebagai baris log, bukan nama file lokal.
 
 ## Ringkasan
 
 | Fase | Status | Catatan |
 |---|---|---|
-| 0 — Manifest, branch, workspace | **Selesai** | Workspace `<workspace-6.18>` |
+| 0 — Manifest, branch, workspace | **Selesai** | Workspace 6.18 terisolasi dari baseline 6.12 |
 | 1 — Kleaf/MGK + device tree 6.18 | **Selesai** | Kernel 6.18.32 target `mgk_64_k618` |
 | 2 — Codemod API 6.13–6.18 | **Selesai** | Build penuh 546 `.ko` berhasil |
 | 3 — Milestone `vendor_boot` | **Selesai (build)** | 221 modul, image terverifikasi |
@@ -40,8 +43,8 @@ serta `for_each_kernel_tracepoint`.
   - Repo berat non-DDK dibuang dari sync.
 - Branch `x6871-android17-6.18` dibuat dari ujung
   `x6871-android16-6.12` pada kedua repo port.
-- Workspace terisolasi: `<workspace-6.18>`
-  (`../vendor/mediatek` milik workspace ini, bukan workspace 6.12).
+- Workspace 6.18 terisolasi dari workspace 6.12; `../vendor/mediatek`
+  milik workspace ini, bukan workspace 6.12.
 - Script mendukung `KVER=6.18`: `build.sh`, `setup.sh`,
   `tools/repack-vendor-boot-latest.sh`, `tools/repack-dlkm-latest.sh`,
   `tools/verify-kmi-abi.py --kver 6.18`.
@@ -256,8 +259,8 @@ di `8250_mtk.ko` (diganti `pm_runtime_*` langsung) dan
 - Vendor modules (`vendor/mediatek/kernel_modules`, branch
   `x6871-android17-6.18`): `d500e72bea0b`
 - Manifest: commit dokumentasi ini
-- Image: `<artefak-lokal>/`
-- Build log: `<log-build-lokal>`
+- Image uji dan log build tidak disertakan di repo; unggahan publik
+  dicantumkan pada bagian artefak terkait.
 
 ### Panic mrdump 6.18
 
@@ -388,19 +391,19 @@ argumen/manual setelah kompilasi pertama.
 ## Perintah kerja
 
 ```bash
-cd <workspace-6.18>
+cd "$HOME/x6871-6.18/ws"
 
 # build
 KVER=6.18 OUT_DIR="$PWD/out_bazel_6.18" \
-  $HOME/x6871-kernel-manifest/build.sh user
+  "$HOME/x6871-kernel-manifest/build.sh" user
 
 # codemod (dry-run)
-python3 $HOME/x6871-kernel-manifest/scripts/port-6.18-mechanical.py
+python3 "$HOME/x6871-kernel-manifest/scripts/port-6.18-mechanical.py"
 
 # verifikasi akhir
-cd $HOME/x6871-kernel-manifest
+cd "$HOME/x6871-kernel-manifest"
 ./tools/verify-kmi-abi.py --kver 6.18 \
-  --ws <workspace-6.18> \
+  --ws "$HOME/x6871-6.18/ws" \
   --vb-dir ... --vd-dir ... --od-dir ...
 ```
 
@@ -419,9 +422,10 @@ cd $HOME/x6871-kernel-manifest
 - DTB 6.18 identik byte-for-byte dengan DTB 6.12 yang boot normal
   (`ead6a965b0aaacc2a9c520721693f342`); DTS 6.18 juga identik. Jadi
   kegagalan boot bukan karena DT/DTB.
-- `log pstore uji` (panic test3) berisi log 6.18 lengkap 0.0–4.68 s.
-  Panic test3 berasal dari `tfa_debug_probe` di `atf_logger`; sudah
-  diperbaiki oleh `54d86b4eb545` untuk test4 dan sesudahnya.
+- Log pstore uji test3 berisi log 6.18 lengkap 0.0–4.68 s. Panic test3
+  berasal dari `tfa_debug_probe` di `atf_logger`:
+  `pc : tfa_debug_probe+0x6c/0x218 [atf_logger]`; sudah diperbaiki oleh
+  `54d86b4eb545` untuk test4 dan sesudahnya.
 - Di log yang sama, 91 modul GKI gagal dimuat:
   `.gnu.linkonce.this_module section size must match ...`
   (`zsmalloc`, `pstore_zone`, `netfs`, `virtio*`, `macsec`, dst.).
@@ -445,7 +449,7 @@ cd $HOME/x6871-kernel-manifest
   melewati 31 detik. Jika masih hang, langkah berikutnya adalah
   diagnostik `hrtimer` (bukan `delayed_work`).
 
-## Hasil test9 (log pstore uji)
+## Hasil uji test9
 
 - Hook stage-1 aktif: `emi_mpu_isr_hook`, `srinfo_r 3`,
   `axi_id_r 11270 (0x2c06)`, `To bypass this violation`. Tidak ada lagi
@@ -513,7 +517,7 @@ PASS, 487 modul (221/209/57), 0 mismatch. Image berisi 221 modul
 `vendor_boot`, termasuk `emi-mpu-hook-v1.ko` di stage-1; `apu_top` tetap
 di `vendor_dlkm`.
 
-### Hasil test11 (log pstore uji)
+### Hasil uji test11
 
 - Solusi 1 bekerja: tidak ada satu pun baris `emimpu_violation_irq` /
   `MIUMPU` di seluruh log. `__apu_wake_rpc_rcx` berhasil pada 4.589 s
@@ -536,7 +540,7 @@ di `vendor_dlkm`.
 - Solusi 3 belum teruji karena panic terjadi sebelum batas timeout
   firmware 10 s.
 
-### Hasil log pstore uji (vendor_dlkm fix ipesys)
+### Hasil uji setelah fix ipesys
 
 - Fix `e37b531921` bekerja: `mtk_ipesys_me_probe` tidak lagi panic dan
   boot menembus userspace sampai `t = 14.17 s` (apexd, Trustonic,
@@ -562,7 +566,7 @@ di `vendor_dlkm`.
 
 ### TWRP touch & vibrator (test12)
 
-`log TWRP` (6.18) menunjukkan akar yang sama dengan `firmware_load`:
+Log TWRP 6.18 menunjukkan akar yang sama dengan `firmware_load`:
 
 ```text
 SELinux: Permission firmware_load in class system not defined in policy.
@@ -628,7 +632,7 @@ Hasil:
 - Gerbang boot #1 dinyatakan **LULUS**. Pengujian subsistem lanjutan
   mengikuti checklist `BOOTTEST.md`.
 
-### Panic log pstore uji — V4L2 `priv == NULL` (2026-11-23)
+### Panic V4L2 `priv == NULL` (2026-11-23)
 
 `VcodecProcess` panic saat `VIDIOC_S_FMT`:
 
@@ -677,12 +681,13 @@ Perlu flash ulang dan uji video/JPEG.
 
 ### FB story video — port workqueue vdec OPPO (2026-11-23)
 
-`log kernel uji` saat FB story gagal:
+Log kernel saat FB story gagal:
 
 ```text
-[30/33/37...] VP90 decoder -> vdec_vcp_decode unsupported
-[42] H264 720x1280 -> TF larb 5 LAT_WDMA / larb 4 VLD
-     mva 0x31c00000, error_code 1, QBUF after unrecoverable error
+[   48.554934] [MTK_VCODEC][ERROR][30]: vdec_vcp_decode() - unsupported (-1,-1) -
+[   58.097919] [MTK_VCODEC][ERROR][33]: vdec_vcp_decode() - unsupported (-1,-1) -
+[   61.773366] [MTK_V4L2][ERROR] mtk_vdec_translation_fault_callback:1128: [42] codec:0x34363248(H264) LAT(1) TF larb 5 port LAT_WDMA(100a5) mva 0x31c00000
+[   61.775543] [MTK_V4L2][ERROR] mtk_vdec_translation_fault_callback:1128: [42] codec:0x34363248(H264) CORE(0) TF larb 4 port VLD(10087) mva 0x31c00000
 ```
 
 TikTok/YouTube normal, dan kegagalan yang sama juga terjadi di 6.12

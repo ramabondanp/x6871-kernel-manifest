@@ -1,37 +1,40 @@
 # Analisa Ulang & Pandangan Berbeda: Boot 6.18 (Badai MIUMPU, `system_dlkm`, dan `test8-panic20s`)
 
 Tanggal: 2026-11-23
-Status: Draft analisa & rekomendasi (belum di-commit)
+Status: Catatan analisa dan implementasi port 6.18
+
+> Catatan bukti: kutipan log di dokumen ini diambil dari sesi uji lokal.
+> Log mentah dan image uji tidak disertakan di repo ini.
 
 ---
 
 ## 1. Konteks & Posisi Saat Ini
 
-Berdasarkan catatan di `docs/PLAN-6.18-STATUS.md` serta log `log pstore uji` dan `log pstore uji`:
+Berdasarkan catatan di `docs/PLAN-6.18-STATUS.md` serta log pstore uji test3 dan test4:
 
 1. **Tiga crash awal sudah teratasi**:
    - `test1`: `mrdump` `bin_attrs` uninitialized → fixed (`968393e9db35`).
    - `test2`: KCFI panic di tracepoint UFS/MET akibat ketidakcocokan tipe `enum` vs `int` → fixed pada 97 file (`f94c481c8c5b` di `kernel_device_modules-6.18` & `d500e72bea0b` di `vendor/mediatek/kernel_modules`).
    - `test3`: `atf_logger` `ioremap_wc()` return `NULL` karena di 6.18 `of_reserved_mem` (`no-map`) tetap mengikat region ke `/proc/iomem` (`IORESOURCE_MEM`), sehingga `ioremap` ditolak oleh `region_is_ram()` → fixed dengan `memremap(..., MEMREMAP_WC)` (`326be9e98f91`).
-2. **Gejala di `test4` (`log pstore uji`)**:
+2. **Gejala di uji test4**:
    - Seluruh buffer `console-ramoops-0` (256 KB) penuh dengan badai interupsi di `t = 32.466s – 32.523s` (~18.000 IRQ/detik, setiap ~54 µs) di CPU0 (`[C0]`):
      ```text
      emimpu_violation_irq: [MIUMPU]emiid0 [1c0]0;...;[3c0]104;[3c4]0;[3c8]0;[3cc]0;[3d0]7;[3d4]a;[3d8]3;[3dc]0;[3e4]2c06;[3e8]0;
      ```
-   - File `log pstore uji` dan `log pstore uji` memiliki hash MD5 yang **100% identik** (`f5a681f1a8428e4f0846eb4f15319970`) dengan `log pstore uji`, yang berarti percobaan `test5`, `test6`, dan `test7` tidak menulis dump pstore baru ke ramoops.
+   - Dump pstore uji test5 dan test6 memiliki hash MD5 yang **100% identik** (`f5a681f1a8428e4f0846eb4f15319970`) dengan dump uji test4, yang berarti percobaan test5, test6, dan test7 tidak menulis dump pstore baru ke ramoops.
 3. **Solusi terakhir yang disiapkan sebelumnya (belum dicoba)**:
-   - Mem-flash `system_dlkm.img` 6.18 yang cocok (karena di `log pstore uji` terlihat 91 modul GKI di `/system_dlkm` gagal dimuat dengan error `.gnu.linkonce.this_module section size must match the kernel's built struct module size at run time`).
+   - Mem-flash `system_dlkm.img` 6.18 yang cocok (karena di log pstore uji test3 terlihat 91 modul GKI di `/system_dlkm` gagal dimuat dengan error `.gnu.linkonce.this_module section size must match the kernel's built struct module size at run time`).
    - **Bersamaan dengan itu**, mem-flash `vendor_boot-6.18-test8-panic20s.img` yang menjadwalkan `schedule_delayed_work(&emimpu_test8_work, 20 * HZ)` di `emimpu_probe()` untuk memaksa `panic()` pada `t ≈ 21.2s` (sebelum watchdog 31s).
 
 ---
 
 ## 2. Analisa Ulang & Pandangan Berbeda (Temuan Baru)
 
-Hasil pemeriksaan silang antara register di `log pstore uji`, daftar modul di `tools/`, dan kode sumber `drivers/memory/mediatek/emi_legacy/emi_legacy_v2/` menunjukkan **4 temuan kunci**:
+Hasil pemeriksaan silang antara register di log pstore uji test4, daftar modul di `tools/`, dan kode sumber `drivers/memory/mediatek/emi_legacy/emi_legacy_v2/` menunjukkan **4 temuan kunci**:
 
 ### Temuan 1: Badai MIUMPU `[3d8]3;[3e4]2c06` adalah **IOMMU Translation Fault** yang tidak ter-bypass karena `emi-mpu-hook-v1.ko` absen dari `tools/modules.load-6.18`
 
-Jika kita membedah nilai register MIUMPU di `log pstore uji` terhadap `emi-mpu-v2.c` dan `emi-mpu-hook-v1.c`:
+Jika kita membedah nilai register MIUMPU di log pstore uji test4 terhadap `emi-mpu-v2.c` dan `emi-mpu-hook-v1.c`:
 - `[3c0] = 0x104`
 - `[3d0] = 0x7` (`err_case_r = 7`)
 - `[3d4] = 0xa` (domain `0xa` = 10)
@@ -53,22 +56,22 @@ Di arsitektur MediaTek MT6895:
    ```
    Karena `irqret == IRQ_HANDLED`, ISR langsung melompat ke `clear_violation` — **tanpa** mencetak `emimpu_violation_irq: [MIUMPU]emiid0...`, **tanpa** memanggil callback Modem EE (`mpu->md_handler`), dan **tanpa** memicu `aee_kernel_exception("EMIMPU_V2", ...)`.
 
-**Mengapa mekanisme bypass ini tidak jalan di `log pstore uji`?**
+**Mengapa mekanisme bypass ini tidak jalan pada uji test4?**
 - File `emi-mpu-hook-v1.ko` **sudah dikemas di dalam ramdisk `vendor_boot`** (tercantum di `tools/recovery-modules-6.18.txt` baris 36) dan dimuat saat boot ke recovery (`tools/modules.load.recovery-6.18` baris 161).
 - **NAMUN `emi-mpu-hook-v1.ko` TIDAK ADA di `tools/modules.load-6.18` (maupun `tools/modules.load`)!**
 - Saat boot Android normal, stage-1 `init` hanya membaca `modules.load`. Akibatnya, `emi-mpu-v2.ko` aktif sejak `t = 1.2s` **tanpa hook (`by_plat_isr_hook == NULL`)**, sementara `emi-mpu-hook-v1.ko` baru dijadwalkan dimuat jauh belakangan dari partisi `vendor_dlkm` (`tools/dlkm/vendor_dlkm/modules.load` baris 104).
-- Fakta bahwa `log pstore uji` membanjiri log dengan `emimpu_violation_irq: [MIUMPU]... [3d8]3;[3e4]2c06` membuktikan secara pasti bahwa hingga `t = 32.46s`, **`emi-mpu-hook-v1.ko` belum ter-load**.
+- Fakta bahwa log pstore uji test4 membanjiri log dengan `emimpu_violation_irq: [MIUMPU]... [3d8]3;[3e4]2c06` membuktikan secara pasti bahwa hingga `t = 32.46s`, **`emi-mpu-hook-v1.ko` belum ter-load**.
 
 ---
 
 ### Temuan 2: Keterkaitan Gagalnya 91 Modul `system_dlkm` dengan Tidak Ter-load-nya `emi-mpu-hook-v1.ko` & Efek Samping Modem EE
 
 1. **Rantai kegagalan DLKM**:
-   - Di `log pstore uji` (baris 1900–1919), 91 modul GKI di `/system_dlkm` gagal dimuat karena ukuran `.gnu.linkonce.this_module` (`struct module`) tidak cocok dengan `boot.img` 6.18 (`6.18.32-android17-5-gecdaacc9a0ee-ab16831611-4k`), termasuk `rfkill.ko`, `zsmalloc.ko`, `pstore_zone.ko`, `netfs.ko`, dll.
+   - Di log pstore uji test3, 91 modul GKI di `/system_dlkm` gagal dimuat karena ukuran `.gnu.linkonce.this_module` (`struct module`) tidak cocok dengan `boot.img` 6.18 (`6.18.32-android17-5-gecdaacc9a0ee-ab16831611-4k`), termasuk `rfkill.ko`, `zsmalloc.ko`, `pstore_zone.ko`, `netfs.ko`, dll.
    - Di `vendor_dlkm/modules.load`, `emi-mpu-hook-v1.ko` berada di **baris 104**, tepat setelah `cfg80211.ko` (baris 16), `mac80211.ko` (baris 17), `conninfra.ko` (baris 100), dan `wlan_drv_gen4m_6895.ko` (baris 102).
    - Modul `cfg80211.ko` dan stack konektivitas bergantung pada `rfkill.ko` dari `/system_dlkm`. Kegagalan memuat `/system_dlkm` menyebabkan proses pemuatan DLKM / `init` stage-2 gagal atau terhenti sebelum mencapai baris 104.
 2. **Salah sasaran ke Modem Exception (`md_handler`)**:
-   - Di `log pstore uji` pada `t = 4.635058`, modul `ccci_md_all.ko` sudah berhasil mendaftarkan callback Modem EE ke `emi-mpu-v2`:
+   - Di log pstore uji test3 pada `t = 4.635058`, modul `ccci_md_all.ko` sudah berhasil mendaftarkan callback Modem EE ke `emi-mpu-v2`:
      `mtk_emimpu_md_handling_register: md_handling_func registered!!`
    - Karena `emi-mpu-hook-v1.ko` belum dimuat (`by_plat_isr_hook == NULL`), begitu terjadi IOMMU translation fault (`srinfo_r = 3`), `emimpu_violation_irq` tidak melompat ke `clear_violation`, melainkan lanjut mengeksekusi `mpu->md_handler(md_str)` (`emi-mpu-v2.c` baris 290–291) yang memanggil `mdee_dumper_v5_emimpu_callback` di dalam konteks hardirq secara berulang-ulang!
 
@@ -134,12 +137,14 @@ Jika setelah Langkah 1–3 perangkat masih reboot di ~31 detik tanpa pstore baru
   `tools/recovery-modules-6.18.txt` dan di dalam ramdisk `vendor_boot`,
   tetapi tidak ada di `tools/modules.load-6.18`. Saat boot normal,
   hook tidak didaftarkan pada stage-1.
-- **Koreksi kecil**: `log pstore uji` menunjukkan `atf_logger`
+- **Koreksi kecil**: log pstore uji test3 menunjukkan `atf_logger`
   (`vendor_dlkm` baris 11) tetap dimuat pada `t = 4.66 s` setelah 91
-  kegagalan `system_dlkm`. Jadi init tidak berhenti tepat setelah
-  `system_dlkm`; belum terbukti apakah pemuatan `vendor_dlkm` mencapai
-  baris 104. Meskipun demikian, menaruh hook di stage-1 tetap perbaikan
-  yang benar dan menghilangkan ketergantungan pada urutan DLKM.
+  kegagalan `system_dlkm`:
+  `[    4.668106][  T676]  tfa_debug_probe+0x34/0x218 [atf_logger ...]`.
+  Jadi init tidak berhenti tepat setelah `system_dlkm`; belum terbukti
+  apakah pemuatan `vendor_dlkm` mencapai baris 104. Meskipun demikian,
+  menaruh hook di stage-1 tetap perbaikan yang benar dan menghilangkan
+  ketergantungan pada urutan DLKM.
 - **Langkah 1–2 sudah diimplementasikan**:
   - `tools/modules.load-6.18`: `emi-mpu-hook-v1.ko` ditambahkan tepat
     setelah `emi-mpu-v2.ko`.
@@ -157,17 +162,17 @@ Jika setelah Langkah 1–3 perangkat masih reboot di ~31 detik tanpa pstore baru
 
 ---
 
-## 5. Analisa Ulang Pasca-`test9` (`log pstore uji`): Root Cause APU IOMMU & Solusi Tanpa Disable APU
+## 5. Analisa Ulang Pasca-test9: Root Cause APU IOMMU & Solusi Tanpa Disable APU
 
-Setelah `test9` (`vendor_boot-6.18-test9-emihook.img` + `system_dlkm.img` 6.18 yang cocok) diuji, log `log pstore uji` (identik MD5 dengan `log pstore uji`) memperlihatkan keseluruhan timeline boot dari `t = 1.35s` hingga `t = 30.72s`. Seluruh 91 error `system_dlkm` sudah hilang dan `emi-mpu-hook-v1.ko` berhasil meredam flood `printk` menjadi 3 baris/detik, namun **badai interupsi hardware ~41.150 Hz dari APU (`[MIUMPU] srinfo_r 3, axi_id_r 11270 / 0x2c06`) tetap menyandera CPU0** hingga memicu RCU stall pada `stop_machine_cpuslocked` (`t = 25.62s`) dan watchdog reset (`t ~ 31s`).
+Setelah `test9` (`vendor_boot-6.18-test9-emihook.img` + `system_dlkm.img` 6.18 yang cocok) diuji, log pstore uji test9 (identik dengan dump uji berikutnya) memperlihatkan keseluruhan timeline boot dari `t = 1.35s` hingga `t = 30.72s`. Seluruh 91 error `system_dlkm` sudah hilang dan `emi-mpu-hook-v1.ko` berhasil meredam flood `printk` menjadi 3 baris/detik, namun **badai interupsi hardware ~41.150 Hz dari APU (`[MIUMPU] srinfo_r 3, axi_id_r 11270 / 0x2c06`) tetap menyandera CPU0** hingga memicu RCU stall pada `stop_machine_cpuslocked` (`t = 25.62s`) dan watchdog reset (`t ~ 31s`).
 
-Pemeriksaan silang antara `log pstore uji`, `log pstore uji`, dan diff kernel `6.12` vs `6.18` (`common/drivers/iommu/iommu.c` & `drivers/iommu/mtk_iommu.c`) mengungkap **akar masalah (root cause) sesungguhnya** yang dapat diperbaiki secara tuntas **tanpa men-disable APU**.
+Pemeriksaan silang antara log pstore uji test3, log pstore uji test9, dan diff kernel `6.12` vs `6.18` (`common/drivers/iommu/iommu.c` & `drivers/iommu/mtk_iommu.c`) mengungkap **akar masalah (root cause) sesungguhnya** yang dapat diperbaiki secara tuntas **tanpa men-disable APU**.
 
-### 5.1. Bukti Forensik dari `log pstore uji` dan `log pstore uji`
+### 5.1. Bukti Forensik dari Log Uji test3 dan test9
 
-1. **Makna `srinfo_r = 3` dan `PA = 0x0` pada `log pstore uji`**:
+1. **Makna `srinfo_r = 3` dan `PA = 0x0` pada uji test9**:
    - Sesuai komentar arsitektur di `emi-mpu-v2.c:295-300`, pada MT6895 garis IRQ IOMMU tidak dihubungkan untuk translation fault; setiap **IOMMU Translation Fault** menghasilkan transaksi AXI dengan **`SRINFO = 3`** ke alamat fisik pengganti (`REG_MMU_IVRP_PADDR` / `protect_base`) agar ditangkap oleh SMPU (`emimpu_violation_irq`).
-   - Pada `log pstore uji`, tepat **24 µs** setelah `apusys_rv` melepas reset uP RISC-V (`mt6895_rproc_start: smc call 11` = `MTK_APUSYS_KERNEL_OP_APUSYS_RV_START_MP` pada `t = 4.626271s`), terjadi violation pertama diikuti badai `srinfo_r = 3`:
+   - Pada log uji test9, tepat **24 µs** setelah `apusys_rv` melepas reset uP RISC-V (`mt6895_rproc_start: smc call 11` = `MTK_APUSYS_KERNEL_OP_APUSYS_RV_START_MP` pada `t = 4.626271s`), terjadi violation pertama diikuti badai `srinfo_r = 3`:
      ```text
      [4.626271][T282] [apusys][info] mt6895_rproc_start: smc call 11
      [4.626295][C0]   [EMIMPU] emi0 comm=swapper/0:0 emi=540080f6,0,400000 axid=203c0
@@ -177,8 +182,8 @@ Pemeriksaan silang antara `log pstore uji`, `log pstore uji`, dan diff kernel `6
      ```
    - Perhatikan bahwa alamat fisik fault pada register MIUMPU (`[3c8]=0, [3cc]=0, [3dc]=0`) adalah **`0x0`**, yang berarti register `REG_MMU_IVRP_PADDR` (`0x114`) maupun `REG_MMU_PT_BASE_ADDR` (`0x000`) pada `APU_IOMMU0` bernilai **`0x0`**!
 
-2. **Bukti di `log pstore uji` (`t = 1.473s`): `APU_IOMMU0` & `APU_IOMMU1` Diinisialisasi Saat Power Domain APU Masih MATI (`0x0`)**:
-   - Lihat log `log pstore uji` baris 318–337 saat `mtk_iommu.ko` (di `vendor_boot`, stage-1) memanggil `mtk_iommu_attach_device()` untuk `19010000.iommu` (`APU_IOMMU0`, `(1,0)`) dan `19015000.iommu` (`APU_IOMMU1`, `(1,1)`):
+2. **Bukti di log uji test3 (`t = 1.473s`): `APU_IOMMU0` & `APU_IOMMU1` Diinisialisasi Saat Power Domain APU Masih MATI (`0x0`)**:
+   - Lihat log pstore uji test3 saat `mtk_iommu.ko` (di `vendor_boot`, stage-1) memanggil `mtk_iommu_attach_device()` untuk `19010000.iommu` (`APU_IOMMU0`, `(1,0)`) dan `19015000.iommu` (`APU_IOMMU1`, `(1,1)`):
      ```text
      [1.473337] mtk_iommu: mtk_iommu_hw_init done, (1,0), dump reg: 0x48:0x0, 0x50:0x0, 0x54:0x0, 0xa0:0x0, 0x110:0x0, 0x114:0x0, 0x120:0x0, 0x124:0x0
      [1.473356] mtk_iommu: mtk_iommu_attach_device, iommu_dev:19010000.iommu(1,0), user_dev:190e1000.apusys_rv, pgtable:0x12ce0001 -- 0x12ce0001 -- 0x0, tab_id:1
@@ -250,7 +255,7 @@ Di `kernel_device_modules-6.18/drivers/misc/mediatek/apusys/apusys_rv/apu_rproc.
 
 ---
 
-## 6. Implementasi 2026-11-23 (pasca-`test10`)
+## 6. Implementasi 2026-11-23 (pasca-test10)
 
 ### 6.1 Solusi 1 — diterapkan
 
@@ -332,9 +337,9 @@ Pasangkan dengan `boot.img` + `system_dlkm.img` GKI
 **Status:** akar kegagalan registrasi kartu teridentifikasi dari log dan
 perbandingan sumber dengan baseline 6.12 KMI 6. Perbaikan sudah diterapkan,
 build + repack + verifier 8/8 lulus, dan audio terkonfirmasi aman di
-perangkat (`log kernel uji`). Lihat [rencana port 6.18](PLAN-6.18.md).
+perangkat (log kernel uji audio). Lihat [rencana port 6.18](PLAN-6.18.md).
 
-### 7.1 Bukti dari `log kernel uji`
+### 7.1 Bukti dari Log Kernel Uji Audio
 
 ```text
 [    5.684120] Hostless_LPBK: ASoC error (-22): substream Hostless_LPBK has no playback, no capture
@@ -395,21 +400,34 @@ dan back-end. Membetulkan `Hostless_LPBK` saja tidak cukup.
 - Artefak: `vendor_dlkm-6.18-audio-dpcm.img`, 24.551.424 B,
   md5 `ad24e0ac5d51c070fe3db2e41f4e18e8`,
   https://gofile.io/d/oTgnm1xd
-- **Terkonfirmasi di perangkat:** audio aman pada `log kernel uji`. Amplifier
+- **Terkonfirmasi di perangkat:** audio aman pada log kernel uji audio. Amplifier
   speaker FS1599 menunjukkan siklus `spk_amp_event 2/4` berulang saat
   playback (t=40.29/42.20, 47.46/49.99, 70.17/71.35, 91.75 s), bukan lagi
   kegagalan registrasi kartu. Error `snd-audio-dsp` PCM open tetap ada
   karena ADSP tidak aktif, tetapi tidak menghambat audio yang diuji.
+  ```text
+  [40.289811] mt6895-mt6368 sound: mt6895_mt6368_spk_amp_event(), event 2
+  [42.208902] mt6895-mt6368 sound: mt6895_mt6368_spk_amp_event(), event 4
+  ```
 
 ## 8. Facebook Story 6.18 — uji perbaikan di sisi kernel
 
-- `log kernel uji`: tiga sesi VP9 non-secure (`svp 0`, konteks 31/33/35) berhasil
+- Log kernel uji VP9 pertama: tiga sesi VP9 non-secure (`svp 0`, konteks 31/33/35) berhasil
   membuat instance MediaTek, lalu `vdec_vcp_decode()` melaporkan
   `unsupported (-1,-1)` dalam 1–3 ms. `QBUF` gagal setelah penolakan itu.
-  Tidak ada fault IOMMU VDEC pada percobaan ini. `log kernel uji` sebelumnya
+  ```text
+  [   48.554934] [MTK_VCODEC][ERROR][30]: vdec_vcp_decode() - unsupported (-1,-1) -
+  [   58.097919] [MTK_VCODEC][ERROR][33]: vdec_vcp_decode() - unsupported (-1,-1) -
+  [   58.102115] [MTK_V4L2][ERROR] vidioc_vdec_qbuf:2494: [33] Call on QBUF after unrecoverable error
+  ```
+  Tidak ada fault IOMMU VDEC pada percobaan ini. Log kernel uji audio sebelumnya
   merekam fault tersendiri: H.264 berhasil init pada 720×1280 dan
   368×640, lalu `LAT_WDMA` dan `CORE/VLD` sama-sama fault di `0x31c00000`.
-- `log Android` hanya mencakup buffer `events` saat boot, bukan sesi
+  ```text
+  [   61.773366] [MTK_V4L2][ERROR] mtk_vdec_translation_fault_callback:1128: [42] codec:0x34363248(H264) LAT(1) TF larb 5 port LAT_WDMA(100a5) mva 0x31c00000
+  [   61.775543] [MTK_V4L2][ERROR] mtk_vdec_translation_fault_callback:1128: [42] codec:0x34363248(H264) CORE(0) TF larb 4 port VLD(10087) mva 0x31c00000
+  ```
+- Log Android hanya mencakup buffer `events` saat boot, bukan sesi
   playback. Log itu tidak mengidentifikasi profil VP9 atau fallback
   yang dipilih Facebook.
 - [Dump stock X6871 SP20](https://gitlab.com/rama-firmware-dumps/infinix/Infinix-X6871/-/blob/X6871-16.3.0.155SP20%28OP008PF001AZ%29/all_files.txt)
@@ -422,7 +440,7 @@ dan back-end. Membetulkan `Hostless_LPBK` saja tidak cukup.
 - `mtk_iommu.ko` (`vendor_boot`): saat invalidasi HypMMU Type-2 untuk
   IOMMU multimedia MT6895, gunakan ID tabel hardware (`MM_TABLE=0`),
   bukan tag firmware milik klien pertama yang menempel ke domain.
-  Di `log kernel uji`, `iommu_test` membuat domain VDEC sebelum klien UBE;
+  Di log kernel uji audio, `iommu_test` membuat domain VDEC sebelum klien UBE;
   domain itu mewarisi tag `1`. Pada fault H.264, lookup software masih
   menemukan PA, tetapi lookup hypervisor di tabel multimedia memberi `0`.
   Ini kandidat perbaikan H.264, belum bukti penyebab penolakan VP9.
@@ -434,8 +452,7 @@ dan back-end. Membetulkan `Hostless_LPBK` saja tidak cukup.
 
 ### 8.2 Artefak dan uji perangkat
 
-Hasil build/repack ada di `<artefak-lokal>/vdec-kernel-test/`.
-Verifier KMI/ABI **8/8 PASS** untuk 487 modul, dan hashtree DLKM lulus.
+Hasil build/repack tidak disertakan di repo. Verifier KMI/ABI **8/8 PASS** untuk 487 modul, dan hashtree DLKM lulus.
 `common`, DTB, bootconfig, fragmen recovery, policy TWRP, dan konfigurasi
 codec Android tidak diubah. `odm_dlkm.img` hasil repack identik dengan
 image sebelumnya.
@@ -453,15 +470,22 @@ Pada Story yang gagal sebelumnya, cek apakah fault `LAT_WDMA`/`CORE/VLD`
 hilang dan apakah VP9 masih ditolak. Jika VP9 masih gagal, ambil baris baru
 `VP9 header rejected`; gunakan TikTok sebagai kontrol.
 
-### 8.3 Hasil `log kernel uji` dan kandidat perbaikan sinkronisasi DMA VP9
+### 8.3 Hasil Uji VP9 Kedua dan Kandidat Perbaikan Sinkronisasi DMA
 
-**Build §8.2 tidak memperbaiki Story.** `log Android` mencatat pembukaan
+**Build §8.2 tidak memperbaiki Story.** Log Android mencatat pembukaan
 `StoryViewerActivity` pada 00:11:26.855, disusul penolakan VP9 pertama
 sekitar 00:11:27.083 setelah mencocokkan waktu kedua log. Sembilan sesi
 ditolak dengan `changed=0x4` setelah inisialisasi VCP sukses. Buffer input
-berisi data (17.927–644.324 B dari 2.094.080 B, offset 0). Tidak ada fault
-VDEC H.264 pada percobaan ini, tetapi juga tidak ada `Init Vdec OK` untuk
-H.264; hasil tersebut belum memvalidasi perubahan IOMMU.
+berisi data (17.927–644.324 B dari 2.094.080 B, offset 0). Log kernel
+mencatat penolakan pertama:
+
+```text
+[   79.372352] [MTK_VCODEC][ERROR][32]: vdec_vcp_decode() VP9 header rejected: changed=0x4 payload=644324 length=2094080 offset=0 flags=0x0
+```
+
+Tidak ada fault VDEC H.264 pada percobaan ini, tetapi juga tidak ada
+`Init Vdec OK` untuk H.264; hasil tersebut belum memvalidasi perubahan
+IOMMU.
 
 Kandidat berikutnya di `mtk-vcodec-dec.ko`: sinkronkan scatterlist DMA-BUF
 asli memakai perangkat dan arah DMA dari attachment tepat sebelum VCP
@@ -473,14 +497,13 @@ Penolakan firmware tidak diabaikan dan jalur codec lain tidak diubah.
 Ini menguji kemungkinan data input belum terlihat oleh VCP, bukan akar
 masalah yang sudah terbukti.
 
-- Artefak lokal: `<artefak-lokal>/vp9-dma-test/vendor_dlkm-6.18-vp9-dma-test.img`.
 - Unduhan: https://gofile.io/d/fZX9rpS6
 - MD5: `e6fa2cd59b3267f0f0c79595b780c33a`; SHA-256:
   `fc53afcc2068df3585b233f986dabc86ec44a979f1537ea0fcca64288df120d7`.
 - Build, AVB hashtree, dan verifier KMI/ABI 8/8 lulus. Dibandingkan build
   §8.2, hanya `mtk-vcodec-dec.ko` yang berubah; `odm_dlkm` identik.
 - Cukup ganti `vendor_dlkm` apabila sudah memakai set §8.2 untuk
-  `log kernel uji`; pertahankan `vendor_boot`, `odm_dlkm`, GKI dan konfigurasi
+  uji VP9 kedua; pertahankan `vendor_boot`, `odm_dlkm`, GKI dan konfigurasi
   vendor yang sama.
 - **Hasil uji perangkat: Story tetap hitam.** Cuplikan ulang menunjukkan
   VP9 masih ditolak dengan `changed=0x4`, offset `0`, dan buffer berisi
