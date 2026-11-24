@@ -24,7 +24,7 @@ Diperbarui: 2026-11-24 (UTC)
 | EMI MPU `SRINFO=3` + RCU stall | **Fixed** oleh commit IOMMU | Verifikasi tidak muncul lagi |
 | ADSP | **Bukan bug; stock DTB disabled** | Pastikan image memakai DTB stock; jangan ubah DT tree |
 | Video VP9 | **Terbuka** | Verifikasi fix `7c48ebd`, lanjutkan jika masih gagal |
-| DPE `v4l2_fh` | **Terbuka** | Perbaiki driver atau lepas node V4L2 DPE |
+| DPE `v4l2_fh` | **Known limitation; skip di 6.18** | Node V4L2 tidak dipakai; kamera lewat `/dev/DPE` |
 | CMDQ/GCE + MML | **Noise, prioritas rendah** | Jangan tambah event DT; perbaiki fallback driver |
 | Thermal `lvts`/`soc_max` | **Fixed, build lolos; uji device tertunda** | Tabel sensor disamakan dengan stock ko; maintainer sedang di luar |
 | `tranhalconfig` | **Terbuka, userspace** | Service/sepolicy vendor, bukan kernel |
@@ -171,7 +171,7 @@ header VP9 sebelum VCP `DEC_START`, tetapi belum ada log setelah commit itu.
 **Verifikasi:** playback VP9 selesai, tidak ada error qbuf, dan decoding
 tidak berhenti di tengah.
 
-### 5.2 DPE `v4l2_fh` — warning 2x per boot
+### 5.2 DPE `v4l2_fh` — known limitation, node V4L2 tidak dipakai
 
 **Gejala:**
 
@@ -179,24 +179,44 @@ tidak berhenti di tengah.
 WARNING: CPU: ... at drivers/media/v4l2-core/v4l2-dev.c:438 v4l2_open+...
 ```
 
-**Temuan:** 6.18 mewajibkan driver V4L2 memakai `v4l2_fh`. Di
-`camera_dpe.c`, `dpe_fop_open()` hanya memanggil `DPE_open()` lalu
-`return 0`, tanpa `v4l2_fh_init()`. Akibatnya node video DPE ditolak
-`-ENODEV`. Kamera masih berjalan lewat char device `/dev/DPE`, jadi ini
-bukan penyebab kamera mati, tetapi node V4L2 DPE tidak bisa dipakai.
+**Akar masalah:** `v4l2_open()` di 6.18 mewajibkan driver memakai
+`v4l2_fh` (`V4L2_FL_USES_V4L2_FH`). Kalau flag tidak ada, core mencetak
+WARN, memanggil `release`, dan mengembalikan `-ENODEV`. `camera_dpe.c`
+(`isp_70`) mendaftarkan video node `dpe-vid`, tetapi `dpe_fop_open()`
+hanya memanggil `DPE_open()` lalu `return 0`; tidak ada
+`v4l2_fh_init()`/`v4l2_fh_open()`. Di 6.12 core belum mewajibkan flag
+ini, jadi warning tidak muncul.
 
-**Rencana fix:**
+**Siapa yang membuka node:** di semua dmesg, satu-satunya opener adalah
+`VcodecProcess` (C2 codec service, pid 1506) saat enumerasi `/dev/video*`
+di boot, 2x. `DPE_open`/`DPE_release` berhasil menaikkan/menurunkan user
+count, lalu core menolak open karena tidak ada fh. Kamera tidak pernah
+membuka node V4L2; jalur kamera memakai char device `/dev/DPE`.
 
-- Opsi A: tambahkan lifecycle `v4l2_fh` di DPE dengan wrapper yang tidak
-  merusak `file->private_data` milik `DPE_USER_INFO_STRUCT`.
-- Opsi B: jangan daftarkan node V4L2 DPE jika memang tidak dipakai; cukup
-  char device.
+**Kenapa bukan kegagalan fungsi:** setelah open DPE gagal, VcodecProcess
+tetap membuka node vdec/venc (`fops_vcodec_open`) dan codec berjalan.
+Kamera foto/video tetap memakai `/dev/DPE`. Node V4L2 DPE juga tidak
+lengkap: `.mmap`, `.read`, `.write`, dan queue `vb2` dikomentari, jadi
+tidak bisa dipakai untuk streaming.
 
-Jangan asal memanggil `v4l2_fh_open()` karena DPE memakai
-`file->private_data` untuk state sendiri; perlu penyesuaian ioctl.
+**Opsi:**
 
-**Verifikasi:** warning `v4l2_open` hilang; open node DPE mengembalikan 0;
-kamera dan DPE tetap berfungsi.
+| Opsi | Kelebihan | Risiko |
+|---|---|---|
+| A. `v4l2_fh` wrapper | node bisa dibuka, sesuai core | menyentuh `file->private_data` di beberapa ioctl; node jadi terlihat oleh enumerasi codec; butuh uji device |
+| B. hapus registrasi video node | warning hilang, char device tetap | menggeser nomor `/dev/video*`, beda dari stock; butuh uji codec/kamera |
+| C. skip + catat | tidak mengubah driver | WARN tetap 2x dan menaint kernel |
+
+**Keputusan pragmatis: C, skip perubahan kernel untuk 6.18.**
+Node V4L2 DPE tidak dipakai; jalur fungsional adalah `/dev/DPE`.
+Opsi A menambah risiko tanpa fungsi baru; Opsi B mengubah urutan
+`/dev/video*` dan belum bisa diuji di device. Buka lagi kalau ada
+komponen userspace yang benar-benar memakai node DPE V4L2 atau kalau
+rilis mewajibkan boot tanpa WARN.
+
+**Verifikasi:** warning 2x diterima sebagai known limitation; kamera dan
+playback codec tetap berjalan; tidak ada crash. Kalau nanti dipilih
+Opsi B, verifikasi `/dev/video*` dan codec setelah node dihapus.
 
 ### 5.3 CMDQ/GCE dan MML — noise, prioritas rendah
 
@@ -534,7 +554,8 @@ Urutan verifikasi yang disarankan:
 
 4. Cek video VP9: tidak ada `VP9 header rejected`, `unsupported (-1,-1)`,
    atau `QBUF after unrecoverable error`.
-5. Cek warning `v4l2_open` sudah hilang.
+5. Warning `v4l2_open` 2x diterima sebagai known limitation 6.18;
+   pastikan kamera dan playback codec tetap berjalan.
 6. Cek `/sys/class/thermal`: jumlah zone sesuai stock (38 base + 4 camera),
    `soc_max` ada, suhu valid, dan tidak ada `Failed to register lvts tz 26`.
 7. Cek service `tranhalconfig` ditemukan; tidak ada `audit_lost`.
@@ -555,7 +576,7 @@ Urutan verifikasi yang disarankan:
 | P1 | Pastikan DTB/DTBO stock yang dipakai, bukan DT tree | ADSP dan node disabled lain tidak relevan untuk DT tree |
 | P1 | Thermal LVTS: verifikasi fix di device | Tabel sensor sudah disamakan dengan stock ko; build lolos |
 | P1 | `tranhalconfig` | Log storm, audit loss, dan lookup lambat |
-| P2 | DPE `v4l2_fh` | Warning 2x per boot; node V4L2 DPE tidak berfungsi |
+| P3 | DPE `v4l2_fh`: skip | Warning 2x; node V4L2 tidak dipakai, char device tetap |
 | P2 | CMDQ/GCE + MML | Noise; perbaiki fallback driver |
 | P3 | `trans_sched`/`fpsgo` wrapper: skip | Stub tidak memberi fungsi; full RE terlalu besar |
 | P3 | TEE/Widevine: skip perubahan kernel | Bukan regresi 6.18; butuh provisioning vendor |
