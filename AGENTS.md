@@ -4,6 +4,17 @@ Dokumen ini hanya berisi aturan umum untuk agen AI. Detail teknis, temuan,
 perintah build/repack, dan status terbaru ada di `docs/`; jangan menduplikasi
 detail tersebut di sini.
 
+## Prinsip keputusan
+
+- Utamakan keputusan pragmatis: perubahan harus memberi fungsi nyata atau
+  menghilangkan akar masalah.
+- Jangan membuat stub, module palsu, atau ioctl palsu hanya untuk
+  menyembunyikan log. Kalau stub tidak benar-benar bekerja, skip.
+- Kalau cara yang ada tidak menghasilkan apa-apa, cari cara lain yang benar
+  atau catat sebagai known limitation.
+- Buka kembali item yang di-skip hanya kalau ada source resmi atau regresi
+  terukur.
+
 ## 1. Scope dan rilis
 
 - Pekerjaan hanya untuk **6.18**. Baseline stabil tetap **6.12**.
