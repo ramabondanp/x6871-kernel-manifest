@@ -252,6 +252,16 @@ md5 `bcf3801494067a5d1cca578cdf3174c5` dan `vendor_dlkm.img` md5
 **Verifikasi device (tertunda):** boot baru tidak lagi mencetak
 `vote mminfra on err:1`; display, codec, dan MML tetap berjalan.
 
+**Artefak gabungan DPE + CMDQ:**
+
+| Image | Ukuran | MD5 |
+|---|---:|---|
+| `vendor_boot.img` | 67.108.864 B | `bcf3801494067a5d1cca578cdf3174c5` |
+| `vendor_dlkm.img` | 24.551.424 B | `86fd65af151a1e813d132c5915686285` |
+| `odm_dlkm.img` | 4.206.592 B | `da2c64a1572ff27382128beb4bbcba8b` (tidak berubah) |
+
+Unduhan: https://gofile.io/d/kV60pldu
+
 ### 5.4 Thermal LVTS — semua zone hilang karena tabel sensor beda dari stock
 
 **Gejala:**
