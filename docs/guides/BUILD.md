@@ -315,6 +315,47 @@ bukan dari keluaran default `out_bazel/`. Pakai `--out-dir
 `pretimeout_dump.ko` ditambahkan oleh GKI KMI 7 dan sudah tersedia di
 `system_dlkm.erofs.img` Google; tidak perlu disalin ke image modul X6871.
 
+#### Profil uji `6.18-lts` (`android17-6.18-lts`, `6.18.63`, KMI 6, build GKI lokal)
+
+Default `local_manifest-6.18.xml` tetap pada tag pure-GKI
+`android17-6.18-2026-09_r13` (`6.18.32`, KMI 5). Profil uji
+`local_manifest-6.18-lts.xml` mem-pin `kernel/common` ke
+`17b8bfe5ce7568445def263dc609f839f3b469f6` (`android17-6.18-lts`, `6.18.63`,
+KMI 6) sebagai **profil build GKI lokal (*self-built*)**:
+
+```bash
+manifest="$HOME/x6871-kernel-manifest"
+cp "$manifest/local_manifest-6.18-lts.xml" .repo/local_manifests/zz-x6871-6.18-lts.xml
+repo sync -j16
+KVER=6.18 "$manifest/setup.sh"
+
+# Build 487 modul X6871 + GKI lokal (opsional: LOCALVERSION_SUFFIX="-<tag>")
+KVER=6.18 OUT_DIR="$PWD/out_bazel_6.18_lts" "$manifest/build.sh" user
+KVER=6.18 OUT_DIR="$PWD/out_bazel_6.18_lts" "$manifest/build.sh" gki
+```
+
+Catatan penting profil ini:
+
+- **Harus satu set build lokal:** `boot-lz4.img` dan
+  `system_dlkm.flatten.erofs.img` dari `./build.sh gki` memakai kunci signing
+  ephemeral dari build tersebut. Flash kelima image (`boot`, `vendor_boot`,
+  `system_dlkm`, `vendor_dlkm`, `odm_dlkm`) sekaligus di `fastbootd` dan jangan
+  dicampur dengan image Google CI atau KMI 5.
+- **Patch sementara `common` (`17b8bfe5ce75`):** `6.18.63` upstream sempat
+  menghapus guard NULL di `blk_plug_invalidate_ts()` sehingga preemption IRQ di
+  dalam `blk_finish_plug+0x54/0x78` memicu
+  `Unable to handle kernel NULL pointer dereference at virtual address 0000000000000020`.
+  `setup.sh` menerapkan `patches/common-6.18-blk-plug-invalidate-ts.patch`
+  lewat `git am` **hanya** bila `common` berada di `17b8bfe5ce75` agar tree
+  tetap bersih (tanpa `-dirty`), dan tidak menyentuh `r13` maupun revisi LTS
+  yang lebih baru.
+- `patches/kleaf-localversion-suffix.patch` menambah env var opsional
+  `LOCALVERSION_SUFFIX` di `build/kernel/kleaf/workspace_status_stamp.py`
+  (tidak aktif bila tidak diset).
+- Saat repack & verifikasi, arahkan `--staging` dan `--out-dir` secara
+  eksplisit ke `out_bazel_6.18_lts/` dan jalankan
+  `./tools/verify-kmi-abi.py --kver 6.18` (wajib 8/8 PASS).
+
 ### Jebakan build
 
 - `--user_ddk_unsafe_headers=...mtk_use_gki_unsafe_headers` **wajib**; tanpa

@@ -15,6 +15,14 @@ Diperbarui: 2026-11-24 (UTC)
 > (`adaptive-ts` + `gt9916_common`: `004169f83006`, `92c5a6f9d3f3`,
 > `80f4abf529e2`) sudah di-commit, dibuild, dan lolos 8/8 `verify-kmi-abi.py`;
 > uji runtime di device tertunda karena maintainer sedang di luar.
+>
+> Profil uji opsional `android17-6.18-lts` (`6.18.63`, KMI 6, build GKI lokal)
+> tersedia lewat `local_manifest-6.18-lts.xml` (lihat
+> [`BUILD.md`](../guides/BUILD.md#profil-uji-618-lts-android17-618-lts-61863-kmi-6-build-gki-lokal)):
+> seluruh 487 modul + GKI lokal lulus 8/8 `verify-kmi-abi.py` dan dilengkapi
+> patch SHA-gated `patches/common-6.18-blk-plug-invalidate-ts.patch` untuk
+> race `blk_finish_plug`/`blk_plug_invalidate_ts` (soak test di device sedang
+> berjalan/tertunda konfirmasi).
 
 ## Ringkasan Fase
 
