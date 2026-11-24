@@ -26,7 +26,7 @@ Diperbarui: 2026-11-24 (UTC)
 | Video VP9 | **Terbuka** | Verifikasi fix `7c48ebd`, lanjutkan jika masih gagal |
 | DPE `v4l2_fh` | **Terbuka** | Perbaiki driver atau lepas node V4L2 DPE |
 | CMDQ/GCE + MML | **Noise, prioritas rendah** | Jangan tambah event DT; perbaiki fallback driver |
-| Thermal `lvts`/`soc_max` | **Fixed, belum diuji di device** | Tabel sensor disamakan dengan stock ko; build lolos |
+| Thermal `lvts`/`soc_max` | **Fixed, build lolos; uji device tertunda** | Tabel sensor disamakan dengan stock ko; maintainer sedang di luar |
 | `tranhalconfig` | **Terbuka, userspace** | Service/sepolicy vendor, bukan kernel |
 | `fpsgo`/`msync2` | **Terbuka, build/init** | Tambah module atau hapus `insmod` |
 | TEE/Widevine | **Terbuka, vendor security** | Provisioning/TA/HDCP, bukan DT |
@@ -334,7 +334,8 @@ valid dan berubah saat beban naik; tidak ada error `soc_max` berulang dari
 stock DTB`). Build 6.18 berhasil, dan tabel `mt6895_tc_settings` di
 `soc_temp_lvts.ko` hasil build sudah cocok dengan stock: 25 sensor, map
 berakhir di id 24, sehingga driver mendaftarkan zone id 1..25. Image
-`vendor_dlkm` sudah direpack dengan 209 modul. Belum diuji boot di device.
+`vendor_dlkm` sudah direpack dengan 209 modul. Belum diuji boot di device;
+pengujian runtime ditunda karena maintainer sedang di luar.
 
 ### 5.5 `tranhalconfig` — userspace/sepolicy
 
