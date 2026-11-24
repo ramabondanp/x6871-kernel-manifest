@@ -29,7 +29,7 @@ Diperbarui: 2026-11-24 (UTC)
 | Thermal `lvts`/`soc_max` | **Fixed, build lolos; uji device tertunda** | Tabel sensor disamakan dengan stock ko; maintainer sedang di luar |
 | `tranhalconfig` | **Terbuka, userspace** | Service/sepolicy vendor, bukan kernel |
 | `fpsgo`/`trans_sched` | **Known limitation; skip di 6.18** | Jangan buat stub palsu; core FPSGO tetap jalan |
-| TEE/Widevine | **Terbuka, vendor security** | Provisioning/TA/HDCP, bukan DT |
+| TEE/Widevine | **Known limitation; sama dengan 6.12 port** | Provisioning/TA, bukan DT atau driver kernel |
 | Error minor | **Rendah** | Catat, tangani setelah prioritas utama |
 
 Tidak ada `am_crash` atau `am_anr` di logcat yang dianalisis. Yang ada hanya
@@ -430,27 +430,73 @@ tree juga hasil port, bukan source stock.
 (`mtk_fpsgo_v8.ko`) tetap terpasang; log `don't support` diterima sebagai
 known limitation 6.18.
 
-### 5.7 TEE/Widevine — vendor security
+### 5.7 TEE/Widevine — known limitation, sama dengan 6.12 port
 
 **Gejala:**
 
 ```text
 Trustonic TEE: GF_ERROR_OPEN_SECURE_OBJECT_FAILED  (59x)
+Trustonic TEE: WARNING: insecure default Trustonic key detected for TA signature.
 device_authen_ta: gp_read_raw g_device_key err=-65528
 tdrv_drmhdcpcommon drDcihInit(): drApiStartThread failed: 0x6f03
 tdrv_widevine      drDcihInit(): drApiStartThread failed: 0x6f03
 ```
 
-**Temuan:** sebagian GF error karena `finger_extra_info` belum ada (wajar
-untuk data fingerprint baru). `device_authen` gagal membaca device key, dan
-HDCP/Widevine init gagal. Ini bisa memengaruhi Play Integrity dan playback
-DRM/HDCP.
+**Status stack TEE di 6.18:**
 
-**Rencana fix:** periksa provisioning device key/certificate, TA
-Widevine/HDCP, dan firmware TEE. Ini bukan DT kernel.
+- `mcDrvModule`, `teeperf`, `trusted_mem`, `gz_*`, `widevine_driver`,
+  `sec`, `iommu_secure`, dan `cmdq_sec_drv` termuat.
+- `TAFileServer Kinibi-MediaTek-Android-700a-V010` berjalan. Gatekeeper,
+  KeyMint, dan TA fingerprint bisa membuka session.
+- `TEESimulator` mencatat KeyMint `from=real-hal rc=0`; jalur TEE KeyMint
+  nyata berfungsi.
+- HAL `vendor.drm-widevine-hal` tetap hidup; `liboemcrypto` memuat dan
+  mencetak BRM commit ID. Tidak ada service death atau crash.
+- Logcat memuat module `teesim`/`playintegrityfix`; perangkat berjalan di
+  lingkungan root. Play Integrity/attestation tidak bisa dijadikan acuan
+  paritas stock selama kondisi ini.
 
-**Verifikasi:** device attestation berhasil, HDCP init tidak gagal, dan
-playback DRM/HDCP berjalan.
+**Arti error:**
+
+| Log | Arti |
+|---|---|
+| `mcp_cmd ... res 33` | `MC_MCP_RET_ERR_SYSTEM_NOT_READY`; TEE OS belum siap saat service awal, berhenti setelah boot |
+| `mcp_cmd ... res 8` | `MC_MCP_RET_ERR_INVALID_PARAM`; satu open session ditolak, bukan kegagalan driver |
+| `GF_ERROR_OPEN_SECURE_OBJECT_FAILED` (59x) | TA fingerprint mencari `finger_*.so` yang belum ada; wajar sebelum enrollment |
+| `insecure default Trustonic key` | TA ditandatangani/diverifikasi dengan default key; kondisi provisioning TEE/device |
+| `gp_read_raw g_device_key err=-65528` | `0xFFFF0008` = `TEE_ERROR_ITEM_NOT_FOUND`; device key belum diprovision |
+| `drApiStartThread failed: 0x6f03` | Thread DCIH di TA DRM stock gagal dibuat; terjadi di TA, bukan di `widevine_driver` kernel |
+
+**Perbandingan 6.12 ke 6.18:** dmesg 6.12 port (`6.12.117...Rama982`,
+`dmesg4.txt` 2026-11-21) memuat pola yang sama: `res 33` berulang, satu
+`res 8`, dua `drDcihInit ... 0x6f03`, `gp_read_raw ... -65528`, dan
+`insecure default`. Jadi pola ini bukan regresi 6.18. Log runtime stock
+X6871 tidak tersedia, jadi paritas dengan stock belum bisa dibuktikan
+dari log; yang bisa dipastikan adalah 6.12 port berperilaku sama.
+
+**Perbedaan driver:** stock X6871 6.12 memakai `mcDrvModule`
+`Kinibi-FFA-A-700a-V010`, build kita `V008`; stock X6867 6.18 memakai
+`V013`. Tetapi 6.12 port juga memakai `V008` dengan log identik, dan source
+`V010`/`V013` tidak tersedia. `widevine_driver.ko` build kita byte-identik
+dengan stock X6867 6.18. Jadi tidak ada perubahan kernel yang bisa
+dibenarkan hanya dari log ini. Buka lagi opsi update GUD hanya kalau ada
+regresi L1 terukur dan source `V010`/`V013` tersedia.
+
+**Keputusan pragmatis: skip perubahan kernel; catat known limitation.**
+
+- `device_authen`/Play Integrity dan Widevine L1 bergantung pada
+  provisioning pabrik (device key, keybox Widevine, status bootloader),
+  bukan DT atau driver kernel.
+- `drDcihInit` gagal di TA stock; tidak ada source TA/kernel yang bisa
+  diperbaiki di tree ini.
+- Jangan menambah stub TA/module atau memalsukan device key.
+- Kalau L1 wajib, perlu provisioning vendor (SP Meta/DRM key install)
+  dan bootloader terkunci; itu di luar scope kernel 6.18.
+
+**Verifikasi:** `DRM Info` menunjukkan level Widevine; playback DRM
+berjalan sesuai level yang tersedia. `gp_read_raw`, `insecure default`,
+dan `drDcihInit` boleh tetap muncul sebagai known limitation selama tidak
+ada crash dan level DRM sesuai kebijakan perangkat.
 
 ## 6. Error Minor/Rendah
 
@@ -495,7 +541,10 @@ Urutan verifikasi yang disarankan:
 8. Cek tidak ada crash dari `trans_sched`/`fpsgo`. Log
    `trans sched don't support!` diterima sebagai known limitation 6.18;
    `msync2` juga tidak ada di stock.
-9. Jalankan playback DRM/HDCP dan cek TEE/Widevine.
+9. Cek level Widevine dengan `DRM Info`, lalu jalankan playback DRM.
+   `gp_read_raw`, `insecure default`, dan `drDcihInit` diterima sebagai
+   known limitation 6.18; yang penting tidak ada crash dan level DRM
+   sesuai kebijakan perangkat.
 
 ## 8. Urutan Kerja yang Disarankan
 
@@ -509,7 +558,7 @@ Urutan verifikasi yang disarankan:
 | P2 | DPE `v4l2_fh` | Warning 2x per boot; node V4L2 DPE tidak berfungsi |
 | P2 | CMDQ/GCE + MML | Noise; perbaiki fallback driver |
 | P3 | `trans_sched`/`fpsgo` wrapper: skip | Stub tidak memberi fungsi; full RE terlalu besar |
-| P2 | TEE/Widevine | DRM/Play Integrity; butuh provisioning vendor |
+| P3 | TEE/Widevine: skip perubahan kernel | Bukan regresi 6.18; butuh provisioning vendor |
 | P3 | Error minor | Bersihkan setelah prioritas utama selesai |
 
 ## 9. Batasan dan Catatan
