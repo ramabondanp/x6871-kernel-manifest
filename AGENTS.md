@@ -75,9 +75,10 @@ Jangan commit file donor, tarball, atau dump firmware ke repo.
 - Jangan menambahkan prefix `6.18:` kalau bug yang diperbaiki juga ada di 6.12.
 - Untuk commit kernel yang khusus 6.18: tanpa prefix `6.18:`, subjek diakhiri
   `for 6.18`.
-- Commit manifest/docs memakai prefix `6.18:` dan subjek hanya boleh punya
-  satu `6.18`.
-- Commit kernel/vendor memakai format kernel, body sekitar 72 kolom, dan
+- Commit manifest/docs wajib berbahasa **Indonesia** (subjek dan body),
+  memakai prefix `6.18:` dan subjek hanya boleh punya satu `6.18`.
+- Commit kernel/vendor wajib berbahasa **Inggris** (subjek dan body),
+  memakai format kernel, body sekitar 72 kolom, dan
   `Signed-off-by: Rama Bondan Prakoso <ramanarubp@gmail.com>`.
 - Sebelum push, jalankan checkpatch untuk commit.
 - Untuk kernel/vendor, checkpatch difokuskan ke **commit message**, bukan code
