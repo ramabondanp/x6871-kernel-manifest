@@ -20,9 +20,9 @@ Diperbarui: 2026-11-25 (UTC)
 > `vendor_boot.img` `ea13b6dfe2de10b20f8a046d40c429f3`, `vendor_dlkm.img`
 > `c7aa223e09de1b1b50545edcb1fc0a08`, `odm_dlkm.img`
 > `773a5910abfac89c2dbd4fcf7bd74613`):
-> - **Crash / EMI / ADSP:** `0` kemunculan `Internal error`, `WARNING: CPU`,
+> - **Crash / EMI / Thermal:** `0` kemunculan `Internal error`, `WARNING: CPU`,
 >   `rcu_preempt detected stalls`, `[MIUMPU]srinfo_r 3`, `EMIMPU`,
->   `adsp_system_bootup fail`, `invalid cid`, maupun `Failed to register lvts tz`.
+>   maupun `Failed to register lvts tz`.
 > - **Video & kamera:** VP9 **PASS** (25x `check_codec_id ipi id 6 svp 0 is correct`,
 >   25 sesi `Init Vdec OK bs VP90` s.d. 1080x1920, `0` error), VP8 720p
 >   (`c2.mtk.vpx.decoder`, 120/120 frame, `132.0 fps` surface / `129.4 fps`
@@ -34,13 +34,15 @@ Diperbarui: 2026-11-25 (UTC)
 > - **Thermal LVTS & Touch:** `40` thermal zone aktif (`soc_max` merespons
 >   beban `59.5°C` -> `72.6°C`); GT9916 + `adaptive-ts` aktif (`~352–354 Hz`,
 >   `charger mode in/out`, `resume restore charger mode`, `0` error kirim).
+> - **Fix minor PASS di device (`495` modul termuat pada boot baru):**
+>   `kthread_run_worker()` (`7d92fc24ce41`, `611ad1f`) memastikan seluruh
+>   worker kthread berjalan di state `S` (`kthread_worker_fn`, `blocked for
+>   more than: 0`) dan `/proc/mtk_typec` (`112de113630b`, `587a0a7`) bersih
+>   (`already registered: 0`, `/proc/mtk_typec/smt_u2_cc_mode = 0`).
 > - **Belum diuji / terbuka:** cek level Widevine via `DRM Info` + playback
 >   DRM, serta pengukuran terpisah recovery report rate pasca sleep/wake pada
 >   `report_rate_switch=1`; isu tersisa: `tranhalconfig` userspace (`222` AVC,
->   `audit_lost: 21`), sementara fix bug minor `hung_task` kthread idle
->   (`kthread_run_worker()`: `7d92fc24ce41`, `611ad1f`) dan duplikasi
->   `/proc/mtk_typec` (`112de113630b`, `587a0a7`) sudah di-commit serta lulus
->   build 8/8 `verify-kmi-abi.py` (belum diuji boot ulang di perangkat).
+>   `audit_lost: 21`).
 >
 > Profil uji opsional `android17-6.18-lts` tersedia lewat
 > `local_manifest-6.18-lts.xml` (lihat
@@ -75,7 +77,7 @@ Diperbarui: 2026-11-25 (UTC)
 | DPE `v4l2_fh` & CMDQ `vote mminfra` | **PASS di device** | `b83dca0` (`0` `v4l2_open` WARN, `[DPE]DPE open`/`release` bersih) & `a71cfd2` (`0` `vote mminfra on err`) |
 | Video VP8 / VP9 / AV1 | **PASS di device** | `213a184315ef` + `a719a23cee6d` + `ac2e63fe0411` (`VDEC_VP8 = 5`); VP9 (`25` sesi s.d. `1080x1920`), VP8 720p (`c2.mtk.vpx.decoder`, 120/120 frame, `132.0 fps`), dan AV1 720p/1080p (`c2.mtk.av1.decoder`, 120/120 frame, `228.0 / 110.5 fps`) PASS (`0` error) |
 | `tranhalconfig` | **Terbuka (userspace)** | Service/sepolicy vendor belum aktif (`222` AVC di `dmesg`, `audit_lost: 21`) |
-| ADSP / `fpsgo`/`trans_sched` / TEE Widevine | **Known limitation / skip** | ADSP disabled di DTB stock (`0` `adsp_system_bootup fail`/`invalid cid`); `trans_sched`/`fpsgo` wrapper tanpa source; TEE/L1 isu provisioning (`DRM Info` belum dicek ulang di `6.18.65`) |
+| ADSP / `fpsgo`/`trans_sched` / TEE Widevine | **Known limitation / skip** | ADSP disabled di DTB stock (`total 0` core; saat early boot `t=5.77s` modul tetap mencetak 1x `adsp_system_bootup fail ret(-14)` dan 80x `invalid cid` lalu berhenti); `trans_sched`/`fpsgo` wrapper tanpa source; TEE/L1 isu provisioning (`DRM Info` belum dicek ulang di `6.18.65`) |
 
 Rincian langkah verifikasi dan prioritas P0–P3 ada di [`TRACKER.md`](TRACKER.md).
 

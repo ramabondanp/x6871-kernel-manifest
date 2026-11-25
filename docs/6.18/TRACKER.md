@@ -22,7 +22,7 @@ Diperbarui: 2026-11-25 (UTC)
 |---|---|---|
 | Oops/panic/RCU stall | **Terverifikasi PASS di device** | `0` kemunculan `Internal error`/`WARNING: CPU`/RCU stall/`[MIUMPU]srinfo_r 3` di boot `6.18.65` |
 | EMI MPU `SRINFO=3` + RCU stall | **Terverifikasi PASS di device** | `6ebc4934a74a` terkonfirmasi bersih di boot `6.18.65` (`EMIMPU: 0`) |
-| ADSP | **Terverifikasi PASS (stock DTB disabled)** | `0` `adsp_system_bootup fail` & `invalid cid` di `6.18.65`; audio `fs15xx` aktif |
+| ADSP | **Known limitation / skip (stock DTB disabled)** | DTB stock `disabled` (`total 0` core); early boot `t=5.77s` masih mencatat 1x `adsp_system_bootup fail ret(-14)` + 80x `invalid cid` saat init lalu berhenti; audio `fs15xx` aktif |
 | Video VP8 / VP9 / AV1 | **Terverifikasi PASS di device** | VP9 (25 sesi s.d. 1080x1920), VP8 720p (120/120 frame, `132.0 fps`), AV1 720p/1080p (120/120 frame, `228.0 / 110.5 fps`), dan VENC 1080p@30fps PASS (`0` error) |
 | DPE `v4l2_fh` | **Terverifikasi PASS di device** | `0` `v4l2_open` WARN; `[DPE]DPE open`/`release` bersih di `6.18.65` |
 | CMDQ/GCE + MML | **Terverifikasi PASS di device** | `0` `vote mminfra on err` di boot `6.18.65`; display, kamera, codec, MML normal |
@@ -31,7 +31,7 @@ Diperbarui: 2026-11-25 (UTC)
 | `tranhalconfig` | **Terbuka, userspace** | Masih `222` AVC & `audit_lost: 21` di `6.18.65`; perlu fix service/sepolicy vendor |
 | `fpsgo`/`trans_sched` | **Known limitation; skip di 6.18** | Jangan buat stub palsu; core FPSGO tetap jalan |
 | TEE/Widevine | **Known limitation; sama dengan 6.12 port** | Provisioning/TA, bukan DT/driver; `DRM Info` belum dicek ulang di boot `6.18.65` |
-| Error minor | **2 bug kernel fixed di source; 9 item skip** | `kthread_run_worker` (`7d92fc24ce41`, `611ad1f`) & `/proc/mtk_typec` (`112de113630b`, `587a0a7`) lulus 8/8 KMI; uji boot device belum dilakukan; 9 item lain paritas stock/userspace |
+| Error minor | **2 bug kernel PASS di device; 9 item skip** | `kthread_run_worker` (`7d92fc24ce41`, `611ad1f`) & `/proc/mtk_typec` (`112de113630b`, `587a0a7`) terverifikasi PASS di boot baru (`6.18.65`); 9 item lain paritas stock/userspace |
 
 Tidak ada `am_crash` atau `am_anr` di logcat historis yang dianalisis. Pada
 uji live terbaru (`6.18.65-android17-6-g39d19ad1a460-rama982-4k`), seluruh fix
@@ -145,8 +145,20 @@ saja masih muncul jika userspace tetap membuka PCM DSP. Itu bukan alasan
 untuk mengaktifkan ADSP.
 
 **Hasil verifikasi live (`6.18.65-android17-6-g39d19ad1a460-rama982-4k`):**
-**PASS** — `adsp_system_bootup fail: 0` dan `invalid cid: 0` di `dmesg`; audio
-`fs15xx` (`6-0034`/`6-0035`) dan perangkat audio tetap aktif.
+pada pengecekan boot segar (`up 0 min`) sebelum ring buffer tergulir,
+terkonfirmasi kasus butir 3 di atas: karena DTB stock memiliki `total 0`
+core (`disabled`) namun module init tetap memanggil `adsp_system_bootup()`,
+awal boot mencatat sekali `adsp_system_bootup fail ret(-14)` dan 80x
+`invalid cid 0/1, total 0` lalu berhenti setelah init:
+
+```text
+[    5.776236] adsp_system_bootup fail ret(-14)
+[    5.778138] [IPI][COM] ipi_dsp_id_to_adsp_cid(), invalid cid 0, total 0
+[    5.778149] [IPI][COM] ipi_dsp_id_to_adsp_cid(), invalid cid 1, total 0
+```
+
+Hal ini menegaskan `dtb` stock aktif (`total 0` core) dan tidak menghambat
+audio `fs15xx` (`6-0034`/`6-0035`); ADSP tetap berstatus non-bug / skip.
 
 ## 5. Temuan Non-Crash dan Rencana Fix
 
@@ -742,8 +754,8 @@ DTB/DTBO stock, dan biner `.ko` stock SP20:
 
 | Gejala | Status & Tindakan | Catatan Akar Masalah |
 |---|---|---|
-| `INFO: task hf_manager:788 blocked for more than 307 seconds.` / `INFO: task mml_work1:8470 blocked for more than 307 seconds.` | **Fixed di source (`7d92fc24ce41`, `611ad1f`), build 8/8 KMI PASS; uji boot belum** | Bug semantik API 6.18: `kthread_create_worker()` tidak lagi memanggil `wake_up_process()`; diganti `kthread_run_worker()` pada `hf_manager`, `mtk-mml`, `mtk_drm_drv`, `ufcs_class`, dan Mali Avalon `a16w` |
-| `proc_dir_entry '/proc/mtk_typec' already registered` | **Fixed di source 6.18 & 6.12 (`112de113630b`, `587a0a7`), build 8/8 KMI PASS; uji boot belum** | Kedua modul `mux_switch` dan `tran_extcon_usb` memanggil `proc_mkdir("mtk_typec", NULL)`; dicegah dengan `kern_path("/proc/mtk_typec", ...)` + `path_put()` |
+| `INFO: task hf_manager:788 blocked for more than 307 seconds.` / `INFO: task mml_work1:8470 blocked for more than 307 seconds.` | **Terverifikasi PASS di device (`7d92fc24ce41`, `611ad1f`)** | Bug semantik API 6.18 (`kthread_run_worker()`): seluruh worker `[mml_work0]`, `[mtk_drm_bind]`, `[hf_manager]`, `[kbase_pm_poweroff_wait]` aktif di state `S` (`kthread_worker_fn`), `0` worker di `D`, `blocked for more than: 0` |
+| `proc_dir_entry '/proc/mtk_typec' already registered` | **Terverifikasi PASS di device (`112de113630b`, `587a0a7`)** | `already registered: 0`; `/proc/mtk_typec/mux_switch/{mux,switch}` & `/proc/mtk_typec/smt_u2_cc_mode = 0` terbentuk (`tran_usb_extcon_procfs_init ret:0`) |
 | `get pmic_node fail` (23x) | **Skip (paritas stock)** | `tc_pmic` mencari phandle `"pmic"`; DTBO stock `fragment@37` tidak menyertakannya dan `tc_pmic.ko` stock identik |
 | `pe50_is_ta_rdy: all support sepc auth fail` (16x) | **Skip (perilaku normal)** | `PE50_INFO` normal di `tc_pe5.c` saat adaptor non-PPS / USB PC |
 | `mtk_emimpu_set_apc: fail, out-of-range domain`, `[SCP] chre memory reserve fail` | **Skip (paritas stock)** | String sama ada di `emi-mpu.ko` stock; memori reserved CHRE memang `size = 0` di konfigurasi stock X6871 |
@@ -758,8 +770,13 @@ Build gabungan fix minor (`6.18.65-android17-6-g39d19ad1a460-rama982-4k`, 487
 modul runtime, `9.843` simbol ABI) lolos **8/8** `verify-kmi-abi.py`
 (`vendor_boot.img` md5 `5395e3faaf9ed636177e2a0b45e941a7`, `vendor_dlkm.img`
 `540b0a7cda2cf90ed2197ee061f1be78`, `odm_dlkm.img`
-`c1f97ae3fe5cf030f2b9e3e416055e58`). Pengujian boot ulang di perangkat untuk
-memverifikasi hilangnya `hung_task` dan `/proc/mtk_typec` **belum dilakukan**.
+`c1f97ae3fe5cf030f2b9e3e416055e58`) dan **PASS** pada uji boot langsung di
+perangkat (`495` modul termuat, `already registered: 0`, `blocked for more than: 0`):
+
+```text
+[    6.744200] tran-extcon-usb extcon_usb: success creating proc file: smt_u2_cc_mode
+[    6.744203] tran-extcon-usb extcon_usb: tran_usb_extcon_procfs_init ret:0
+```
 
 ## 7. Verifikasi Setelah Fix
 
@@ -769,8 +786,10 @@ Status verifikasi pada uji live `6.18.65-android17-6-g39d19ad1a460-rama982-4k`:
    stock) — **PASS**.
 2. Boot normal dan periksa log kernel (`dmesg`) — **PASS**.
 3. Tidak ada `Internal error`, `WARNING: CPU`, `rcu_preempt detected stalls`,
-   `[MIUMPU]srinfo_r 3`, `adsp_system_bootup fail`, maupun `invalid cid` — **PASS**
-   (semuanya `0` kemunculan).
+   maupun `[MIUMPU]srinfo_r 3` — **PASS** (semuanya `0` kemunculan). Pada boot
+   segar `t=5.77s`, ADSP mencatat 1x `adsp_system_bootup fail ret(-14)` + 80x
+   `invalid cid` saat init karena DTB stock `disabled` (`total 0` core) lalu
+   berhenti; audio normal.
 4. Video VP8, VP9, dan AV1: `25` sesi `Init Vdec OK bs VP90`, plus uji
    decode hardware VP8 720p (`c2.mtk.vpx.decoder`, 120/120 frame, `132.0 fps`)
    dan AV1 720p/1080p (`c2.mtk.av1.decoder`, 120/120 frame, `228.0 / 110.5 fps`),
@@ -807,7 +826,7 @@ Status verifikasi pada uji live `6.18.65-android17-6-g39d19ad1a460-rama982-4k`:
 | P3 | CMDQ `vote mminfra`: verifikasi di device | **Selesai (PASS di `6.18.65`)** — `0` `vote mminfra on err` |
 | P3 | `trans_sched`/`fpsgo` wrapper: skip | **Skip** — stub tidak memberi fungsi; full RE terlalu besar |
 | P3 | TEE/Widevine: skip perubahan kernel | **Skip** — bukan regresi 6.18; butuh provisioning vendor |
-| P3 | Error minor | **2 bug kernel fixed (`7d92fc24ce41`, `611ad1f`, `112de113630b`)**, lolos 8/8 KMI; **uji boot device belum dilakukan**; 9 item lain di-skip |
+| P3 | Error minor | **2 bug kernel PASS di `6.18.65`** (`7d92fc24ce41`, `611ad1f`, `112de113630b`); 9 item lain di-skip |
 
 ## 9. Batasan dan Catatan
 
