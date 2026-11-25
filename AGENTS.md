@@ -17,7 +17,11 @@ detail tersebut di sini.
 
 ## 1. Scope dan rilis
 
-- Pekerjaan hanya untuk **6.18**. Baseline stabil tetap **6.12**.
+- Fokus kerja dan build ada di **6.18** (`x6871-android17-6.18`), sementara
+  baseline stabil tetap **6.12** (`x6871-android16-6.12`). Jika sebuah fix
+  berlaku untuk kedua kernel, commit langsung ke kedua branch
+  (`x6871-android17-6.18` dan `x6871-android16-6.12`), tetapi tidak perlu build
+  **6.12** kecuali diminta.
 - 6.12 dipakai untuk penggunaan harian; 6.18 masih pratinjau dan belum punya
   image rilis publik.
 - Jangan mencampur image KMI 6 (6.12) dengan KMI 5/6.18.
@@ -73,6 +77,10 @@ Jangan commit file donor, tarball, atau dump firmware ke repo.
 - **Jangan amend commit fix.** Kalau ada perbaikan, buat commit baru.
 - Di **manifest**, fix/analisa juga harus menjadi **commit baru**, bukan amend.
 - Jangan menambahkan prefix `6.18:` kalau bug yang diperbaiki juga ada di 6.12.
+- Jika fix kernel/vendor berlaku untuk kedua kernel (6.18 dan 6.12), terapkan
+  dan commit langsung ke kedua branch (`x6871-android17-6.18` dan
+  `x6871-android16-6.12`) tanpa akhiran `for 6.18`; tidak perlu build 6.12
+  kecuali diminta.
 - Untuk commit kernel yang khusus 6.18: tanpa prefix `6.18:`, subjek diakhiri
   `for 6.18`.
 - Commit manifest/docs wajib berbahasa **Indonesia** (subjek dan body),
@@ -154,7 +162,7 @@ Jangan commit file donor, tarball, atau dump firmware ke repo.
 
 ## 9. Checklist agen
 
-- [ ] Scope hanya 6.18; 6.12 tidak diubah.
+- [ ] Build difokuskan ke 6.18; jika fix berlaku untuk kedua kernel, sudah di-commit ke branch 6.18 dan 6.12 tanpa perlu build 6.12.
 - [ ] Perubahan hanya pada topik yang diminta.
 - [ ] DTB/DTBO stock tidak diubah.
 - [ ] Tidak menambah node/zone/event yang tidak ada di stock.
