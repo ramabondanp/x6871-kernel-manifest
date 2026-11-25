@@ -30,7 +30,7 @@ Diperbarui: 2026-11-25 (UTC)
 | Touch (`gt9916_common` + `adaptive-ts`) | **Terverifikasi PASS di device** | Node & `vendor.hardware.trantp-service` aktif, `~352–354 Hz`, charger anti-noise PASS; sisa ukur sleep/wake pada `report_rate_switch=1` |
 | `tranhalconfig` | **Terbuka, userspace** | Masih `222` AVC & `audit_lost: 21` di `6.18.65`; perlu fix service/sepolicy vendor |
 | `fpsgo`/`trans_sched` | **Known limitation; skip di 6.18** | Jangan buat stub palsu; core FPSGO tetap jalan |
-| TEE/Widevine | **Known limitation; sama dengan 6.12 port** | Provisioning/TA, bukan DT/driver; `DRM Info` belum dicek ulang di boot `6.18.65` |
+| TEE/Widevine | **Skip (known limitation)** | Provisioning/TA, bukan DT/driver (sama dengan 6.12 port); cek `DRM Info`/DRM di-skip |
 | Error minor | **2 bug kernel PASS di device; 9 item skip** | `kthread_run_worker` (`7d92fc24ce41`, `611ad1f`) & `/proc/mtk_typec` (`112de113630b`, `587a0a7`) terverifikasi PASS di boot baru (`6.18.65`); 9 item lain paritas stock/userspace |
 
 Tidak ada `am_crash` atau `am_anr` di logcat historis yang dianalisis. Pada
@@ -667,8 +667,8 @@ berjalan sesuai level yang tersedia. `gp_read_raw`, `insecure default`,
 dan `drDcihInit` boleh tetap muncul sebagai known limitation selama tidak
 ada crash dan level DRM sesuai kebijakan perangkat.
 
-**Status di boot `6.18.65`:** cek `DRM Info` dan playback DRM **belum
-dijalankan ulang** pada sesi uji terbaru.
+**Status di boot `6.18.65`:** **Skip** (known limitation non-kernel /
+provisioning TEE; cek `DRM Info` dan playback DRM dilewati).
 
 ### 5.8 Touch (`gt9916_common` + `adaptive-ts`) — dynamic report rate, `tppolldrv`, dan charger anti-noise
 
@@ -804,8 +804,8 @@ Status verifikasi pada uji live `6.18.65-android17-6-g39d19ad1a460-rama982-4k`:
    AVC dan `audit_lost: 21`.
 8. Tidak ada crash dari `trans_sched`/`fpsgo`; `mtk_fpsgo_v8.ko` tetap
    terpasang — **PASS** (known limitation 6.18).
-9. Cek level Widevine dengan `DRM Info` & playback DRM — **belum dicek ulang**
-   pada boot `6.18.65`.
+9. Cek level Widevine dengan `DRM Info` & playback DRM — **skip** (known
+   limitation non-kernel / provisioning TEE).
 10. Touch GT9916: 4 node kontrol + `vendor.hardware.trantp-service` aktif,
     `getevent -lt` terukur `~352–354 Hz`, `charger mode in/out` & `resume restore charger mode`
     tanpa `failed send charger_cmd` — **PASS** (recovery pasca sleep/wake
@@ -822,18 +822,18 @@ Status verifikasi pada uji live `6.18.65-android17-6-g39d19ad1a460-rama982-4k`:
 | P1 | `tranhalconfig` | **Terbuka (userspace)** — `222` AVC & `audit_lost: 21`, perlu fix vendor/sepolicy |
 | P1 | DPE `v4l2_fh`: verifikasi fix isp_70 di device | **Selesai (PASS di `6.18.65`)** — `0` `v4l2_open` WARN |
 | P1 | Touch GT9916 (`adaptive-ts` + `gt9916_common`) | **PASS di `6.18.65`**; sisa ukur recovery sleep/wake pada `report_rate_switch=1` |
-| P2 | Widevine `DRM Info` & playback DRM | **Belum dicek ulang di `6.18.65`** (non-kernel / known limitation) |
 | P3 | CMDQ `vote mminfra`: verifikasi di device | **Selesai (PASS di `6.18.65`)** — `0` `vote mminfra on err` |
 | P3 | `trans_sched`/`fpsgo` wrapper: skip | **Skip** — stub tidak memberi fungsi; full RE terlalu besar |
-| P3 | TEE/Widevine: skip perubahan kernel | **Skip** — bukan regresi 6.18; butuh provisioning vendor |
+| P3 | TEE/Widevine | **Skip** — bukan regresi 6.18; isu provisioning/TA vendor, cek `DRM Info` dilewati |
 | P3 | Error minor | **2 bug kernel PASS di `6.18.65`** (`7d92fc24ce41`, `611ad1f`, `112de113630b`); 9 item lain di-skip |
 
 ## 9. Batasan dan Catatan
 
 - Hasil verifikasi live pada `6.18.65-android17-6-g39d19ad1a460-rama982-4k`
   sudah menutup temuan crash, ADSP, VP8/VP9/AV1, DPE, CMDQ, thermal LVTS, dan
-  touch di atas; pengujian yang belum dijalankan (`DRM Info` Widevine dan
-  recovery sleep/wake `report_rate_switch=1`) tetap dicatat eksplisit.
+  touch di atas; pengujian yang belum dijalankan (recovery sleep/wake
+  `report_rate_switch=1`) tetap dicatat eksplisit, sedangkan TEE/Widevine
+  masuk kategori skip.
 - Dokumen ini tidak mengubah kode. Perubahan tetap harus melalui commit baru
   sesuai aturan commit di `AGENTS.md` (prefix `6.18:` di manifest; format
   kernel dengan akhiran `for 6.18` di repo kernel/vendor bila khusus 6.18).

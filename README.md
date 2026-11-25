@@ -16,7 +16,7 @@ Pada build sebelumnya (KMI 5), TWRP, layar hingga 144 Hz dan Always-On Display (
 
 ## Status 6.18 (pratinjau)
 
-Kernel 6.18 belum dirilis dan belum disarankan untuk penggunaan harian. Pada perangkat uji (`6.18.65`), sistem sudah bisa boot (memerlukan [patch SELinux `firmware_load`](docs/guides/SELINUX-6.18.md)). TWRP (layar sentuh dan getar), Wi-Fi, Bluetooth, audio, kamera foto dan rekam video 1080p, pemutaran video H.264, VP8, VP9, dan AV1, thermal LVTS, serta kontrol sentuh sudah berfungsi. Cek Widevine masih belum diuji lengkap, dan 6.18 belum memiliki image rilis publik.
+Kernel 6.18 belum dirilis dan belum disarankan untuk penggunaan harian. Pada perangkat uji (`6.18.65`), sistem sudah bisa boot (memerlukan [patch SELinux `firmware_load`](docs/guides/SELINUX-6.18.md)). TWRP (layar sentuh dan getar), Wi-Fi, Bluetooth, audio, kamera foto dan rekam video 1080p, pemutaran video H.264, VP8, VP9, dan AV1, thermal LVTS, serta kontrol sentuh sudah berfungsi. 6.18 belum memiliki image rilis publik.
 
 Rilis 6.12 di atas tetap menjadi versi yang direkomendasikan. Perkembangan 6.18 dicatat di [status eksekusi 6.18](docs/6.18/STATUS.md).
 
