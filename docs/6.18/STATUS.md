@@ -27,7 +27,7 @@ Diperbarui: 2026-11-25 (UTC)
 > Profil uji opsional `android17-6.18-lts` (`6.18.65`, `4cc5bb220b50`, KMI 6,
 > build GKI lokal) tersedia lewat `local_manifest-6.18-lts.xml` (lihat
 > [`BUILD.md`](../guides/BUILD.md#profil-uji-618-lts-android17-618-lts-61865-kmi-6-build-gki-lokal)):
-> seluruh 487 modul + GKI lokal (`6.18.65-android17-6-g39d19ad1a460-ramabondanp-4k`,
+> seluruh 487 modul + GKI lokal (`6.18.65-android17-6-g39d19ad1a460-rama982-4k`,
 > `9.843` simbol ABI) lulus 8/8 `verify-kmi-abi.py`; patch SHA-gated
 > `patches/common-6.18-blk-plug-invalidate-ts.patch` tetap diterapkan (`39d19ad1a460`)
 > setelah sebelumnya terkonfirmasi pada `6.18.64` menghilangkan panic
