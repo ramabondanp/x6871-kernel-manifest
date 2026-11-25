@@ -36,9 +36,11 @@ Diperbarui: 2026-11-25 (UTC)
 >   `charger mode in/out`, `resume restore charger mode`, `0` error kirim).
 > - **Belum diuji / terbuka:** cek level Widevine via `DRM Info` + playback
 >   DRM, serta pengukuran terpisah recovery report rate pasca sleep/wake pada
->   `report_rate_switch=1`; isu tersisa: `tranhalconfig`
->   userspace (`222` AVC, `audit_lost: 21`) serta pesan minor `hung_task`
->   berkala pada kthread MTK idle (`hf_manager`, `mml_work1`).
+>   `report_rate_switch=1`; isu tersisa: `tranhalconfig` userspace (`222` AVC,
+>   `audit_lost: 21`), sementara fix bug minor `hung_task` kthread idle
+>   (`kthread_run_worker()`: `7d92fc24ce41`, `611ad1f`) dan duplikasi
+>   `/proc/mtk_typec` (`112de113630b`, `587a0a7`) sudah di-commit serta lulus
+>   build 8/8 `verify-kmi-abi.py` (belum diuji boot ulang di perangkat).
 >
 > Profil uji opsional `android17-6.18-lts` tersedia lewat
 > `local_manifest-6.18-lts.xml` (lihat

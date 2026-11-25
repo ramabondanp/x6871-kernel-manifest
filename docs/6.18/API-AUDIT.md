@@ -1,8 +1,8 @@
 # Audit API 6.18 pada Modul OOT X6871
 
-Diperbarui: 2026-11-23
+Diperbarui: 2026-11-25
 
-> Catatan: audit statis ini dilakukan sebelum bringup di perangkat. Untuk status boot dan hasil uji terkini, lihat [`STATUS.md`](STATUS.md) dan [`TRACKER.md`](TRACKER.md).
+> Catatan: audit statis awal dilakukan sebelum bringup di perangkat, lalu diperbarui dengan temuan runtime 6.18. Untuk status boot dan hasil uji terkini, lihat [`STATUS.md`](STATUS.md) dan [`TRACKER.md`](TRACKER.md).
 
 Dokumen ini mencatat pemeriksaan perubahan API Linux 6.13–6.18 yang
 **tidak tertangkap compiler** (perubahan semantik, bukan rename atau
@@ -35,6 +35,7 @@ perubahan signature). Audit dilakukan tanpa hardware, memakai hasil build
 | prototipe probe `ufshcd_*` | `enum ufs_trace_str_t` | `ufs-mediatek-dbg` | diperbaiki |
 | probe `pm_qos_*` | `s32` / `enum pm_qos_req_action` | `met` | diperbaiki |
 | V4L2 ioctl `priv` | 6.18 mengirim `NULL` ke semua handler; driver harus ambil fh dari `file->private_data` | `mtk-vcodec-dec/enc`, `mtk-jpeg` | diperbaiki: `fh_to_ctx(file->private_data)`; qbuf jpeg tidak lagi menolak `priv == NULL` |
+| `kthread_create_worker` | 6.18 tidak lagi memanggil `wake_up_process()`, memicu `hung_task` pada worker idle (`hf_manager`, `mml_work1`) | `hf_manager`, `mtk-mml`, `mtk_drm`, `ufcs_class`, Mali Avalon `a16w` | diperbaiki: `kthread_run_worker()` (`7d92fc24ce41`, `611ad1f`) |
 
 ## Perubahan yang diperiksa dan dinilai aman
 
@@ -53,7 +54,7 @@ perubahan signature). Audit dilakukan tanpa hardware, memakai hasil build
 | `devm_ioremap*`, `of_iomap`, `memremap` | tetap mengembalikan NULL, bukan ERR_PTR; pemakaian lama tidak berubah |
 | `cpufreq_driver.attr` | field dihapus; atribut standar didaftarkan core |
 | `iommu_present` / `iommu_dev_disable_feature` | diganti `iommu_get_domain_for_dev()` di DRM |
-| `devm_gpio_request_one`, `dma_pool_create_node`, `kthread_create_worker_on_node` | wrapper dengan argumen tambahan |
+| `devm_gpio_request_one`, `dma_pool_create_node` | wrapper dengan argumen tambahan |
 | `hrtimer_setup`, `timer_init_key`, `debugfs_create_file_full`, `alloc_workqueue_noprof` | rename/wrapper profil |
 
 ## Sisa risiko yang hanya bisa dibuktikan saat boot

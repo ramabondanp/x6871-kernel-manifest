@@ -31,7 +31,7 @@ Diperbarui: 2026-11-25 (UTC)
 | `tranhalconfig` | **Terbuka, userspace** | Masih `222` AVC & `audit_lost: 21` di `6.18.65`; perlu fix service/sepolicy vendor |
 | `fpsgo`/`trans_sched` | **Known limitation; skip di 6.18** | Jangan buat stub palsu; core FPSGO tetap jalan |
 | TEE/Widevine | **Known limitation; sama dengan 6.12 port** | Provisioning/TA, bukan DT/driver; `DRM Info` belum dicek ulang di boot `6.18.65` |
-| Error minor | **Rendah** | Tambah catatan `hung_task` idle `hf_manager`/`mml_work1` di `6.18.65` |
+| Error minor | **2 bug kernel fixed di source; 9 item skip** | `kthread_run_worker` (`7d92fc24ce41`, `611ad1f`) & `/proc/mtk_typec` (`112de113630b`, `587a0a7`) lulus 8/8 KMI; uji boot device belum dilakukan; 9 item lain paritas stock/userspace |
 
 Tidak ada `am_crash` atau `am_anr` di logcat historis yang dianalisis. Pada
 uji live terbaru (`6.18.65-android17-6-g39d19ad1a460-rama982-4k`), seluruh fix
@@ -737,19 +737,29 @@ runtime, `9.843` simbol ABI).
 
 ## 6. Error Minor/Rendah
 
-| Gejala | Catatan |
-|---|---|
-| `proc_dir_entry '/proc/mtk_typec' already registered` | `mux_switch` dan `tran_extcon_usb` membuat direktori proc yang sama; salah satu gagal membuat `smt_u2_cc_mode` |
-| `get pmic_node fail` (23x) | Voting charger; charging tetap jalan |
-| `pe50_is_ta_rdy: all support sepc auth fail` (16x) | Fast charging tetap jalan |
-| `fgauged: open .../cus_save_data fail`, `nv_fail(1)` | Kalibrasi battery gauge tidak terbaca |
-| `mtu3 ... failed to start g1: -22` | USB gadget gagal start sekali, lalu retry dan jalan |
-| `GPU/FREQ ... fail to set STACK limiter: 12` | GPU tetap jalan |
-| `wait_for_md_on_complete timeout`, `mddp is not supported` | MDDP tidak aktif; WiFi tetap jalan |
-| `WARNING: CPU ... rcu_note_context_switch`, `Workqueue: ... susfs_guard_lkm` | Modul KernelSU/SUSFS, bukan port kernel |
-| `mtk_emimpu_set_apc: fail, out-of-range domain`, `[SCP] chre memory reserve fail` | Isu SCP CHRE terpisah, bukan EMI violation `SRINFO=3` yang sudah difix |
-| `healthd: battery...Path not found` | Node health/battery tidak ada di DT; sebagian kosmetik |
-| `INFO: task hf_manager:788 blocked for more than 307 seconds.` / `INFO: task mml_work1:8470 blocked for more than 307 seconds.` | Pesan `hung_task` berkala (~61 s) di `6.18.65` pada kthread MTK idle di `TASK_UNINTERRUPTIBLE` (`kthread+0xb0/0x294`); non-fatal |
+Hasil analisa seluruh 11 item error minor dari log boot `6.18`, source tree,
+DTB/DTBO stock, dan biner `.ko` stock SP20:
+
+| Gejala | Status & Tindakan | Catatan Akar Masalah |
+|---|---|---|
+| `INFO: task hf_manager:788 blocked for more than 307 seconds.` / `INFO: task mml_work1:8470 blocked for more than 307 seconds.` | **Fixed di source (`7d92fc24ce41`, `611ad1f`), build 8/8 KMI PASS; uji boot belum** | Bug semantik API 6.18: `kthread_create_worker()` tidak lagi memanggil `wake_up_process()`; diganti `kthread_run_worker()` pada `hf_manager`, `mtk-mml`, `mtk_drm_drv`, `ufcs_class`, dan Mali Avalon `a16w` |
+| `proc_dir_entry '/proc/mtk_typec' already registered` | **Fixed di source 6.18 & 6.12 (`112de113630b`, `587a0a7`), build 8/8 KMI PASS; uji boot belum** | Kedua modul `mux_switch` dan `tran_extcon_usb` memanggil `proc_mkdir("mtk_typec", NULL)`; dicegah dengan `kern_path("/proc/mtk_typec", ...)` + `path_put()` |
+| `get pmic_node fail` (23x) | **Skip (paritas stock)** | `tc_pmic` mencari phandle `"pmic"`; DTBO stock `fragment@37` tidak menyertakannya dan `tc_pmic.ko` stock identik |
+| `pe50_is_ta_rdy: all support sepc auth fail` (16x) | **Skip (perilaku normal)** | `PE50_INFO` normal di `tc_pe5.c` saat adaptor non-PPS / USB PC |
+| `mtk_emimpu_set_apc: fail, out-of-range domain`, `[SCP] chre memory reserve fail` | **Skip (paritas stock)** | String sama ada di `emi-mpu.ko` stock; memori reserved CHRE memang `size = 0` di konfigurasi stock X6871 |
+| `wait_for_md_on_complete timeout`, `mddp is not supported` | **Skip (non-fatal)** | Jalur MDDP WLAN (`mddp.c`) tidak aktif; Wi-Fi dan data seluler berjalan normal via AP |
+| `GPU/FREQ ... fail to set STACK limiter: 12` | **Skip (transient)** | Limiter `12` (`LIMIT_POWERHAL` di `gpufreq_v2.c`) dipanggil sebelum GPUEB/DVFS siap saat boot |
+| `mtu3 ... failed to start g1: -22` | **Skip (transient)** | `-EINVAL` pada `drivers/usb/gadget/udc/core.c` karena urutan configfs saat `init`; retry otomatis berhasil |
+| `fgauged: open .../cus_save_data fail`, `nv_fail(1)` | **Skip (userspace)** | Daemon `fuelgauged` saat file kalibrasi kustom belum tersedia; pengisian baterai normal |
+| `healthd: battery...Path not found` | **Skip (userspace / kosmetik)** | Health HAL mencari properti opsional yang tidak ada di DT stock |
+| `WARNING: CPU ... rcu_note_context_switch`, `Workqueue: ... susfs_guard_lkm` | **Skip (modul pihak ketiga)** | Berasal dari modul root KernelSU/SUSFS, bukan source port kernel |
+
+Build gabungan fix minor (`6.18.65-android17-6-g39d19ad1a460-rama982-4k`, 487
+modul runtime, `9.843` simbol ABI) lolos **8/8** `verify-kmi-abi.py`
+(`vendor_boot.img` md5 `5395e3faaf9ed636177e2a0b45e941a7`, `vendor_dlkm.img`
+`540b0a7cda2cf90ed2197ee061f1be78`, `odm_dlkm.img`
+`c1f97ae3fe5cf030f2b9e3e416055e58`). Pengujian boot ulang di perangkat untuk
+memverifikasi hilangnya `hung_task` dan `/proc/mtk_typec` **belum dilakukan**.
 
 ## 7. Verifikasi Setelah Fix
 
@@ -797,7 +807,7 @@ Status verifikasi pada uji live `6.18.65-android17-6-g39d19ad1a460-rama982-4k`:
 | P3 | CMDQ `vote mminfra`: verifikasi di device | **Selesai (PASS di `6.18.65`)** — `0` `vote mminfra on err` |
 | P3 | `trans_sched`/`fpsgo` wrapper: skip | **Skip** — stub tidak memberi fungsi; full RE terlalu besar |
 | P3 | TEE/Widevine: skip perubahan kernel | **Skip** — bukan regresi 6.18; butuh provisioning vendor |
-| P3 | Error minor | **Rendah** — termasuk `hung_task` idle `hf_manager`/`mml_work1` |
+| P3 | Error minor | **2 bug kernel fixed (`7d92fc24ce41`, `611ad1f`, `112de113630b`)**, lolos 8/8 KMI; **uji boot device belum dilakukan**; 9 item lain di-skip |
 
 ## 9. Batasan dan Catatan
 
