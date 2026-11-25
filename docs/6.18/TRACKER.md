@@ -20,23 +20,23 @@ Diperbarui: 2026-11-25 (UTC)
 
 | Kategori | Status | Tindakan |
 |---|---|---|
-| Oops/panic/RCU stall | **Ada fix, belum diverifikasi** | Ambil log baru setelah semua fix |
-| EMI MPU `SRINFO=3` + RCU stall | **Fixed** oleh commit IOMMU | Verifikasi tidak muncul lagi |
-| ADSP | **Bukan bug; stock DTB disabled** | Pastikan image memakai DTB stock; jangan ubah DT tree |
-| Video VP9 | **Fixed di source, uji device tertunda** | `ac2e63fe0411` menyelaraskan `VDEC_VP8 = 5` (`5..13`) ke VCP stock; build `6.18-lts` 8/8 PASS, uji playback tertunda |
-| DPE `v4l2_fh` | **Fixed di isp_70; uji device tertunda** | `v4l2_fh` ditambahkan; build lolos |
-| CMDQ/GCE + MML | **`vote mminfra` fixed; event/MML historis** | Build lolos; verifikasi device tertunda |
-| Thermal `lvts`/`soc_max` | **Fixed, build lolos; uji device tertunda** | Tabel sensor disamakan dengan stock ko; maintainer sedang di luar |
-| Touch (`gt9916_common` + `adaptive-ts`) | **Fixed, build lolos; uji device tertunda** | Paritas stock untuk 240/360 Hz, dynamic report rate, `/dev/tppolldrv` ioctl, state recovery, dan charger anti-noise |
-| `tranhalconfig` | **Terbuka, userspace** | Service/sepolicy vendor, bukan kernel |
+| Oops/panic/RCU stall | **Terverifikasi PASS di device** | `0` kemunculan `Internal error`/`WARNING: CPU`/RCU stall/`[MIUMPU]srinfo_r 3` di boot `6.18.65` |
+| EMI MPU `SRINFO=3` + RCU stall | **Terverifikasi PASS di device** | `6ebc4934a74a` terkonfirmasi bersih di boot `6.18.65` (`EMIMPU: 0`) |
+| ADSP | **Terverifikasi PASS (stock DTB disabled)** | `0` `adsp_system_bootup fail` & `invalid cid` di `6.18.65`; audio `fs15xx` aktif |
+| Video VP9 | **PASS di device (VP9); VP8/AV1 belum diuji** | 25 sesi `Init Vdec OK bs VP90` (hingga 1080x1920) & VENC 1080p@30fps PASS; sisa uji VP8/AV1 |
+| DPE `v4l2_fh` | **Terverifikasi PASS di device** | `0` `v4l2_open` WARN; `[DPE]DPE open`/`release` bersih di `6.18.65` |
+| CMDQ/GCE + MML | **Terverifikasi PASS di device** | `0` `vote mminfra on err` di boot `6.18.65`; display, kamera, codec, MML normal |
+| Thermal `lvts`/`soc_max` | **Terverifikasi PASS di device** | `0` `Failed to register lvts tz`; 40 zone aktif (`soc_max` `59.5°C` -> `72.6°C`) |
+| Touch (`gt9916_common` + `adaptive-ts`) | **Terverifikasi PASS di device** | Node & `vendor.hardware.trantp-service` aktif, `~352–354 Hz`, charger anti-noise PASS; sisa ukur sleep/wake pada `report_rate_switch=1` |
+| `tranhalconfig` | **Terbuka, userspace** | Masih `222` AVC & `audit_lost: 21` di `6.18.65`; perlu fix service/sepolicy vendor |
 | `fpsgo`/`trans_sched` | **Known limitation; skip di 6.18** | Jangan buat stub palsu; core FPSGO tetap jalan |
-| TEE/Widevine | **Known limitation; sama dengan 6.12 port** | Provisioning/TA, bukan DT atau driver kernel |
-| Error minor | **Rendah** | Catat, tangani setelah prioritas utama |
+| TEE/Widevine | **Known limitation; sama dengan 6.12 port** | Provisioning/TA, bukan DT/driver; `DRM Info` belum dicek ulang di boot `6.18.65` |
+| Error minor | **Rendah** | Tambah catatan `hung_task` idle `hf_manager`/`mml_work1` di `6.18.65` |
 
-Tidak ada `am_crash` atau `am_anr` di logcat yang dianalisis. Yang ada hanya
-`am_wtf`, service lookup lambat, dan proses background mati normal. Semua log
-dibuat **sebelum** fix terakhir, jadi status "fixed" di bawah berarti "ada
-commit yang cocok", bukan "sudah terbukti hilang di boot baru".
+Tidak ada `am_crash` atau `am_anr` di logcat historis yang dianalisis. Pada
+uji live terbaru (`6.18.65-android17-6-g39d19ad1a460-rama982-4k`), seluruh fix
+kernel di atas sudah terverifikasi di perangkat nyata; item yang belum diuji
+atau masih terbuka di userspace ditandai eksplisit pada tiap subbagian.
 
 ## 2. Metode dan Cakupan
 
@@ -83,16 +83,23 @@ Commit `32a2cb4`/`f09133d` hanya membatasi log dan `md_handler`, bukan
 memperbaiki akar masalah. Jadi `pstore` yang menunjukkan `srinfo_r 3` dan
 RCU stall tidak lagi dihitung sebagai isu terbuka.
 
-**Verifikasi yang dibutuhkan:** boot baru setelah semua commit, lalu cek:
+**Hasil verifikasi live (`6.18.65-android17-6-g39d19ad1a460-rama982-4k`):**
+**PASS** — pengecekan `dmesg` sepanjang pengujian kamera, perekaman video,
+decode VP9/H.264, charger replug, dan kontrol touch mencatat **0 kemunculan**
+untuk seluruh pola berikut:
 
 ```text
-Internal error
-WARNING: CPU
-rcu_preempt detected stalls
-[MIUMPU]srinfo_r 3
+Internal error: 0
+WARNING: CPU: 0
+rcu_preempt detected stalls: 0
+[MIUMPU]srinfo_r 3: 0
+EMIMPU: 0
 ```
 
-Kalau semuanya tidak muncul, tabel crash bisa ditutup.
+Selain itu, jalur `mtk-aie-5.3 15310000.aie` menutup stream dengan bersih
+(`STREAM STOP` dan `[mtk_aie_hw_disconnect] stream_count:0 map_count0`)
+tanpa Oops `mtk_aie_s_fmt_out_mp` (`96f4120`). Tabel crash di atas resmi
+**ditutup**.
 
 ## 4. ADSP: Stock DTB Disabled, DT Tree Tidak Dipakai
 
@@ -137,9 +144,9 @@ Catatan: card `snd-audio-dsp` juga ada di DT stock. Jadi error ASoC DSP bisa
 saja masih muncul jika userspace tetap membuka PCM DSP. Itu bukan alasan
 untuk mengaktifkan ADSP.
 
-**Verifikasi:** pada boot dengan DTB stock, `adsp_system_bootup fail` dan
-`invalid cid` tidak muncul; audio speaker/earpiece, kabel, dan Bluetooth
-tetap berfungsi.
+**Hasil verifikasi live (`6.18.65-android17-6-g39d19ad1a460-rama982-4k`):**
+**PASS** — `adsp_system_bootup fail: 0` dan `invalid cid: 0` di `dmesg`; audio
+`fs15xx` (`6-0034`/`6-0035`) dan perangkat audio tetap aktif.
 
 ## 5. Temuan Non-Crash dan Rencana Fix
 
@@ -179,8 +186,9 @@ mtk_vdec_g_v_ctrl: Error!! Cannot get param                (7x)
   memperkecil `VDEC_VENC_MAX` menjadi `8`, sehingga `mtk_dec_tput_init()`
   selalu gagal memuat 12 entri `max-op-rate-table` dan `throughput-table`
   dari DTB stock. Diperbaiki oleh commit `a719a23cee6d` dengan memulihkan
-  `VDEC_VENC_MAX = 20` tanpa mengubah ID `VENC_H264..VENC_H263` (build dan
-  uji perangkat belum dijalankan).
+  `VDEC_VENC_MAX = 20` tanpa mengubah ID `VENC_H264..VENC_H263` (sudah
+  termasuk dalam build `6.18-lts` dan lolos uji live di `6.18.65` dengan
+  `0` error `tput`/`max-op-rate`).
 
 - Uji live V4L2 M2M pada `/dev/video3` di profil `6.18-lts` mengonfirmasi
   H.264 dan HEVC 720×1280 (`mtk_mm` DMA-BUF) **PASS** (`Init Vdec OK`,
@@ -209,15 +217,40 @@ mtk_vdec_g_v_ctrl: Error!! Cannot get param                (7x)
 **Verifikasi:**
 
 - Disassembly `vcp_dec_ipi_handler` pada `mtk-vcodec-dec.ko` build `6.18-lts`
-  (`6.18.64-android17-6-gf047eec1d614-ramabondanp-4k`, KMI 6) memastikan ID
-  decoder `1..3`, `5..13` (VP8=`5`, VP9=`6`, AV1=`13`) sudah cocok dengan
-  stock. Repack `vendor_boot.img` (`bd9cf453357e180592f0b0186a1068c6`),
-  `vendor_dlkm.img` (`c511541ba00a2aa39c20f2b8d3989f59`), dan `odm_dlkm.img`
-  (`f0555ff67a8407959eb2dfb10cf1bf21`) lulus **8/8** `verify-kmi-abi.py`
-  (0 mismatch ABI dari 9.843 simbol).
-- **Uji device (tertunda):** flash set image `6.18-lts` terbaru, lalu uji
-  decode VP9, VP8, AV1, dan playback Facebook Story. Setelah playback VP9
-  lulus, perbarui status video di README dan dokumen status.
+  memastikan ID decoder `1..3`, `5..13` (VP8=`5`, VP9=`6`, AV1=`13`) cocok
+  dengan stock. Build penuh `6.18.65-android17-6-g39d19ad1a460-rama982-4k`
+  lulus **8/8** `verify-kmi-abi.py` (487 modul runtime, `9.843` simbol ABI,
+  0 mismatch/unresolved) dengan set 5 image:
+  - `boot-lz4.img`: `b62605570ef07c9ffe5a7fe4aaf1040d`
+  - `system_dlkm.flatten.erofs.img`: `8857cbd0d7de0bbaf087cbe80e0253ec`
+  - `vendor_boot.img`: `ea13b6dfe2de10b20f8a046d40c429f3`
+  - `vendor_dlkm.img`: `c7aa223e09de1b1b50545edcb1fc0a08`
+  - `odm_dlkm.img`: `773a5910abfac89c2dbd4fcf7bd74613`
+- **Hasil verifikasi live di perangkat (`6.18.65`) — VP9 PASS:**
+  - `check_codec_id ipi id 6 svp 0 is correct`: **25x** (`0` penolakan).
+  - `Init Vdec OK bs VP90`: **25 sesi** (`360x640`, `540x960`, `720x1280`,
+    hingga `1080x1920` `M2CS`), DVFS adaptif aktif (`update adaptive op 0 -> 31`),
+    dan progres frame (`decoded_cnt:77 -> 138`).
+  - `0` error `B001`, `MTK_V4L2_ERR`, `VP9 header rejected`, `tput`, maupun
+    `max-op-rate`.
+  - Video encoder (`mtk-vcodec-enc`) juga **PASS** pada rekaman `1920x1080`
+    30 fps (`vb2ops_venc_start_streaming(): fmt 0x6, P/L 4/11, w/h 1920/1080, buf 1920/1080, fps/bps 30/20000000(0)`
+    -> `vidioc_encoder_cmd=1` -> `vb2ops_venc_stop_streaming` -> `fops_vcodec_release`,
+    `0` `MTK_V4L2_ERR`).
+
+```text
+[  218.137319] check_codec_id ipi id 6 svp 0 is correct
+[  218.137595] [MTK_V4L2] level=0 vdec_vcp_init(),1409: [82] VP90(1) Decoder Instance >> 000000005d094521, ap_inst_addr ffffff8074300010
+[  218.142513] [MTK_V4L2] level=0 vb2ops_vdec_buf_queue(),3976: [82] Init Vdec OK bs VP90 fm M21S, wxh=384x640 pic wxh=360x640 bitdepth:8 lo:0 sz[0]=0x5a000 sz[1]=0x0 num_planes 1, fb_sz[0] 368640, fb_sz[1] 0, BS
+[  219.760312] [MTK_V4L2_DVFS_QOS] mtk_vdec_dvfs_monitor_op_rate(),910: [VDVFS][VDEC][ADAPTIVE][82] update adaptive op 0 -> 31
+[  220.162814] [MTK_V4L2_DVFS_QOS] mtk_vdec_check_alive_work(),2257: [VDVFS] ctx:82, active:1, decoded_cnt:77, last_decoded_cnt:0
+[  222.182291] [MTK_V4L2_DVFS_QOS] mtk_vdec_check_alive_work(),2257: [VDVFS] ctx:82, active:1, decoded_cnt:138, last_decoded_cnt:77
+[  255.658346] [MTK_V4L2] level=0 vb2ops_vdec_buf_queue(),3976: [104] Init Vdec OK bs VP90 fm M2CS, wxh=1088x1920 pic wxh=1080x1920 bitdepth:8 lo:1 sz[0]=0x300140 sz[1]=0x0 num_planes 1, fb_sz[0] 3146048, fb_sz[1] 0, BS
+```
+
+- **Belum diuji:** playback **VP8** dan **AV1** (`c2.mtk.av1.decoder`
+  terdaftar di `dumpsys media.player`, tetapi playback keduanya belum
+  dijalankan pada sesi uji ini).
 
 ### 5.2 DPE `v4l2_fh` — fixed di isp_70
 
@@ -254,8 +287,18 @@ char device `/dev/DPE`.
 `vendor_dlkm.img` baru md5 `86fd65af151a1e813d132c5915686285` sudah
 memuat module ini.
 
-**Verifikasi device (tertunda):** boot baru harus tidak lagi mencetak
-`v4l2_open` WARN; kamera dan playback codec tetap berjalan.
+**Hasil verifikasi live (`6.18.65-android17-6-g39d19ad1a460-rama982-4k`):**
+**PASS** — `0` kemunculan `v4l2_open` WARN di `dmesg`. Kamera (`mtk-cam` +
+`s5khm6sx_mipi_raw`), flashlight (`ocp81375_v4l2`:
+`[ocp81375_get_hw_fault] flag1_0x0A=0 flag2_0x0B =0 enableregval=0`), DPE,
+dan playback/rekam codec berjalan normal:
+
+```text
+[DPE]DPE open g_u4EnableClockCount: 1
+[DPE]- X. Ret: 0. UserCount: 1.
+[DPE]DPE release g_u4EnableClockCount: 0
+S5KHM6SX[s5khm6sx_feedback_awbgain] set_awbgain: r_gain = 0x6fa b_gain = 0x5f2 sensor mode = 5
+```
 
 ### 5.3 CMDQ/GCE dan MML — `vote mminfra` fixed; sisanya historis
 
@@ -297,8 +340,9 @@ mengandung pemeriksaan sign bit (`ret < 0`). `vendor_boot.img` baru
 md5 `bcf3801494067a5d1cca578cdf3174c5` dan `vendor_dlkm.img` md5
 `86fd65af151a1e813d132c5915686285` sudah memuatnya.
 
-**Verifikasi device (tertunda):** boot baru tidak lagi mencetak
-`vote mminfra on err:1`; display, codec, dan MML tetap berjalan.
+**Hasil verifikasi live (`6.18.65-android17-6-g39d19ad1a460-rama982-4k`):**
+**PASS** — `0` kemunculan `vote mminfra on err` di `dmesg`; display, kamera,
+codec, dan MML berjalan normal.
 
 **Artefak gabungan thermal + DPE + CMDQ:**
 
@@ -403,15 +447,22 @@ DTBO.
 valid dan berubah saat beban naik; tidak ada error `soc_max` berulang dari
 `thermal_interface`.
 
-**Status implementasi:** fix sudah masuk commit
-`cbabf0ea8c34` (`thermal: mediatek: Align MT6895 LVTS sensor map with
-stock DTB`). Build 6.18 berhasil, dan tabel `mt6895_tc_settings` di
-`soc_temp_lvts.ko` hasil build sudah cocok dengan stock: 25 sensor, map
-berakhir di id 24, sehingga driver mendaftarkan zone id 1..25. Image
-`vendor_dlkm` sudah direpack dengan 209 modul. Belum diuji boot di device;
-pengujian runtime ditunda karena maintainer sedang di luar. Image gabungan
-terbaru di §5.3 (md5 `86fd65af151a1e813d132c5915686285`) juga memuat fix
-ini.
+**Hasil verifikasi live (`6.18.65-android17-6-g39d19ad1a460-rama982-4k`):**
+**PASS** — `cbabf0ea8c34` (`thermal: mediatek: Align MT6895 LVTS sensor map
+with stock DTB`) terkonfirmasi aktif di perangkat (`vendor_dlkm.img` md5
+`c7aa223e09de1b1b50545edcb1fc0a08`):
+
+- `Failed to register lvts tz`: **0** kemunculan di `dmesg`.
+- **40 thermal zone** aktif di `/sys/class/thermal/` (seluruh 38 zone base
+  stock termasuk `soc_max`, `cpu_little1..4`, `cpu_big1..6`, `cpu_bigbig1..2`,
+  `gpu1..2`, `apu1..2`, `dram_ch0..3`, `soc_top`, `soc_mm`, `md1..3`, 8 PMIC,
+  3 NTC, `consys`, ditambah `mt6375-gauge` dan `battery`).
+- `soc_max` merespons beban kamera/rekam video secara dinamis: naik dari
+  `59523` (`59.5°C`) menjadi `72562` (`72.6°C`).
+- **Catatan perilaku runtime:** `apu2` mengembalikan `No data available` saat
+  APU idle, dan 4 zone DTBO `camera0..2`, `camera4` tidak didaftarkan oleh
+  `imgsensor` (total zone teramati tetap `40`), sementara kamera tetap
+  berfungsi normal.
 
 ### 5.5 `tranhalconfig` — userspace/sepolicy
 
@@ -439,6 +490,9 @@ service/sepolicy, bukan kernel.
 
 **Verifikasi:** lookup service berhasil, `TranFwkHalClient` tidak
 `No Binder`, dan `audit_lost` tidak muncul.
+
+**Status di boot `6.18.65`:** **masih terbuka (userspace/SELinux)** — `dmesg`
+masih mencatat `222` AVC `tranhalconfig` dan `audit_lost: 21`.
 
 ### 5.6 `fpsgo`/`trans_sched`/`msync2` — module stock yang belum ada di 6.18
 
@@ -574,6 +628,9 @@ berjalan sesuai level yang tersedia. `gp_read_raw`, `insecure default`,
 dan `drDcihInit` boleh tetap muncul sebagai known limitation selama tidak
 ada crash dan level DRM sesuai kebijakan perangkat.
 
+**Status di boot `6.18.65`:** cek `DRM Info` dan playback DRM **belum
+dijalankan ulang** pada sesi uji terbaru.
+
 ### 5.8 Touch (`gt9916_common` + `adaptive-ts`) — dynamic report rate, `tppolldrv`, dan charger anti-noise
 
 **Gejala:** pergerakan sentuh di port terasa kurang mulus dibandingkan stock
@@ -614,20 +671,42 @@ firmware/config Goodix sudah sama.
 *(Catatan: `fpsgo.ko` dan `trans_sched.ko` tetap menjadi known limitation
 terpisah di 6.18 pada §5.6.)*
 
-**Artefak build & verifikasi KMI/ABI:**
+**Artefak teruji (`6.18.65-android17-6-g39d19ad1a460-rama982-4k`):**
+lihat MD5 set 5 image pada §5.1 (lulus 8/8 `verify-kmi-abi.py`, 487 modul
+runtime, `9.843` simbol ABI).
 
-- `verify-kmi-abi.py --kver 6.18`: **8/8 PASS** (487 modul runtime, `9593`
-  simbol `abi.stg`, 0 mismatch/unresolved).
-- `vendor_boot.img` md5 `9191487268513536b9ea5ebf2984dcc6` (221 modul, `dtb`/
-  `bootconfig`/`vendor_ramdisk01` identik dengan base packer)
-- `vendor_dlkm.img` md5 `37fcaa05ac5b210d2a3ee7da8e1eb79a` (209 modul)
-- `odm_dlkm.img` md5 `954b13ad3fc61bbf54675eb1e526d1a5` (57 modul)
+**Hasil verifikasi live (`6.18.65`) — PASS:**
 
-**Verifikasi device (tertunda):** cek keberadaan `/proc/report_rate_switch`,
-`/proc/tp_report_rate_switch`, `/proc/border_suppression`, dan `/dev/tppolldrv`;
-ukur event rate `getevent -lt` saat `report_rate_switch` 0 vs 1 dan sesudah
-sleep/wake; cek log `charger mode in/out` saat colok/cabut charger tanpa
-`failed send charger_cmd`.
+- Seluruh node kontrol aktif dan service `vendor.hardware.trantp-service`
+  berjalan: `/dev/tppolldrv`, `/proc/report_rate_switch`,
+  `/proc/tp_report_rate_switch`, `/proc/border_suppression`.
+- Charger anti-noise + restore pasca-resume **PASS** dengan `0`
+  `failed send charger_cmd` maupun `GTP-ERR`:
+
+```text
+[  491.662382] [GTP-INF][goodix_ts_resume:2067] resume restore charger mode
+[  531.538445] [GTP-INF][mtk_power_misc_psy_event:99] charger mode out
+[  535.334302] [GTP-INF][mtk_power_misc_psy_event:93] charger mode in
+```
+
+- Pengukuran `getevent -lt` pada `mtk-tpd` (`/dev/input/event5`, resolusi 16x
+  `0..17279`):
+  - Baseline awal (`0`): `234` `SYN_REPORT` / `225` interval valid,
+    `median_dt=2.846ms` (`351.4 Hz`), `mean_dt=3.521ms` (`284.0 Hz`)
+  - Setelah `echo 0 > /proc/report_rate_switch`: `223` / `215`,
+    `median_dt=2.839ms` (`352.2 Hz`), `mean_dt=3.264ms` (`306.4 Hz`)
+  - Setelah `echo 1 > /proc/report_rate_switch`: `215` / `207`,
+    `median_dt=2.826ms` (`353.9 Hz`), `mean_dt=3.255ms` (`307.2 Hz`)
+  - `0` error perintah Goodix (`failed send 240hz` / `failed send 360hz` /
+    `GTP-ERR`: `0`); log resume mencatat
+    `[GTP-INF][goodix_report_rate_switch:191] Enter 0 game report rate successful!`.
+  - Nilai `/proc/report_rate_switch` dikembalikan ke `0`.
+- **Belum diuji terpisah:** pengukuran ulang recovery report rate sesudah
+  sleep/wake khususnya pada kondisi `report_rate_switch=1`.
+- **Periferal lain terkonfirmasi aktif pada sesi yang sama:** `aw22xxx_led`
+  (`3-006a`), `fs15xx` (`6-0034`/`6-0035`), `hl7139a` (`1-0055`/`7-0055`),
+  `fuelgauged` (`charge_full=5000000`, `Charging`), `/dev/goodix_fp`,
+  `/dev/aw8697_haptic`, dan `/dev/pn553`.
 
 ## 6. Error Minor/Rendah
 
@@ -643,67 +722,61 @@ sleep/wake; cek log `charger mode in/out` saat colok/cabut charger tanpa
 | `WARNING: CPU ... rcu_note_context_switch`, `Workqueue: ... susfs_guard_lkm` | Modul KernelSU/SUSFS, bukan port kernel |
 | `mtk_emimpu_set_apc: fail, out-of-range domain`, `[SCP] chre memory reserve fail` | Isu SCP CHRE terpisah, bukan EMI violation `SRINFO=3` yang sudah difix |
 | `healthd: battery...Path not found` | Node health/battery tidak ada di DT; sebagian kosmetik |
+| `INFO: task hf_manager:788 blocked for more than 307 seconds.` / `INFO: task mml_work1:8470 blocked for more than 307 seconds.` | Pesan `hung_task` berkala (~61 s) di `6.18.65` pada kthread MTK idle di `TASK_UNINTERRUPTIBLE` (`kthread+0xb0/0x294`); non-fatal |
 
 ## 7. Verifikasi Setelah Fix
 
-Urutan verifikasi yang disarankan:
+Status verifikasi pada uji live `6.18.65-android17-6-g39d19ad1a460-rama982-4k`:
 
-1. Build dan flash dengan DTB/DTBO stock. Repack `vendor_boot` harus
-   mempertahankan `dtb` byte-identical dengan stock; jangan memakai DTB
-   hasil build tree. `dtbo.img` juga tetap stock.
-2. Boot normal, ambil `dmesg`, `pstore`, dan `logcat` baru.
-3. Cek tidak ada:
-
-   ```text
-   Internal error
-   WARNING: CPU
-   rcu_preempt detected stalls
-   [MIUMPU]srinfo_r 3
-   adsp_system_bootup fail
-   invalid cid
-   ```
-
-4. Cek video VP9: tidak ada `VP9 header rejected`, `unsupported (-1,-1)`,
-   atau `QBUF after unrecoverable error`.
-5. Cek warning `v4l2_open` sudah hilang dan tidak ada
-   `vote mminfra on err:1`; pastikan kamera, playback codec, dan MML
-   tetap berjalan.
-6. Cek `/sys/class/thermal`: jumlah zone sesuai stock (38 base + 4 camera),
-   `soc_max` ada, suhu valid, dan tidak ada `Failed to register lvts tz 26`.
-7. Cek service `tranhalconfig` ditemukan; tidak ada `audit_lost`.
-8. Cek tidak ada crash dari `trans_sched`/`fpsgo`. Log
-   `trans sched don't support!` diterima sebagai known limitation 6.18;
-   `msync2` juga tidak ada di stock.
-9. Cek level Widevine dengan `DRM Info`, lalu jalankan playback DRM.
-   `gp_read_raw`, `insecure default`, dan `drDcihInit` diterima sebagai
-   known limitation 6.18; yang penting tidak ada crash dan level DRM
-   sesuai kebijakan perangkat.
-10. Cek touch GT9916: node `/proc/report_rate_switch`,
-    `/proc/tp_report_rate_switch`, `/proc/border_suppression`, dan
-    `/dev/tppolldrv` ada; sampling rate `getevent -lt` naik saat 360 Hz dan
-    tetap pulih setelah resume; log `charger mode in/out` muncul saat
-    charging tanpa `failed send charger_cmd`.
+1. Build dan flash dengan DTB/DTBO stock (`dtb` byte-identical, `dtbo.img`
+   stock) — **PASS**.
+2. Boot normal dan periksa log kernel (`dmesg`) — **PASS**.
+3. Tidak ada `Internal error`, `WARNING: CPU`, `rcu_preempt detected stalls`,
+   `[MIUMPU]srinfo_r 3`, `adsp_system_bootup fail`, maupun `invalid cid` — **PASS**
+   (semuanya `0` kemunculan).
+4. Video VP9: `25` sesi `Init Vdec OK bs VP90`, `0` `VP9 header rejected`,
+   `unsupported (-1,-1)`, atau `QBUF after unrecoverable error` — **PASS**
+   (**VP8 dan AV1 belum diuji**).
+5. Tidak ada `v4l2_open` WARN (`0`) dan `vote mminfra on err:1` (`0`); kamera,
+   AIE, flashlight, encoder 1080p@30fps, codec, dan MML berjalan — **PASS**.
+6. `/sys/class/thermal`: `40` zone aktif (38 base stock + `mt6375-gauge` +
+   `battery`), `soc_max` valid dan responsif (`59.5°C` -> `72.6°C`), `0`
+   `Failed to register lvts tz` — **PASS** (catatan: `apu2` `No data available`
+   saat idle, `camera0..4` belum didaftarkan `imgsensor`).
+7. Service `tranhalconfig` — **masih terbuka (userspace/SELinux)**: `222`
+   AVC dan `audit_lost: 21`.
+8. Tidak ada crash dari `trans_sched`/`fpsgo`; `mtk_fpsgo_v8.ko` tetap
+   terpasang — **PASS** (known limitation 6.18).
+9. Cek level Widevine dengan `DRM Info` & playback DRM — **belum dicek ulang**
+   pada boot `6.18.65`.
+10. Touch GT9916: 4 node kontrol + `vendor.hardware.trantp-service` aktif,
+    `getevent -lt` terukur `~352–354 Hz`, `charger mode in/out` & `resume restore charger mode`
+    tanpa `failed send charger_cmd` — **PASS** (recovery pasca sleep/wake
+    pada `report_rate_switch=1` **belum diukur terpisah**).
 
 ## 8. Urutan Kerja yang Disarankan
 
-| Prioritas | Pekerjaan | Alasan |
+| Prioritas | Pekerjaan | Status / Alasan |
 |---|---|---|
-| P0 | Verifikasi crash/EMI pasca-fix dengan log baru | Memastikan 7 Oops + RCU stall benar-benar hilang |
-| P0 | Video VP9 | Isu user-facing yang masih terbuka |
-| P1 | Pastikan DTB/DTBO stock yang dipakai, bukan DT tree | ADSP dan node disabled lain tidak relevan untuk DT tree |
-| P1 | Thermal LVTS: verifikasi fix di device | Tabel sensor sudah disamakan dengan stock ko; build lolos |
-| P1 | `tranhalconfig` | Log storm, audit loss, dan lookup lambat |
-| P1 | DPE `v4l2_fh`: verifikasi fix isp_70 di device | Build lolos; warning seharusnya hilang |
-| P1 | Touch GT9916 (`adaptive-ts` + `gt9916_common`): verifikasi di device | Build + 8/8 KMI lolos; `odm_dlkm` + `vendor_boot` direpack |
-| P3 | CMDQ `vote mminfra`: verifikasi di device | Fix false-positive; event/MML historis |
-| P3 | `trans_sched`/`fpsgo` wrapper: skip | Stub tidak memberi fungsi; full RE terlalu besar |
-| P3 | TEE/Widevine: skip perubahan kernel | Bukan regresi 6.18; butuh provisioning vendor |
-| P3 | Error minor | Bersihkan setelah prioritas utama selesai |
+| P0 | Verifikasi crash/EMI pasca-fix dengan log baru | **Selesai (PASS di `6.18.65`)** — 7 Oops + RCU stall + EMI `0` kemunculan |
+| P0 | Video VP9 | **VP9 PASS di `6.18.65`**; sisa uji playback VP8 & AV1 |
+| P1 | Pastikan DTB/DTBO stock yang dipakai, bukan DT tree | **Selesai (PASS di `6.18.65`)** — ADSP `disabled` sesuai stock |
+| P1 | Thermal LVTS: verifikasi fix di device | **Selesai (PASS di `6.18.65`)** — 40 zone aktif, `soc_max` responsif |
+| P1 | `tranhalconfig` | **Terbuka (userspace)** — `222` AVC & `audit_lost: 21`, perlu fix vendor/sepolicy |
+| P1 | DPE `v4l2_fh`: verifikasi fix isp_70 di device | **Selesai (PASS di `6.18.65`)** — `0` `v4l2_open` WARN |
+| P1 | Touch GT9916 (`adaptive-ts` + `gt9916_common`) | **PASS di `6.18.65`**; sisa ukur recovery sleep/wake pada `report_rate_switch=1` |
+| P2 | Widevine `DRM Info` & playback DRM | **Belum dicek ulang di `6.18.65`** (non-kernel / known limitation) |
+| P3 | CMDQ `vote mminfra`: verifikasi di device | **Selesai (PASS di `6.18.65`)** — `0` `vote mminfra on err` |
+| P3 | `trans_sched`/`fpsgo` wrapper: skip | **Skip** — stub tidak memberi fungsi; full RE terlalu besar |
+| P3 | TEE/Widevine: skip perubahan kernel | **Skip** — bukan regresi 6.18; butuh provisioning vendor |
+| P3 | Error minor | **Rendah** — termasuk `hung_task` idle `hf_manager`/`mml_work1` |
 
 ## 9. Batasan dan Catatan
 
-- Semua log yang dianalisis dibuat sebelum fix terakhir. Belum ada bukti
-  runtime setelah commit.
+- Hasil verifikasi live pada `6.18.65-android17-6-g39d19ad1a460-rama982-4k`
+  sudah menutup temuan crash, ADSP, VP9, DPE, CMDQ, thermal LVTS, dan touch
+  di atas; pengujian yang belum dijalankan (VP8/AV1, `DRM Info`, dan
+  recovery sleep/wake `report_rate_switch=1`) tetap dicatat eksplisit.
 - Dokumen ini tidak mengubah kode. Perubahan tetap harus melalui commit baru
   sesuai aturan commit di `AGENTS.md` (prefix `6.18:` di manifest; format
   kernel dengan akhiran `for 6.18` di repo kernel/vendor bila khusus 6.18).

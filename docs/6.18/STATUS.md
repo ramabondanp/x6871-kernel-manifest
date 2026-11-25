@@ -10,29 +10,38 @@ Diperbarui: 2026-11-25 (UTC)
 > - Syarat SELinux `firmware_load` untuk boot sistem 6.18: [`SELINUX-6.18.md`](../guides/SELINUX-6.18.md)
 > - Kronologi bringup `test1`–`test13` dan analisa yang sudah ditutup: [`BRINGUP-LOG.md`](../archive/6.18/BRINGUP-LOG.md)
 >
-> Per 2026-11-25: akar masalah penolakan VP9/VP8 teridentifikasi via uji
-> live di perangkat `6.18-lts` dan disassembly stock SP20 — `enum mtk_codec_type`
-> melewati slot `4` di VCP sehingga `VDEC_VP8..VDEC_AV1` bergeser `-1`;
-> commit `ac2e63fe0411` (`VDEC_VP8 = 5`) di-build di profil `6.18-lts`
-> (`6.18.64`, KMI 6) dan lolos 8/8 `verify-kmi-abi.py` (`vendor_dlkm.img`
-> md5 `c511541ba00a2aa39c20f2b8d3989f59`), tinggal flash dan uji playback di
-> perangkat.
+> Per 2026-11-25 (uji live di X6871, `6.18-lts` `6.18.65-android17-6-g39d19ad1a460-rama982-4k`):
+> set 5 image profil `android17-6.18-lts` (`4cc5bb220b50` + patch
+> `39d19ad1a460` untuk `blk_plug_invalidate_ts`, KMI 6, build GKI lokal)
+> sudah dibuild, lolos 8/8 `verify-kmi-abi.py` (487 modul runtime, `9.843`
+> simbol ABI; `495` modul termuat di perangkat), dan lulus uji runtime di
+> perangkat (`boot-lz4.img` md5 `b62605570ef07c9ffe5a7fe4aaf1040d`,
+> `system_dlkm.flatten.erofs.img` `8857cbd0d7de0bbaf087cbe80e0253ec`,
+> `vendor_boot.img` `ea13b6dfe2de10b20f8a046d40c429f3`, `vendor_dlkm.img`
+> `c7aa223e09de1b1b50545edcb1fc0a08`, `odm_dlkm.img`
+> `773a5910abfac89c2dbd4fcf7bd74613`):
+> - **Crash / EMI / ADSP:** `0` kemunculan `Internal error`, `WARNING: CPU`,
+>   `rcu_preempt detected stalls`, `[MIUMPU]srinfo_r 3`, `EMIMPU`,
+>   `adsp_system_bootup fail`, `invalid cid`, maupun `Failed to register lvts tz`.
+> - **Video & kamera:** VP9 **PASS** (25x `check_codec_id ipi id 6 svp 0 is correct`,
+>   25 sesi `Init Vdec OK bs VP90` 360x640 s.d. 1080x1920, `0` error),
+>   H.264/VENC 1080p@30fps **PASS**, kamera (`s5khm6sx_mipi_raw`), AIE
+>   (`96f4120`), flashlight (`ocp81375_v4l2`), DPE `v4l2_fh` (`b83dca0`), dan
+>   CMDQ `vote mminfra` (`a71cfd2`) **PASS**.
+> - **Thermal LVTS & Touch:** `40` thermal zone aktif (`soc_max` merespons
+>   beban `59.5°C` -> `72.6°C`); GT9916 + `adaptive-ts` aktif (`~352–354 Hz`,
+>   `charger mode in/out`, `resume restore charger mode`, `0` error kirim).
+> - **Belum diuji / terbuka:** playback VP8 & AV1, cek level Widevine via
+>   `DRM Info` + playback DRM, dan pengukuran terpisah recovery report rate
+>   pasca sleep/wake pada `report_rate_switch=1`; isu tersisa: `tranhalconfig`
+>   userspace (`222` AVC, `audit_lost: 21`) serta pesan minor `hung_task`
+>   berkala pada kthread MTK idle (`hf_manager`, `mml_work1`).
 >
-> Per 2026-11-24: fix thermal LVTS, DPE `v4l2_fh`, CMDQ `vote mminfra`,
-> pemulihan `VDEC_VENC_MAX`, serta kontrol report rate & mode touch
-> (`adaptive-ts` + `gt9916_common`: `004169f83006`, `92c5a6f9d3f3`,
-> `80f4abf529e2`) sudah di-commit, dibuild, dan lolos 8/8 `verify-kmi-abi.py`;
-> uji runtime di device tertunda karena maintainer sedang di luar.
->
-> Profil uji opsional `android17-6.18-lts` (`6.18.65`, `4cc5bb220b50`, KMI 6,
-> build GKI lokal) tersedia lewat `local_manifest-6.18-lts.xml` (lihat
-> [`BUILD.md`](../guides/BUILD.md#profil-uji-618-lts-android17-618-lts-61865-kmi-6-build-gki-lokal)):
-> seluruh 487 modul + GKI lokal (`6.18.65-android17-6-g39d19ad1a460-rama982-4k`,
-> `9.843` simbol ABI) lulus 8/8 `verify-kmi-abi.py`; patch SHA-gated
-> `patches/common-6.18-blk-plug-invalidate-ts.patch` tetap diterapkan (`39d19ad1a460`)
-> setelah sebelumnya terkonfirmasi pada `6.18.64` menghilangkan panic
-> `blk_finish_plug`/`blk_plug_invalidate_ts` (uji runtime `6.18.65` di perangkat
-> belum dijalankan).
+> Profil uji opsional `android17-6.18-lts` tersedia lewat
+> `local_manifest-6.18-lts.xml` (lihat
+> [`BUILD.md`](../guides/BUILD.md#profil-uji-618-lts-android17-618-lts-61865-kmi-6-build-gki-lokal));
+> patch SHA-gated `patches/common-6.18-blk-plug-invalidate-ts.patch` tetap
+> diterapkan (`39d19ad1a460`).
 
 ## Ringkasan Fase
 
@@ -54,14 +63,14 @@ Diperbarui: 2026-11-25 (UTC)
 | Boot Android + SELinux `firmware_load` | **PASS di device** | Wajib patch `plat_sepolicy.cil` / `vendor_sepolicy.cil` / `vendor_file_contexts` ([SELINUX-6.18.md](../guides/SELINUX-6.18.md)) |
 | Wi-Fi & Bluetooth (`conninfra`) | **PASS di device** | Berfungsi setelah allow `connsys_vendor_file` (`firmware_load`) |
 | Audio (`mt6895-mt6368`, FS1599) | **PASS di device** | Fix 17 link DPCM dua arah di `mt6895-mt6368.c`; speaker & amplifier aktif |
-| Touch (`gt9916_common` + `adaptive-ts`) | **Fixed di source, uji device tertunda** | Tambah dynamic report rate 240/360 Hz, `/proc/report_rate_switch`, `/proc/tp_report_rate_switch`, `/proc/border_suppression`, `/dev/tppolldrv` ioctl, state recovery pasca-resume, dan charger anti-noise notifier (`004169f83006`..`80f4abf529e2`); `vendor_boot` + `odm_dlkm` direpack |
-| APU IOMMU + MIUMPU/RCU stall | **Fixed, verifikasi log baru tertunda** | `mtk_iommu_hw_program()` saat resume RCX (`6ebc4934a74a`) + hook stage-1 |
-| Video V4L2/H.264/JPEG (`priv == NULL` & `q_run_work`) | **Fixed, uji lanjut tertunda** | `file->private_data` (`050d89c`/`41f442c`/`29ba44c`) + workqueue vdec OPPO (`31781fa`) |
-| Thermal LVTS (`soc_temp_lvts`) | **Fixed di source, uji device tertunda** | Tabel sensor diselaraskan ke 25 sensor stock (`cbabf0ea8c34`); `vendor_dlkm` direpack |
-| DPE `v4l2_fh` & CMDQ `vote mminfra` | **Fixed di source, uji device tertunda** | `b83dca0` (`isp_70/camera_dpe.c`) & `a71cfd2` (`ret < 0`); `vendor_boot` + `vendor_dlkm` direpack |
-| Video VP9 (Facebook Story) | **Fixed di source, uji device tertunda** | `7c48ebd` di-revert (`213a184315ef`); `VDEC_VENC_MAX=20` dipulihkan (`a719a23cee6d`); `ac2e63fe0411` menyelaraskan `VDEC_VP8 = 5` (`5..13`) dengan firmware VCP; build `6.18-lts` lolos 8/8 `verify-kmi-abi.py` (`vendor_dlkm.img` direpack) |
-| `tranhalconfig` | **Terbuka (userspace)** | Service/sepolicy vendor belum aktif, menyebabkan `audit_lost` |
-| ADSP / `fpsgo`/`trans_sched` / TEE Widevine | **Known limitation / skip** | ADSP disabled di DTB stock; `trans_sched`/`fpsgo` wrapper tanpa source; TEE/L1 isu provisioning |
+| Touch (`gt9916_common` + `adaptive-ts`) | **PASS di device** | `~352–354 Hz` (`getevent -lt`), `/proc/report_rate_switch`, `/proc/tp_report_rate_switch`, `/proc/border_suppression`, `/dev/tppolldrv`, `vendor.hardware.trantp-service`, dan `charger mode in/out` + `resume restore charger mode` PASS (`004169f83006`..`80f4abf529e2`, `0` error kirim); recovery sleep/wake pada `report_rate_switch=1` belum diukur terpisah |
+| APU IOMMU + MIUMPU/RCU stall | **PASS di device** | `mtk_iommu_hw_program()` saat resume RCX (`6ebc4934a74a`) + hook stage-1; `0` `[MIUMPU]srinfo_r 3`, `EMIMPU`, maupun RCU stall di `6.18.65` |
+| Video V4L2/H.264/VENC, Kamera & AIE | **PASS di device** | `priv == NULL` (`050d89c`/`41f442c`/`29ba44c`), AIE `96f4120` (`STREAM STOP` bersih), kamera `s5khm6sx_mipi_raw`, flashlight `ocp81375_v4l2`, dan VENC `1920x1080@30fps` PASS (`0` Oops/`MTK_V4L2_ERR`) |
+| Thermal LVTS (`soc_temp_lvts`) | **PASS di device** | Tabel 25 sensor stock (`cbabf0ea8c34`); `0` `Failed to register lvts tz`, `40` thermal zone aktif (`soc_max` `59.5°C` -> `72.6°C`; `apu2` `No data available` saat idle; `camera0..4` belum didaftarkan `imgsensor`) |
+| DPE `v4l2_fh` & CMDQ `vote mminfra` | **PASS di device** | `b83dca0` (`0` `v4l2_open` WARN, `[DPE]DPE open`/`release` bersih) & `a71cfd2` (`0` `vote mminfra on err`) |
+| Video VP9 | **PASS di device (VP9); VP8/AV1 belum diuji** | `213a184315ef` + `a719a23cee6d` + `ac2e63fe0411` (`VDEC_VP8 = 5`); `25x` `check_codec_id ipi id 6 svp 0 is correct`, `25` sesi `Init Vdec OK bs VP90` s.d. `1080x1920`, `0` error; playback VP8 & AV1 belum diuji |
+| `tranhalconfig` | **Terbuka (userspace)** | Service/sepolicy vendor belum aktif (`222` AVC di `dmesg`, `audit_lost: 21`) |
+| ADSP / `fpsgo`/`trans_sched` / TEE Widevine | **Known limitation / skip** | ADSP disabled di DTB stock (`0` `adsp_system_bootup fail`/`invalid cid`); `trans_sched`/`fpsgo` wrapper tanpa source; TEE/L1 isu provisioning (`DRM Info` belum dicek ulang di `6.18.65`) |
 
 Rincian langkah verifikasi dan prioritas P0–P3 ada di [`TRACKER.md`](TRACKER.md).
 
