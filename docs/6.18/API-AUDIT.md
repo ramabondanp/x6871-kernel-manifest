@@ -7,7 +7,7 @@ Diperbarui: 2026-11-25
 Dokumen ini mencatat pemeriksaan perubahan API Linux 6.13–6.18 yang
 **tidak tertangkap compiler** (perubahan semantik, bukan rename atau
 perubahan signature). Audit dilakukan tanpa hardware, memakai hasil build
-6.12 (`out_bazel_kmi7`) dan 6.18 (`out_bazel_test`).
+6.12 dan 6.18.
 
 ## Metode
 

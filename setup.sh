@@ -11,7 +11,7 @@
 #   3. symlink 13 module donor OPPO mt6896 (hanya bila workspace split legacy)
 #   4. symlink ../vendor/mediatek (mgk_repo pakai path="../vendor/mediatek")
 #   5. hapus label //vendor/... yang tidak tersedia dari mgk_64.bzl (bila masih ada)
-#   6. patch Kleaf/MGK sesuai profil (multi-abi KMI 7 atau 6.18)
+#   6. patch Kleaf/MGK sesuai profil (6.18)
 set -e
 
 die() { echo "ERROR: $*" >&2; exit 1; }
@@ -165,20 +165,6 @@ if [ "$KVER" = "6.18" ]; then
       -c user.name="Rama Bondan Prakoso" -c user.email="ramanarubp@gmail.com" \
       am --committer-date-is-author-date "$COMMON_LTS_PATCH"
     echo 'common: patch blk_plug_invalidate_ts terpasang (git am)'
-  fi
-else
-  # GKI 14d405822690 memuat target ABI yang belum tersedia di Kleaf Motorola.
-  # Backport hanya rule build; jangan mengubah kernel-6.12.
-  if [ "$(git -C kernel-6.12 rev-parse HEAD 2>/dev/null)" = 14d40582269013a9bc6df12b2479da18f27e3d33 ]; then
-    KLEAF_PATCH=$HERE/patches/kleaf-multi-abi-update.patch
-    if git -C build/kernel apply --reverse --check "$KLEAF_PATCH" 2>/dev/null; then
-      echo 'Kleaf: backport multi_abi_update sudah terpasang'
-    elif git -C build/kernel apply --check "$KLEAF_PATCH"; then
-      git -C build/kernel apply "$KLEAF_PATCH"
-      echo 'Kleaf: backport multi_abi_update terpasang'
-    else
-      die 'backport multi_abi_update tidak dapat diterapkan; cek revisi dan perubahan lokal build/kernel'
-    fi
   fi
 fi
 

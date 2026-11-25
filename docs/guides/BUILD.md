@@ -260,61 +260,6 @@ direktori kerja tidak berada di `out/` di sebelah workspace (default `~/out`).
 5. Jalankan `./tools/verify-kmi-abi.py` dengan `--out-dir` dan direktori modul hasil repack yang eksplisit. Wajib lulus semua pemeriksaan dan cocokkan CRC ekspor dengan `vmlinux.symvers` serta `system_dlkm.erofs.img` dari CI yang sama.
 6. Setelah validasi lulus, pin tag atau SHA yang persis sama di `local_manifest.xml`. Untuk uji perangkat, pasangkan ketiga image modul baru dengan `boot-lz4.img` + `system_dlkm.erofs.img` CI tersebut. Jangan campur generasi KMI.
 
-#### Profil uji KMI 7 — Google CI `16987858`
-
-Default `local_manifest.xml` tetap di KMI 6. Profil uji memakai revisi
-`kernel/common` **`14d40582269013a9bc6df12b2479da18f27e3d33`**
-dari [Google CI `16987858`, target `kernel_aarch64`](https://ci.android.com/builds/submitted/16987858/kernel_aarch64/latest)
-(`6.12.96`, KMI 7, 4 KB); ini bukan tag `android16-6.12-2026-09_r17`,
-yang masih KMI 6. Siapkan workspace terpisah sesuai README dan jalankan
-perintah berikut dari root workspace, setelah overlay utama `x6871.xml`
-terpasang:
-
-```bash
-manifest="$HOME/x6871-kernel-manifest"
-cp "$manifest/local_manifest-kmi7.xml" .repo/local_manifests/zz-x6871-kmi7.xml
-repo sync
-"$manifest/setup.sh"
-OUT_DIR="$PWD/out_bazel_kmi7" "$manifest/build.sh" user
-```
-
-`setup.sh` memasang backport `multi_abi_update` di Kleaf Motorola tanpa
-memodifikasi checkout GKI. Isi `boot-lz4.img` harus melaporkan
-`6.12.96-android16-7-g14d405822690-ab16987858-4k`; jangan pakai
-`boot-lz4.img` atau `system_dlkm.erofs.img` dari rilis KMI 6.
-
-Untuk kembali ke KMI 6 di perangkat, pulihkan kelima image sebagai satu
-set (boot, system DLKM, dan ketiga image modul). Lihat
-[prosedur rollback](FLASH-AND-TEST.md#3-flash-dan-rollback).
-
-Peta CRC `abi.stg` dari revisi tersebut cocok dengan artefak CI (10.704
-simbol). Semua 488 modul di pre-release konfigurasi KMI 6 memiliki CRC
-impor yang berbeda terhadap KMI 7, sehingga ketiga image modul perlu
-dibangun ulang. Rebuild MT6895 `user` (`0fba8e7` / `83b4fa6`) berhasil.
-Ketiga image hasil repack berisi 488 modul (`222` vendor_boot, `209`
-vendor_dlkm, `57` odm_dlkm); semuanya lulus delapan pemeriksaan KMI/ABI.
-Semua CRC untuk 2.657 simbol impor unik dari GKI cocok dengan ekspor
-`vmlinux.symvers` dan modul `system_dlkm` CI. Kedua AVB hashtree DLKM
-juga lulus verifikasi. Ketiga image tersedia di
-[GitHub Pre-release `gki-kmi7-16987858`](https://github.com/ramabondanp/x6871-kernel-manifest/releases/tag/gki-kmi7-16987858).
-Maintainer melaporkan bahwa pre-release KMI 7 ini sudah diuji langsung
-di X6871. Hasil uji berikut berasal dari build lanjutan, bukan dari
-artefak pre-release di atas:
-
-- [OTP kamera](../archive/6.12/PRETEST.md#69-uji-kamera-dengan-port-otp--kmi-7): kamera
-  dilaporkan normal, tetapi penggunaan data OTP oleh HAL belum terverifikasi.
-- [Fuel gauge MT6375](../archive/6.12/PRETEST.md#70-uji-fuel-gauge-mt6375--kmi-7): profil 3
-  dan `charge_full` 5.000.000 µAh terbaca; `fuelgauged` stock aktif dan UI
-  naik dari 78% ke 81%. Uji sampai `DONE` masih pending.
-- [LED AW22XXX](../archive/6.12/PRETEST.md#71-uji-probe-aw22xxx--kmi-7): probe dilaporkan
-  berhasil setelah koreksi GPIO interrupt. Efek LED belum diuji.
-
-Saat repack, ambil `--staging` secara eksplisit dari `out_bazel_kmi7/`,
-bukan dari keluaran default `out_bazel/`. Pakai `--out-dir
-"$PWD/out_bazel_kmi7"` pada verifier bila dijalankan dari root workspace.
-`pretimeout_dump.ko` ditambahkan oleh GKI KMI 7 dan sudah tersedia di
-`system_dlkm.erofs.img` Google; tidak perlu disalin ke image modul X6871.
-
 #### Profil uji `6.18-lts` (`android17-6.18-lts`, `6.18.65`, KMI 6, build GKI lokal)
 
 Default `local_manifest-6.18.xml` tetap pada tag pure-GKI

@@ -10,7 +10,7 @@ Port tidak resmi ini mengadaptasi driver dari kode sumber donor dan merekonstruk
 
 **[Rilis eksperimental `gki-kmi6-20261122`](https://github.com/ramabondanp/x6871-kernel-manifest/releases/tag/gki-kmi6-20261122)** berhasil boot sampai launcher dengan GKI resmi Google `android16-6.12-2026-09_r16` (Linux 6.12.92, KMI 6). Maintainer telah menguji langsung fungsi perangkat yang tercantum di bawah pada X6871 dan melaporkan semuanya berfungsi.
 
-Maintainer juga melaporkan bahwa kedua pre-release, [KMI 6 dengan `X6871.config`](https://github.com/ramabondanp/x6871-kernel-manifest/releases/tag/gki-kmi6-x6871-config-f8198be) dan [KMI 7 dari Google CI `16987858`](https://github.com/ramabondanp/x6871-kernel-manifest/releases/tag/gki-kmi7-16987858), sudah diuji langsung di X6871. Rincian hasil uji per fitur untuk kedua pre-release belum dicatat.
+Maintainer juga melaporkan bahwa pre-release [KMI 6 dengan `X6871.config`](https://github.com/ramabondanp/x6871-kernel-manifest/releases/tag/gki-kmi6-x6871-config-f8198be) sudah diuji langsung di X6871. Rincian hasil uji per fitur untuk pre-release tersebut belum dicatat.
 
 Pada build sebelumnya (KMI 5), TWRP, layar hingga 144 Hz dan Always-On Display (AOD), GPU, Wi-Fi, audio speaker dan earpiece, kamera foto dan video, senter, getar, ketuk dua kali untuk membangunkan layar, sidik jari dalam layar, dan pengisian daya cepat sudah diuji dan berfungsi. Masalah USB saat kabel dicabut dan dipasang kembali ditemukan pada GKI kustom, bukan pada modul perangkat. Lihat [hasil pengujian](docs/archive/6.12/HANDOFF-HISTORY.md#hasil-uji-perangkat-sebelum-migrasi-kmi-5) untuk rinciannya.
 
@@ -61,7 +61,7 @@ Unduh `vendor_boot`, `vendor_dlkm`, dan `odm_dlkm` dari [GitHub Release](https:/
 
 ## Dokumentasi lanjutan
 
-- **Build & Repack:** [panduan build & repack](docs/guides/BUILD.md) — lingkungan, [unduhan referensi](docs/guides/BUILD.md#unduhan-referensi), pemecahan masalah, [build baseline MediaTek tanpa driver X6871](docs/guides/BUILD.md#build-baseline-mtk-tanpa-driver-x6871), serta [profil uji KMI 7](docs/guides/BUILD.md#profil-uji-kmi-7--google-ci-16987858) (overlay terpisah Google CI `16987858`).
+- **Build & Repack:** [panduan build & repack](docs/guides/BUILD.md) — lingkungan, [unduhan referensi](docs/guides/BUILD.md#unduhan-referensi), pemecahan masalah, serta [build baseline MediaTek tanpa driver X6871](docs/guides/BUILD.md#build-baseline-mtk-tanpa-driver-x6871).
 - **Flash & Uji Boot:** [prosedur flash, rollback, dan checklist](docs/guides/FLASH-AND-TEST.md).
 - **Hardware & DTBO:** [pemetaan hardware](docs/hardware/DEVICES.md) dan [overlay X6871](docs/hardware/DEVICES-OVERLAY.md) — hubungan node DT dengan drivernya.
 - **Pratinjau 6.18:** [status 6.18](docs/6.18/STATUS.md), [tracker isu & verifikasi](docs/6.18/TRACKER.md), dan [patch SELinux `firmware_load`](docs/guides/SELINUX-6.18.md).

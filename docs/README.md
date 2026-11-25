@@ -4,7 +4,7 @@ Indeks seluruh dokumentasi di `docs/`, dikelompokkan berdasarkan tujuan pembaca.
 
 ## Panduan Operasional (`guides/`)
 
-- [BUILD.md](guides/BUILD.md) — lingkungan workspace, `X6871.config`, perintah build 6.12 & 6.18, baseline MTK, repack `vendor_boot`/DLKM, setup patch zstd `Android_boot_image_editor`, profil uji KMI 7, serta aturan keras build.
+- [BUILD.md](guides/BUILD.md) — lingkungan workspace, `X6871.config`, perintah build 6.12 & 6.18, baseline MTK, repack `vendor_boot`/DLKM, setup patch zstd `Android_boot_image_editor`, profil uji 6.18-lts, serta aturan keras build.
 - [FLASH-AND-TEST.md](guides/FLASH-AND-TEST.md) — daftar artefak uji 6.12 (`gki-kmi6-20261122`), prosedur flash & rollback, checklist subsistem, dan debugging `modules.dep`.
 - [SELINUX-6.18.md](guides/SELINUX-6.18.md) — prosedur wajib patch policy SELinux `firmware_load` untuk boot sistem Android pada kernel 6.18.
 
