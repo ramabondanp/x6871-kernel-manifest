@@ -24,13 +24,15 @@ Diperbarui: 2026-11-25 (UTC)
 > `80f4abf529e2`) sudah di-commit, dibuild, dan lolos 8/8 `verify-kmi-abi.py`;
 > uji runtime di device tertunda karena maintainer sedang di luar.
 >
-> Profil uji opsional `android17-6.18-lts` (`6.18.64`, `aeb47e496127`, KMI 6,
+> Profil uji opsional `android17-6.18-lts` (`6.18.65`, `4cc5bb220b50`, KMI 6,
 > build GKI lokal) tersedia lewat `local_manifest-6.18-lts.xml` (lihat
-> [`BUILD.md`](../guides/BUILD.md#profil-uji-618-lts-android17-618-lts-61864-kmi-6-build-gki-lokal)):
-> seluruh 487 modul + GKI lokal lulus 8/8 `verify-kmi-abi.py`, dan maintainer
-> mengonfirmasi di perangkat bahwa patch SHA-gated
-> `patches/common-6.18-blk-plug-invalidate-ts.patch` menghilangkan panic
-> `blk_finish_plug`/`blk_plug_invalidate_ts`.
+> [`BUILD.md`](../guides/BUILD.md#profil-uji-618-lts-android17-618-lts-61865-kmi-6-build-gki-lokal)):
+> seluruh 487 modul + GKI lokal (`6.18.65-android17-6-g39d19ad1a460-ramabondanp-4k`,
+> `9.843` simbol ABI) lulus 8/8 `verify-kmi-abi.py`; patch SHA-gated
+> `patches/common-6.18-blk-plug-invalidate-ts.patch` tetap diterapkan (`39d19ad1a460`)
+> setelah sebelumnya terkonfirmasi pada `6.18.64` menghilangkan panic
+> `blk_finish_plug`/`blk_plug_invalidate_ts` (uji runtime `6.18.65` di perangkat
+> belum dijalankan).
 
 ## Ringkasan Fase
 
