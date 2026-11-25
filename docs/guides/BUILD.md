@@ -350,7 +350,7 @@ Catatan penting profil ini:
   (`17b8bfe5ce75`, `aeb47e496127`, atau `4cc5bb220b50`) agar tree tetap bersih (tanpa `-dirty`),
   dan tidak menyentuh `r13` maupun revisi LTS yang lebih baru. Set 5 image
   `6.18.65-android17-6-g39d19ad1a460-rama982-4k` (`4cc5bb220b50` + `39d19ad1a460`)
-  sudah lulus uji live di X6871 (boot, kamera/VENC, VP9, DPE, CMDQ, thermal
+  sudah lulus uji live di X6871 (boot, kamera/VENC, VP8/VP9/AV1, DPE, CMDQ, thermal
   LVTS, dan touch dengan `0` panic/Oops; rincian di
   [`STATUS.md`](../6.18/STATUS.md) dan [`TRACKER.md`](../6.18/TRACKER.md)).
 - `patches/kleaf-localversion-suffix.patch` menambah env var opsional

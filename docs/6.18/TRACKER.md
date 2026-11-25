@@ -23,7 +23,7 @@ Diperbarui: 2026-11-25 (UTC)
 | Oops/panic/RCU stall | **Terverifikasi PASS di device** | `0` kemunculan `Internal error`/`WARNING: CPU`/RCU stall/`[MIUMPU]srinfo_r 3` di boot `6.18.65` |
 | EMI MPU `SRINFO=3` + RCU stall | **Terverifikasi PASS di device** | `6ebc4934a74a` terkonfirmasi bersih di boot `6.18.65` (`EMIMPU: 0`) |
 | ADSP | **Terverifikasi PASS (stock DTB disabled)** | `0` `adsp_system_bootup fail` & `invalid cid` di `6.18.65`; audio `fs15xx` aktif |
-| Video VP9 | **PASS di device (VP9); VP8/AV1 belum diuji** | 25 sesi `Init Vdec OK bs VP90` (hingga 1080x1920) & VENC 1080p@30fps PASS; sisa uji VP8/AV1 |
+| Video VP8 / VP9 / AV1 | **Terverifikasi PASS di device** | VP9 (25 sesi s.d. 1080x1920), VP8 720p (120/120 frame, `132.0 fps`), AV1 720p/1080p (120/120 frame, `228.0 / 110.5 fps`), dan VENC 1080p@30fps PASS (`0` error) |
 | DPE `v4l2_fh` | **Terverifikasi PASS di device** | `0` `v4l2_open` WARN; `[DPE]DPE open`/`release` bersih di `6.18.65` |
 | CMDQ/GCE + MML | **Terverifikasi PASS di device** | `0` `vote mminfra on err` di boot `6.18.65`; display, kamera, codec, MML normal |
 | Thermal `lvts`/`soc_max` | **Terverifikasi PASS di device** | `0` `Failed to register lvts tz`; 40 zone aktif (`soc_max` `59.5°C` -> `72.6°C`) |
@@ -248,9 +248,36 @@ mtk_vdec_g_v_ctrl: Error!! Cannot get param                (7x)
 [  255.658346] [MTK_V4L2] level=0 vb2ops_vdec_buf_queue(),3976: [104] Init Vdec OK bs VP90 fm M2CS, wxh=1088x1920 pic wxh=1080x1920 bitdepth:8 lo:1 sz[0]=0x300140 sz[1]=0x0 num_planes 1, fb_sz[0] 3146048, fb_sz[1] 0, BS
 ```
 
-- **Belum diuji:** playback **VP8** dan **AV1** (`c2.mtk.av1.decoder`
-  terdaftar di `dumpsys media.player`, tetapi playback keduanya belum
-  dijalankan pada sesi uji ini).
+- **Hasil verifikasi live di perangkat (`6.18.65`) — VP8 & AV1 PASS:**
+  diuji dengan sampel `ffmpeg` (4 detik, `120` packet) lewat pipeline
+  MediaCodec hardware nyata (`c2.mtk.vpx.decoder` dan `c2.mtk.av1.decoder`
+  -> V4L2 `mtk-vcodec-dec` -> VCP, dengan `ABinderProcess_startThreadPool()`
+  aktif):
+  - **VP8 720p (`libvpx`, profile 0, `c2.mtk.vpx.decoder`):**
+    - Mode `surface`: `120/120` frame terdekode, `120/120` frame piksel non-zero,
+      `acquired_images=120`, `eos=1`, `0.909 s` (**`132.0 fps`**).
+    - Mode `bytebuffer`: `120/120` frame, `120/120` non-zero, `eos=1`,
+      `0.927 s` (**`129.4 fps`**).
+  - **AV1 720p & 1080p (`libsvtav1`, Main Profile `yuv420p`, `c2.mtk.av1.decoder`):**
+    - 720p `surface`: `120/120` frame, `120/120` non-zero,
+      `acquired_images=120`, `eos=1`, `0.526 s` (**`228.0 fps`**).
+    - 720p `bytebuffer`: `120/120` frame, `120/120` non-zero, `eos=1`,
+      `0.577 s` (**`208.1 fps`**).
+    - 1080p `surface`: `120/120` frame, `120/120` non-zero,
+      `acquired_images=120`, `eos=1`, `1.086 s` (**`110.5 fps`**).
+  - Selama seluruh rangkaian uji VP8 & AV1: `MTK_V4L2_ERR: 0`, `B001: 0`,
+    `rejected: 0`, `unsupported: 0`, `Internal error: 0`, `WARNING: CPU: 0`,
+    `EMIMPU: 0`, `MIUMPU: 0`, `rcu_preempt: 0`.
+
+```text
+[ 1956.213519] check_codec_id ipi id 5 svp 0 is correct
+[ 1956.213891] [MTK_V4L2] level=0 vdec_vcp_init(),1409: [165] VP80(1) Decoder Instance >> 000000009991becc, ap_inst_addr ffffff80a79f9010
+[ 1956.215739] [MTK_V4L2] level=0 vb2ops_vdec_buf_queue(),3976: [165] Init Vdec OK bs VP80 fm M21S, wxh=1280x736 pic wxh=1280x720 bitdepth:8 lo:0 sz[0]=0x159000 sz[1]=0x0 num_planes 1, fb_sz[0] 1413120, fb_sz[1] 0, BS
+[ 1958.601044] check_codec_id ipi id 13 svp 0 is correct
+[ 1958.607098] [MTK_V4L2] level=0 vb2ops_vdec_buf_queue(),3976: [169] Init Vdec OK bs AV10 fm M21S, wxh=1280x736 pic wxh=1280x720 bitdepth:8 lo:0 sz[0]=0x159000 sz[1]=0x0 num_planes 1, fb_sz[0] 1413120, fb_sz[1] 0, BS
+[ 1960.289641] check_codec_id ipi id 13 svp 0 is correct
+[ 1960.301412] [MTK_V4L2] level=0 vb2ops_vdec_buf_queue(),3976: [173] Init Vdec OK bs AV10 fm M2CS, wxh=1920x1088 pic wxh=1920x1080 bitdepth:8 lo:1 sz[0]=0x300140 sz[1]=0x0 num_planes 1, fb_sz[0] 3146048, fb_sz[1] 0, BS
+```
 
 ### 5.2 DPE `v4l2_fh` — fixed di isp_70
 
@@ -734,9 +761,10 @@ Status verifikasi pada uji live `6.18.65-android17-6-g39d19ad1a460-rama982-4k`:
 3. Tidak ada `Internal error`, `WARNING: CPU`, `rcu_preempt detected stalls`,
    `[MIUMPU]srinfo_r 3`, `adsp_system_bootup fail`, maupun `invalid cid` — **PASS**
    (semuanya `0` kemunculan).
-4. Video VP9: `25` sesi `Init Vdec OK bs VP90`, `0` `VP9 header rejected`,
-   `unsupported (-1,-1)`, atau `QBUF after unrecoverable error` — **PASS**
-   (**VP8 dan AV1 belum diuji**).
+4. Video VP8, VP9, dan AV1: `25` sesi `Init Vdec OK bs VP90`, plus uji
+   decode hardware VP8 720p (`c2.mtk.vpx.decoder`, 120/120 frame, `132.0 fps`)
+   dan AV1 720p/1080p (`c2.mtk.av1.decoder`, 120/120 frame, `228.0 / 110.5 fps`),
+   `0` error/penolakan codec — **PASS**.
 5. Tidak ada `v4l2_open` WARN (`0`) dan `vote mminfra on err:1` (`0`); kamera,
    AIE, flashlight, encoder 1080p@30fps, codec, dan MML berjalan — **PASS**.
 6. `/sys/class/thermal`: `40` zone aktif (38 base stock + `mt6375-gauge` +
@@ -759,7 +787,7 @@ Status verifikasi pada uji live `6.18.65-android17-6-g39d19ad1a460-rama982-4k`:
 | Prioritas | Pekerjaan | Status / Alasan |
 |---|---|---|
 | P0 | Verifikasi crash/EMI pasca-fix dengan log baru | **Selesai (PASS di `6.18.65`)** — 7 Oops + RCU stall + EMI `0` kemunculan |
-| P0 | Video VP9 | **VP9 PASS di `6.18.65`**; sisa uji playback VP8 & AV1 |
+| P0 | Video VP9 / VP8 / AV1 | **Selesai (PASS di `6.18.65`)** — VP9, VP8 720p, dan AV1 720p/1080p terverifikasi PASS (`0` error) |
 | P1 | Pastikan DTB/DTBO stock yang dipakai, bukan DT tree | **Selesai (PASS di `6.18.65`)** — ADSP `disabled` sesuai stock |
 | P1 | Thermal LVTS: verifikasi fix di device | **Selesai (PASS di `6.18.65`)** — 40 zone aktif, `soc_max` responsif |
 | P1 | `tranhalconfig` | **Terbuka (userspace)** — `222` AVC & `audit_lost: 21`, perlu fix vendor/sepolicy |
@@ -774,8 +802,8 @@ Status verifikasi pada uji live `6.18.65-android17-6-g39d19ad1a460-rama982-4k`:
 ## 9. Batasan dan Catatan
 
 - Hasil verifikasi live pada `6.18.65-android17-6-g39d19ad1a460-rama982-4k`
-  sudah menutup temuan crash, ADSP, VP9, DPE, CMDQ, thermal LVTS, dan touch
-  di atas; pengujian yang belum dijalankan (VP8/AV1, `DRM Info`, dan
+  sudah menutup temuan crash, ADSP, VP8/VP9/AV1, DPE, CMDQ, thermal LVTS, dan
+  touch di atas; pengujian yang belum dijalankan (`DRM Info` Widevine dan
   recovery sleep/wake `report_rate_switch=1`) tetap dicatat eksplisit.
 - Dokumen ini tidak mengubah kode. Perubahan tetap harus melalui commit baru
   sesuai aturan commit di `AGENTS.md` (prefix `6.18:` di manifest; format
