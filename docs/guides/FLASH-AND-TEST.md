@@ -1,11 +1,11 @@
 # FLASH & TEST — Prosedur Uji Boot & Checklist X6871
 
-> **Status 2026-11-22:** Android 16 berhasil boot sampai launcher pada
-> `gki-kmi6-20261122` dengan GKI resmi Google. Log uji TWRP dan subsistem
-> berasal dari build KMI 5 (lihat [HANDOFF-HISTORY](../archive/6.12/HANDOFF-HISTORY.md#hasil-uji-perangkat-sebelum-migrasi-kmi-5)). Dalam
-> [catatan rilis](https://github.com/ramabondanp/x6871-kernel-manifest/releases/tag/gki-kmi6-20261122),
-> maintainer mengonfirmasi bahwa fitur yang didokumentasikan berfungsi
-> pada unit yang ia uji langsung.
+> **Status 2026-11-22:** Android 16 berhasil boot sampai launcher pada build
+> uji 6.12 KMI 6 (`v19-kmi6`) dengan GKI resmi Google. Log uji TWRP dan
+> subsistem berasal dari build KMI 5 (lihat [HANDOFF-HISTORY](../archive/6.12/HANDOFF-HISTORY.md#hasil-uji-perangkat-sebelum-migrasi-kmi-5)).
+> Maintainer mengonfirmasi bahwa fitur yang didokumentasikan berfungsi pada
+> unit yang ia uji langsung (GitHub Release lama sudah dihapus karena
+> kedaluwarsa).
 > Bug USB cabut-colok tercatat pada GKI kustom; §67–§68 di [`PRETEST.md`](../archive/6.12/PRETEST.md)
 > tidak memuat log khusus uji cabut-colok pada GKI resmi KMI 6.
 > Untuk arsip percobaan repack manual lama, lihat [REPACK-HISTORY](../archive/6.12/REPACK-HISTORY.md).
@@ -39,9 +39,12 @@ Tujuan: memvalidasi **seluruh boot** (recovery + Android system), bukan hanya sa
    `vendor_boot` mempertahankan DTB dari image dasar TWRP. `dtbo.img`
    bawaan perangkat tidak diubah atau di-flash dalam panduan ini.
 
-## 1. Artefak Uji Terbaru (`gki-kmi6-20261122`)
+## 1. Komposisi Artefak 6.12 (KMI 6)
 
-Unduh ketiga image X6871 dari [GitHub Release `gki-kmi6-20261122` (eksperimental)](https://github.com/ramabondanp/x6871-kernel-manifest/releases/tag/gki-kmi6-20261122). Ambil dua image GKI dari tautan Google di bawah.
+Semua GitHub Release lama sudah dihapus karena sudah kedaluwarsa. Bangun
+ketiga image modul X6871 sendiri lewat [§2](#2-membuat-image-vendor_boot--dlkm),
+lalu pasangkan dengan dua image GKI resmi Google di bawah. Tabel ini mencatat
+komposisi dan checksum referensi dari build uji `v19-kmi6`.
 
 | Artefak | Sumber | Catatan |
 |---|---|---|

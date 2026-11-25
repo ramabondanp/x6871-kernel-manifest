@@ -3,8 +3,8 @@
 Diperbarui: 2026-11-25 (UTC)
 
 > Dokumen ini merangkum status port **6.18** dari rencana awal
-> ([`PLAN-INITIAL.md`](../archive/6.18/PLAN-INITIAL.md)). Baseline produksi
-> **6.12** (`gki-kmi6-20261122`) tidak berubah.
+> ([`PLAN-INITIAL.md`](../archive/6.18/PLAN-INITIAL.md)). Baseline
+> **6.12** (`android16-6.12-2026-09_r16`, KMI 6) tidak berubah.
 >
 > - Isu terbuka, prioritas fix, dan checklist verifikasi: [`TRACKER.md`](TRACKER.md)
 > - Syarat SELinux `firmware_load` untuk boot sistem 6.18: [`SELINUX-6.18.md`](../guides/SELINUX-6.18.md)

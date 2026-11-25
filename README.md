@@ -4,13 +4,13 @@ Repo ini menyediakan manifest dan skrip untuk membangun modul kernel **Infinix G
 
 Port tidak resmi ini mengadaptasi driver dari kode sumber donor dan merekonstruksi bagian yang tidak dipublikasikan melalui reverse engineering modul kernel dari firmware bawaan X6871. Kernel inti tetap memakai GKI resmi Google tanpa modifikasi.
 
-**Ringkasan:** gunakan rilis **6.12** untuk penggunaan harian. **Kernel 6.18** masih pratinjau dan belum memiliki image rilis publik.
+**Ringkasan:** gunakan branch **6.12** (bangun dari source) untuk penggunaan harian; semua GitHub Release lama sudah dihapus karena kedaluwarsa. **Kernel 6.18** masih pratinjau dan belum memiliki image rilis publik.
 
 ## Apa yang sudah diuji?
 
-**[Rilis eksperimental `gki-kmi6-20261122`](https://github.com/ramabondanp/x6871-kernel-manifest/releases/tag/gki-kmi6-20261122)** berhasil boot sampai launcher dengan GKI resmi Google `android16-6.12-2026-09_r16` (Linux 6.12.92, KMI 6). Maintainer telah menguji langsung fungsi perangkat yang tercantum di bawah pada X6871 dan melaporkan semuanya berfungsi.
+Build uji **6.12 KMI 6** (`v19-kmi6`) berhasil boot sampai launcher dengan GKI resmi Google `android16-6.12-2026-09_r16` (Linux 6.12.92, KMI 6). Maintainer telah menguji langsung fungsi perangkat yang tercantum di bawah pada X6871 dan melaporkan semuanya berfungsi.
 
-Maintainer juga melaporkan bahwa pre-release [KMI 6 dengan `X6871.config`](https://github.com/ramabondanp/x6871-kernel-manifest/releases/tag/gki-kmi6-x6871-config-f8198be) sudah diuji langsung di X6871. Rincian hasil uji per fitur untuk pre-release tersebut belum dicatat.
+Maintainer juga melaporkan bahwa build uji KMI 6 dengan `X6871.config` (`f8198be`) sudah diuji langsung di X6871. Rincian hasil uji per fitur untuk build tersebut belum dicatat.
 
 Pada build sebelumnya (KMI 5), TWRP, layar hingga 144 Hz dan Always-On Display (AOD), GPU, Wi-Fi, audio speaker dan earpiece, kamera foto dan video, senter, getar, ketuk dua kali untuk membangunkan layar, sidik jari dalam layar, dan pengisian daya cepat sudah diuji dan berfungsi. Masalah USB saat kabel dicabut dan dipasang kembali ditemukan pada GKI kustom, bukan pada modul perangkat. Lihat [hasil pengujian](docs/archive/6.12/HANDOFF-HISTORY.md#hasil-uji-perangkat-sebelum-migrasi-kmi-5) untuk rinciannya.
 
@@ -53,11 +53,11 @@ out_bazel/*/execroot/_main/bazel-out/k8-fastbuild/bin/kernel_device_modules-6.12
 
 ## Sebelum flash
 
-Bagian ini untuk rilis stabil 6.12. Versi 6.18 belum memiliki image publik dan belum disarankan untuk flash harian.
+Bagian ini untuk baseline **6.12** (`android16-6.12-2026-09_r16`, KMI 6). Semua GitHub Release lama sudah dihapus karena sudah kedaluwarsa, dan versi 6.18 belum memiliki image rilis publik serta belum disarankan untuk flash harian.
 
-Unduh `vendor_boot`, `vendor_dlkm`, dan `odm_dlkm` dari [GitHub Release](https://github.com/ramabondanp/x6871-kernel-manifest/releases/tag/gki-kmi6-20261122). Pasangkan ketiganya dengan **`boot-lz4.img` dan `system_dlkm.erofs.img`** dari [artefak GKI resmi Google `android16-6.12-2026-09_r16` (KMI 6)](https://ci.android.com/builds/submitted/16901051/kernel_aarch64/latest). Jangan campur dengan image KMI 5. `dtbo.img` tetap bawaan perangkat.
+Bangun `vendor_boot`, `vendor_dlkm`, dan `odm_dlkm` dari source melalui [langkah membuat image](docs/guides/FLASH-AND-TEST.md#2-membuat-image-vendor_boot--dlkm). Pasangkan ketiganya dengan **`boot-lz4.img` dan `system_dlkm.erofs.img`** dari [artefak GKI resmi Google `android16-6.12-2026-09_r16` (KMI 6)](https://ci.android.com/builds/submitted/16901051/kernel_aarch64/latest). Jangan campur dengan image KMI 5. `dtbo.img` tetap bawaan perangkat.
 
-**Khusus X6871 dengan bootloader terbuka.** Cadangkan data dan siapkan image bawaan untuk rollback sebelum flash. Lihat [daftar image dan checksum](docs/guides/FLASH-AND-TEST.md#1-artefak-uji-terbaru-gki-kmi6-20261122) serta [panduan flash dan rollback](docs/guides/FLASH-AND-TEST.md#3-flash-dan-rollback). Jika build sendiri, ikuti [langkah membuat image](docs/guides/FLASH-AND-TEST.md#2-membuat-image-vendor_boot--dlkm) terlebih dahulu.
+**Khusus X6871 dengan bootloader terbuka.** Cadangkan data dan siapkan image bawaan untuk rollback sebelum flash. Lihat [komposisi image dan checksum referensi](docs/guides/FLASH-AND-TEST.md#1-komposisi-artefak-612-kmi-6) serta [panduan flash dan rollback](docs/guides/FLASH-AND-TEST.md#3-flash-dan-rollback).
 
 ## Dokumentasi lanjutan
 
