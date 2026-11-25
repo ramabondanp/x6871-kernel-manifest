@@ -1,6 +1,6 @@
 # PLAN 6.18 Lanjutan — Temuan Log dan Prioritas Perbaikan
 
-Diperbarui: 2026-11-24 (UTC)
+Diperbarui: 2026-11-25 (UTC)
 
 > Dokumen ini adalah lanjutan dari [`STATUS.md`](STATUS.md).
 > Fokusnya bukan menambah fitur, tetapi menutup temuan dari log boot 6.18:
@@ -23,7 +23,7 @@ Diperbarui: 2026-11-24 (UTC)
 | Oops/panic/RCU stall | **Ada fix, belum diverifikasi** | Ambil log baru setelah semua fix |
 | EMI MPU `SRINFO=3` + RCU stall | **Fixed** oleh commit IOMMU | Verifikasi tidak muncul lagi |
 | ADSP | **Bukan bug; stock DTB disabled** | Pastikan image memakai DTB stock; jangan ubah DT tree |
-| Video VP9 | **Terbuka** | Verifikasi fix `7c48ebd`, lanjutkan jika masih gagal |
+| Video VP9 | **Fixed di source, uji device tertunda** | `ac2e63fe0411` menyelaraskan `VDEC_VP8 = 5` (`5..13`) ke VCP stock; build `6.18-lts` 8/8 PASS, uji playback tertunda |
 | DPE `v4l2_fh` | **Fixed di isp_70; uji device tertunda** | `v4l2_fh` ditambahkan; build lolos |
 | CMDQ/GCE + MML | **`vote mminfra` fixed; event/MML historis** | Build lolos; verifikasi device tertunda |
 | Thermal `lvts`/`soc_max` | **Fixed, build lolos; uji device tertunda** | Tabel sensor disamakan dengan stock ko; maintainer sedang di luar |
@@ -182,21 +182,42 @@ mtk_vdec_g_v_ctrl: Error!! Cannot get param                (7x)
   `VDEC_VENC_MAX = 20` tanpa mengubah ID `VENC_H264..VENC_H263` (build dan
   uji perangkat belum dijalankan).
 
-**Rencana fix:**
+- Uji live V4L2 M2M pada `/dev/video3` di profil `6.18-lts` mengonfirmasi
+  H.264 dan HEVC 720×1280 (`mtk_mm` DMA-BUF) **PASS** (`Init Vdec OK`,
+  `B001 status=0`, `DQEVENT changes=0x1`, alokasi UBE `14681088` byte),
+  sedangkan VP9 (`82 49 83 42`, 720×1280) gagal identik (`B001 status=-1`,
+  `changed=0x4`) pada semua mode buffer (`mtk_mm`, `mtk_mm-uncached`,
+  `system`, dan `mmap`), dan VP8 gagal pada `check_codec_id`.
+- **Akar masalah terbukti** dari trace live `VCU_IPIMSG_DEC_CHECK_CODEC_ID`
+  dan disassembly `vcp_dec_ipi_handler` pada `mtk-vcodec-dec.ko` stock SP20:
+  firmware VCP dan modul stock melewati slot `4` di `enum mtk_codec_type`,
+  memetakan `VDEC_VP8 = 5`, `VDEC_VP9 = 6` (memiliki varian `svp=1`), ...,
+  `VDEC_AV1 = 13`. Karena slot `4` hilang di tree, `VDEC_VP8..VDEC_AV1`
+  bergeser `-1` sehingga `check_codec_id()` untuk VP9 menganggap
+  `VDEC_VP9 == 5`, menolak `id=6` (VP9 VCP) dan membuka decoder VP8 (`id=5`)
+  untuk bitstream VP9 (alokasi 4 buffer kecil tanpa UBE 14 MB), lalu
+  firmware langsung menolak header VP9 dengan `changed=0x4`. Bug yang sama
+  juga ada di tree `6.12`.
 
-1. Jangan menambah patch spekulatif lagi di sisi AP sebelum ada bukti dari
-   sisi VCP.
-2. Tangkap log sisi VCP (`mtk_vdec_vcp_log`) saat VP9 ditolak untuk melihat
-   alasan firmware mengembalikan `changed=0x4` pada frame Profile 0.
-3. Bandingkan A/B satu sampel VP9 yang sama antara stock SP20 dan port 6.18
-   dengan `mtk_v4l2_dbg_level=3` (`DEC_START_DONE`, device DMA, dan rentang
-   IOVA bitstream/working buffer).
-4. Setelah playback VP9 lulus, update status video di README dan dokumen
-   status.
+**Fix:**
 
-**Verifikasi:** playback VP9 selesai, tidak ada error qbuf, dan decoding
-tidak berhenti di tengah. (Uji build/repack untuk `213a184315ef` dan
-`a719a23cee6d` belum dilakukan.)
+- Commit `ac2e63fe0411` menetapkan `VDEC_VP8 = 5` di
+  `drivers/media/platform/mtk-vcodec/mtk_vcodec_drv.h`, menyelaraskan ID
+  decoder `VDEC_VP8..VDEC_AV1` ke `5..13` tanpa mengubah `VENC_H264..VENC_H263`
+  (`1..7`) maupun `VDEC_VENC_MAX = 20`.
+
+**Verifikasi:**
+
+- Disassembly `vcp_dec_ipi_handler` pada `mtk-vcodec-dec.ko` build `6.18-lts`
+  (`6.18.64-android17-6-gf047eec1d614-ramabondanp-4k`, KMI 6) memastikan ID
+  decoder `1..3`, `5..13` (VP8=`5`, VP9=`6`, AV1=`13`) sudah cocok dengan
+  stock. Repack `vendor_boot.img` (`bd9cf453357e180592f0b0186a1068c6`),
+  `vendor_dlkm.img` (`c511541ba00a2aa39c20f2b8d3989f59`), dan `odm_dlkm.img`
+  (`f0555ff67a8407959eb2dfb10cf1bf21`) lulus **8/8** `verify-kmi-abi.py`
+  (0 mismatch ABI dari 9.843 simbol).
+- **Uji device (tertunda):** flash set image `6.18-lts` terbaru, lalu uji
+  decode VP9, VP8, AV1, dan playback Facebook Story. Setelah playback VP9
+  lulus, perbarui status video di README dan dokumen status.
 
 ### 5.2 DPE `v4l2_fh` — fixed di isp_70
 

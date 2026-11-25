@@ -1,6 +1,6 @@
 # Status Eksekusi Port 6.18
 
-Diperbarui: 2026-11-24 (UTC)
+Diperbarui: 2026-11-25 (UTC)
 
 > Dokumen ini merangkum status port **6.18** dari rencana awal
 > ([`PLAN-INITIAL.md`](../archive/6.18/PLAN-INITIAL.md)). Baseline produksi
@@ -9,6 +9,14 @@ Diperbarui: 2026-11-24 (UTC)
 > - Isu terbuka, prioritas fix, dan checklist verifikasi: [`TRACKER.md`](TRACKER.md)
 > - Syarat SELinux `firmware_load` untuk boot sistem 6.18: [`SELINUX-6.18.md`](../guides/SELINUX-6.18.md)
 > - Kronologi bringup `test1`–`test13` dan analisa yang sudah ditutup: [`BRINGUP-LOG.md`](../archive/6.18/BRINGUP-LOG.md)
+>
+> Per 2026-11-25: akar masalah penolakan VP9/VP8 teridentifikasi via uji
+> live di perangkat `6.18-lts` dan disassembly stock SP20 — `enum mtk_codec_type`
+> melewati slot `4` di VCP sehingga `VDEC_VP8..VDEC_AV1` bergeser `-1`;
+> commit `ac2e63fe0411` (`VDEC_VP8 = 5`) di-build di profil `6.18-lts`
+> (`6.18.64`, KMI 6) dan lolos 8/8 `verify-kmi-abi.py` (`vendor_dlkm.img`
+> md5 `c511541ba00a2aa39c20f2b8d3989f59`), tinggal flash dan uji playback di
+> perangkat.
 >
 > Per 2026-11-24: fix thermal LVTS, DPE `v4l2_fh`, CMDQ `vote mminfra`,
 > pemulihan `VDEC_VENC_MAX`, serta kontrol report rate & mode touch
@@ -49,7 +57,7 @@ Diperbarui: 2026-11-24 (UTC)
 | Video V4L2/H.264/JPEG (`priv == NULL` & `q_run_work`) | **Fixed, uji lanjut tertunda** | `file->private_data` (`050d89c`/`41f442c`/`29ba44c`) + workqueue vdec OPPO (`31781fa`) |
 | Thermal LVTS (`soc_temp_lvts`) | **Fixed di source, uji device tertunda** | Tabel sensor diselaraskan ke 25 sensor stock (`cbabf0ea8c34`); `vendor_dlkm` direpack |
 | DPE `v4l2_fh` & CMDQ `vote mminfra` | **Fixed di source, uji device tertunda** | `b83dca0` (`isp_70/camera_dpe.c`) & `a71cfd2` (`ret < 0`); `vendor_boot` + `vendor_dlkm` direpack |
-| Video VP9 (Facebook Story) | **Terbuka (P0)** | Ditolak VCP `changed=0x4`; `7c48ebd` di-revert (`213a184315ef`); `VDEC_VENC_MAX=20` dipulihkan (`a719a23cee6d`, belum dibuild/uji) |
+| Video VP9 (Facebook Story) | **Fixed di source, uji device tertunda** | `7c48ebd` di-revert (`213a184315ef`); `VDEC_VENC_MAX=20` dipulihkan (`a719a23cee6d`); `ac2e63fe0411` menyelaraskan `VDEC_VP8 = 5` (`5..13`) dengan firmware VCP; build `6.18-lts` lolos 8/8 `verify-kmi-abi.py` (`vendor_dlkm.img` direpack) |
 | `tranhalconfig` | **Terbuka (userspace)** | Service/sepolicy vendor belum aktif, menyebabkan `audit_lost` |
 | ADSP / `fpsgo`/`trans_sched` / TEE Widevine | **Known limitation / skip** | ADSP disabled di DTB stock; `trans_sched`/`fpsgo` wrapper tanpa source; TEE/L1 isu provisioning |
 
