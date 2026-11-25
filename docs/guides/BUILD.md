@@ -19,7 +19,7 @@ Panduan operasional aktif untuk membangun modul kernel X6871 (baseline stabil **
 | DLKM (`vendor_dlkm` + `odm_dlkm`) | **266** `.ko` (`209` + `57`) dibangun dari kode sumber (KMI 6, tanpa bentrok `CONFIG_MODULE_SIG_PROTECT`) |
 | Build target | `//kernel_device_modules-6.12:mgk_64_k612_customer_modules_install.user` |
 | Build terakhir | sukses (clean KMI 6 + trimmed X6871 allowlist), 2026-11-22 |
-| Revisi modul perangkat untuk build dari source | [`0fba8e7`](https://github.com/ramabondanp/alps-kernel_device_modules-6.12/commit/0fba8e7f20f47dc5814acd28fba14d6854b00520) (`x6871-android16-6.12`, dengan fragment X6871; image rilis tetap dari `fa18f7f`) |
+| Revisi modul perangkat untuk build dari source | [`0fba8e7`](https://github.com/ramabondanp/alps-kernel_device_modules/commit/0fba8e7f20f47dc5814acd28fba14d6854b00520) (`x6871-android16-6.12`, dengan fragment X6871; image rilis tetap dari `fa18f7f`) |
 | Vendor MTK modules HEAD | `83b4fa6` (`alps-vendor_mediatek_kernel_modules`, `x6871-android16-6.12`) |
 | Active clean workspace | `~/x6871-kernel` |
 | Runtime | **Lulus boot di GKI KMI 6 (`android16-6.12-2026-09_r16`, `v19-kmi6`)** dengan `boot-lz4.img` + `system_dlkm.erofs.img` resmi Google (0 mismatch CRC vs `abi.stg` `10.630` simbol, 0 kolisi `CONFIG_MODULE_SIG_PROTECT`, 0 unresolved symbol). Rincian log fitur berasal dari KMI 5; konfirmasi uji langsung oleh maintainer dicatat di [GitHub Release](https://github.com/ramabondanp/x6871-kernel-manifest/releases/tag/gki-kmi6-20261122). |
@@ -144,7 +144,7 @@ Verifikasi 6.18: lihat [STATUS.md](../6.18/STATUS.md#perintah-kerja).
 
 ### Konfigurasi X6871
 
-Refaktor ini ada di commit modul perangkat [`0fba8e7`](https://github.com/ramabondanp/alps-kernel_device_modules-6.12/commit/0fba8e7f20f47dc5814acd28fba14d6854b00520). Pre-release KMI 6 dengan fragment X6871 dibangun dari revisi awal `f8198be`.
+Refaktor ini ada di commit modul perangkat [`0fba8e7`](https://github.com/ramabondanp/alps-kernel_device_modules/commit/0fba8e7f20f47dc5814acd28fba14d6854b00520). Pre-release KMI 6 dengan fragment X6871 dibangun dari revisi awal `f8198be`.
 `entry_level_legacy.config` tetap dipakai untuk modul legacy MT6895.
 `X6871.config` diterapkan sesudahnya untuk fitur perangkat. Simbol baru
 dideklarasikan di `kernel/configs/Kconfig.x6871` dan dibaca melalui

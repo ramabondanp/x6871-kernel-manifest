@@ -16,7 +16,7 @@
   menambahkan 2 repo port Infinix X6871:
     - 3 repo Kleaf/MGK build rules (build/kernel, bazel_common_rules, bazel_mgk_rules)
     - 1 repo GKI upstream AOSP (kernel/common @ android16-6.12-2026-09_r16, tanpa patch)
-    - 2 repo port X6871 (alps-kernel_device_modules-6.12 dan
+    - 2 repo port X6871 (alps-kernel_device_modules dan
       alps-vendor_mediatek_kernel_modules, keduanya di branch
       x6871-android16-6.12)
 
@@ -50,7 +50,7 @@
        Untuk build baseline MTK, lihat docs/HANDOFF.md. -->
   <project path="kernel-6.12" name="kernel/common"
            remote="aosp" revision="refs/tags/android16-6.12-2026-09_r16" />
-  <project path="kernel_device_modules-6.12" name="alps-kernel_device_modules-6.12"
+  <project path="kernel_device_modules-6.12" name="alps-kernel_device_modules"
            remote="alps" revision="x6871-android16-6.12" />
 
   <!-- Vendor modules MTK terpadu:

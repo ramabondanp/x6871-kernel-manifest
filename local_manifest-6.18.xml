@@ -55,7 +55,7 @@
            remote="moto" revision="android-16-release-w1vo36.88-36-7" />
 
   <!-- Port X6871 untuk 6.18. -->
-  <project path="kernel_device_modules-6.18" name="alps-kernel_device_modules-6.12"
+  <project path="kernel_device_modules-6.18" name="alps-kernel_device_modules"
            remote="alps" revision="x6871-android17-6.18" />
   <project path="vendor/mediatek/kernel_modules"
            name="alps-vendor_mediatek_kernel_modules"
