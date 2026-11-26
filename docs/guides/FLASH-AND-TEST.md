@@ -9,6 +9,11 @@
 > Bug USB cabut-colok tercatat pada GKI kustom; §67–§68 di [`PRETEST.md`](../archive/6.12/PRETEST.md)
 > tidak memuat log khusus uji cabut-colok pada GKI resmi KMI 6.
 > Untuk arsip percobaan repack manual lama, lihat [REPACK-HISTORY](../archive/6.12/REPACK-HISTORY.md).
+>
+> **Pratinjau 6.18:** status uji dan komposisi 6.18 ada di
+> [STATUS.md](../6.18/STATUS.md). Boot sistem 6.18 memerlukan
+> [patch SELinux `firmware_load`](SELINUX-6.18.md). Jangan mencampur image
+> **6.12** (KMI 6) dengan **6.18** (KMI 5 atau 6.18-lts KMI 6).
 
 Tujuan: memvalidasi **seluruh boot** (recovery + Android system), bukan hanya satu modul.
 
@@ -65,13 +70,13 @@ Taruh image dasar sebagai `vendor_boot.img` di direktori packer, lalu
 jalankan `./gradlew unpack` dari sana. Pastikan `build/unzip_boot/root.1`
 ada dan dependensi Gradle tersedia untuk `pack --offline`.
 
-Contoh memakai packer di `~/tmp/vbwork-twrp`. Siapkan `python3`, `llvm-strip`,
+Contoh memakai checkout packer di `<dir-packer>`. Siapkan `python3`, `llvm-strip`,
 `llvm-objcopy`, `readelf`, `depmod`, `modinfo`, `zstd`, dan `cpio` di `PATH`.
 
 ```bash
 cd ~/x6871-kernel-manifest
 export KERNEL_ROOT="$HOME/x6871-kernel"
-export PACKER="$HOME/tmp/vbwork-twrp"
+export PACKER="<dir-packer>"
 out="$HOME/x6871-out"
 work="$out/dlkm-latest-work"
 
@@ -82,6 +87,11 @@ work="$out/dlkm-latest-work"
     --vd-dir "$work/vendor_dlkm/lib/modules" \
     --od-dir "$work/odm_dlkm/lib/modules"
 ```
+
+Untuk **6.18**, arahkan `KERNEL_ROOT` ke workspace 6.18 dan tambahkan
+`KVER=6.18` ke kedua skrip repack serta `--kver 6.18` ke `verify-kmi-abi.py`
+(pada profil uji `6.18-lts`, beri juga `--staging` dan `--out-dir`
+eksplisit ke `out_bazel_6.18_lts/`; lihat [BUILD.md](BUILD.md#profil-uji-618-lts-android17-618-lts-61865-kmi-6-build-gki-lokal)).
 
 Skrip repack `vendor_boot` menjalankan build Bazel, mengambil staging hasil
 build itu, men-stage 222 modul dari `tools/recovery-modules.txt`, menghapus debug
@@ -111,9 +121,9 @@ Jalankan satu per satu; jika ada perintah gagal, jangan lanjut ke reboot Android
 ```bash
 # 1. Dari bootloader fastboot (bootloader unlocked; image tidak ditandatangani)
 fastboot flash boot boot-lz4.img
-fastboot flash vendor_boot x6871-twrp-vendor_boot-v19-kmi6.img
+fastboot flash vendor_boot vendor_boot-test.img
 
-# 2. Masuk fastbootd untuk partisi logis (system_dlkm resmi Google + vendor_dlkm + odm_dlkm):
+# 2. Masuk fastbootd untuk partisi logis (system_dlkm + vendor_dlkm + odm_dlkm):
 fastboot reboot fastboot
 fastboot getvar is-userspace  # harus yes
 fastboot flash system_dlkm system_dlkm.erofs.img
@@ -124,10 +134,15 @@ fastboot flash odm_dlkm odm_dlkm.img
 fastboot reboot
 ```
 
+*(Pada profil uji `6.18-lts` build GKI lokal, flash kelima image hasil build
+tersebut sekaligus — termasuk `system_dlkm.flatten.erofs.img` dari
+`./build.sh gki` — dan jangan campur dengan image Google CI atau KMI 5.)*
+
 Untuk rollback, ulangi urutan di atas dengan satu set image lengkap:
 
-- **Kembali ke KMI 5 (`v18`):** gunakan `boot.img` + `system_dlkm.img` KMI 5,
-  `x6871-twrp-vendor_boot-v18.img`, `vendor_dlkm-v16-kmi5.img`, dan `odm_dlkm-v16-kmi5.img`.
+- **Kembali ke set build lain (mis. KMI 5 lama atau 6.12 stabil):** gunakan
+  kelima image (`boot`, `vendor_boot`, `system_dlkm`, `vendor_dlkm`,
+  `odm_dlkm`) dari set build/GKI yang sama; jangan mencampur antar generasi KMI.
 - **Kembali ke stock:** pulihkan kelima partisi yang diubah (`boot`,
   `vendor_boot`, `system_dlkm`, `vendor_dlkm`, `odm_dlkm`) dengan image dari
   firmware bawaan yang sama. Prosedur ini tidak mengubah `dtbo`.

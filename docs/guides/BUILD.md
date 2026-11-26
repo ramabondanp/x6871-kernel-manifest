@@ -19,8 +19,8 @@ Panduan operasional aktif untuk membangun modul kernel X6871 (baseline stabil **
 | DLKM (`vendor_dlkm` + `odm_dlkm`) | **266** `.ko` (`209` + `57`) dibangun dari kode sumber (KMI 6, tanpa bentrok `CONFIG_MODULE_SIG_PROTECT`) |
 | Build target | `//kernel_device_modules-6.12:mgk_64_k612_customer_modules_install.user` |
 | Build terakhir | sukses (clean KMI 6 + trimmed X6871 allowlist), 2026-11-22 |
-| Revisi modul perangkat untuk build dari source | [`0fba8e7`](https://github.com/ramabondanp/alps-kernel_device_modules/commit/0fba8e7f20f47dc5814acd28fba14d6854b00520) (`x6871-android16-6.12`, dengan fragment X6871; referensi build uji `v19-kmi6` memakai `fa18f7f`) |
-| Vendor MTK modules HEAD | `83b4fa6` (`alps-vendor_mediatek_kernel_modules`, `x6871-android16-6.12`) |
+| Revisi modul perangkat untuk build dari source | [`0fba8e7`](https://github.com/ramabondanp/alps-kernel_device_modules/commit/0fba8e7f20f47dc5814acd28fba14d6854b00520) (`x6871-android16-6.12`, referensi build uji `v19-kmi6` memakai `fa18f7f`; backport lintas-branch terbaru hingga `587a0a7`, belum dibuild ulang) |
+| Vendor MTK modules HEAD | `83b4fa6` (`alps-vendor_mediatek_kernel_modules`, `x6871-android16-6.12` saat uji `v19-kmi6`; backport lintas-branch terbaru hingga `5e9b2d8`, belum dibuild ulang) |
 | Active clean workspace | `~/x6871-kernel` |
 | Runtime | **Lulus boot di GKI KMI 6 (`android16-6.12-2026-09_r16`, `v19-kmi6`)** dengan `boot-lz4.img` + `system_dlkm.erofs.img` resmi Google (0 mismatch CRC vs `abi.stg` `10.630` simbol, 0 kolisi `CONFIG_MODULE_SIG_PROTECT`, 0 unresolved symbol). Rincian log fitur berasal dari KMI 5; konfirmasi uji langsung oleh maintainer dicatat pada build uji `v19-kmi6` (GitHub Release lama sudah dihapus). |
 
@@ -40,12 +40,12 @@ kernel dasar yang ditargetkan, bukan objek reverse engineering.
 ## Aturan keras
 
 1. **Jangan pakai `/tmp`** — pakai `~/tmp`.
-2. **Selalu commit + push setelah setiap perubahan, tanpa bertanya.**
-   Push ke remote `alps` (branch sesuai target: `x6871-android16-6.12` untuk 6.12, `x6871-android17-6.18` untuk 6.18); remote `local` hanya kalau tersedia di workspace.
-3. Commit di **semua tree kernel/modul** (`w1vo/kernel_device_modules-*`,
-   `alps-vendor_mediatek_kernel_modules`, donor 6.1/6.12, repo `alps`) wajib
-   **bahasa Inggris** — subjek dan body. Hanya repo manifest
-   (`x6871-kernel-manifest`) yang boleh bahasa Indonesia.
+2. **Ikuti aturan commit dan branch di [`AGENTS.md`](../../AGENTS.md):**
+   push ke remote `alps` (branch `x6871-android16-6.12` untuk 6.12, `x6871-android17-6.18` untuk 6.18), buat commit baru (jangan amend fix), dan jalankan `checkpatch` untuk commit message sebelum push.
+3. Commit di **semua tree kernel/modul** (`alps-kernel_device_modules`,
+   `alps-vendor_mediatek_kernel_modules`, donor 6.1/6.12) wajib
+   **bahasa Inggris** — subjek dan body, dengan `Signed-off-by`. Hanya repo
+   manifest (`x6871-kernel-manifest`) yang wajib bahasa Indonesia.
 4. Jangan satu commit untuk semua perubahan; satu commit per fitur.
 5. Repo manifest harus tetap ramping.
 6. **Cocokkan modul lewat fingerprint isi `.ko`, jangan lewat nama.**
@@ -75,7 +75,10 @@ kernel dasar yang ditargetkan, bukan objek reverse engineering.
 15. **GKI (`kernel-6.12` / `common`) JANGAN PERNAH diedit untuk menyesuaikan modul.**
     Semua adaptasi KMI/API wajib dilakukan di `kernel_device_modules-*`,
     `vendor/mediatek/kernel_modules`, atau `local_manifest*.xml` agar modul
-    selalu kompatibel 100% dengan `boot.img` + `system_dlkm.img` rilis resmi Google.
+    selalu kompatibel 100% dengan `boot.img` + `system_dlkm.img` rilis resmi Google
+    (pengecualian sementara hanya untuk profil uji `6.18-lts`: `setup.sh`
+    menerapkan patch SHA-gated `patches/common-6.18-blk-plug-invalidate-ts.patch`
+    hingga upstream fix masuk).
 16. **Jangan masukkan modul GKI terproteksi ke `vendor_dlkm`/`vendor_boot`/`odm_dlkm`.**
     Pada GKI resmi Google (`CONFIG_MODULE_SIG_PROTECT=y`), setiap modul di
     `modules.bzl` selain `_COMMON_UNPROTECTED_MODULES_LIST`
@@ -101,19 +104,27 @@ kernel dasar yang ditargetkan, bukan objek reverse engineering.
 - Jika `../vendor/mediatek` sudah dipakai workspace lain, tempatkan checkout
   baru di direktori induk terpisah (mis. `~/x6871-build/kernel`). `setup.sh`
   tidak akan menimpa link workspace lain. Set `KERNEL_ROOT` untuk repack.
-- Oracle firmware (237 `.ko`): `~/tmp/x6871/vr/root/lib/modules/`
-- DTBO otoritatif: `~/tmp/x6871/frag0.dts`
-- Konfigurasi kernel device: `~/tmp/bootRE_ikconfig`
+- Referensi stock (modul `.ko` dari `vendor_boot`/`vendor_dlkm`/`odm_dlkm`,
+  decompile `dtb`/`dtbo.img`, serta `ikconfig` stock) diekstrak dari
+  [dump firmware stock X6871](https://gitlab.com/rama-firmware-dumps/infinix/Infinix-X6871)
+  dan disimpan lokal di luar repo.
 
 ### Unduhan referensi
 
 - **Source donor OPPO MT6896 (kernel 6.12):** [repo modul kernel OPPO Reno12, branch `oppo/mt6896_b_16.0_reno12`](https://github.com/oppo-source/android_kernel_modules_oppo_mt6896/tree/oppo/mt6896_b_16.0_reno12). Modul donor yang dipakai sudah disertakan di repo modul vendor X6871; tidak perlu clone terpisah untuk build.
-- **Source donor Transsion 6.1:** [unduh `android15_kernel_modules_and_devicetree_mt6897.tar.gz`](https://d1wd32b69guoqm.cloudfront.net/opensource/android15_kernel_modules_and_devicetree_mt6897.tar.gz) dari [Infinix Open Source Center](https://opensource.dev.infinixmobility.com/). Tarball ini hanya untuk referensi porting driver, bukan basis atau prasyarat build. Path lokal di catatan audit: `~/tmp/mt6897-full.tar.gz`, diekstrak ke `~/tmp/ts61-src/`.
+- **Source donor Transsion 6.1:** [unduh `android15_kernel_modules_and_devicetree_mt6897.tar.gz`](https://d1wd32b69guoqm.cloudfront.net/opensource/android15_kernel_modules_and_devicetree_mt6897.tar.gz) dari [Infinix Open Source Center](https://opensource.dev.infinixmobility.com/). Tarball ini hanya untuk referensi porting driver, bukan basis atau prasyarat build.
 - **Firmware stock X6871:** [dump firmware di GitLab](https://gitlab.com/rama-firmware-dumps/infinix/Infinix-X6871), versi referensi `X6871-16.3.0.155SP20`. Dipakai untuk mencari image bawaan serta membandingkan modul dan DTB/DTBO. Untuk rollback, gunakan firmware bawaan yang sesuai dengan perangkat dan versi yang dipakai sebelumnya.
 
 ### Perintah build
 
 Build 6.12 (stabil):
+
+```bash
+cd ~/x6871-kernel
+"$HOME/x6871-kernel-manifest/build.sh" user
+```
+
+Atau bentuk perintah Bazel lengkapnya:
 
 ```bash
 cd ~/x6871-kernel
@@ -130,7 +141,7 @@ TMPDIR=~/tmp BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1 \
 ```
 
 Staging hasil build 6.12:
-`out_bazel/e3662dd3043d825281b1dcd92c77f735/execroot/_main/bazel-out/k8-fastbuild/bin/kernel_device_modules-6.12/mgk_64_k612_customer_modules_install.user/`
+`out_bazel/*/execroot/_main/bazel-out/k8-fastbuild/bin/kernel_device_modules-6.12/mgk_64_k612_customer_modules_install.user/`
 
 #### Build 6.18 (pratinjau)
 
@@ -149,8 +160,9 @@ Refaktor ini ada di commit modul perangkat [`0fba8e7`](https://github.com/ramabo
 `X6871.config` diterapkan sesudahnya untuk fitur perangkat. Simbol baru
 dideklarasikan di `kernel/configs/Kconfig.x6871` dan dibaca melalui
 `Kconfig.ext`; aturan DDK memakai konfigurasi yang dihasilkan Kconfig.
-Tidak ada perubahan pada tree `kernel-6.12` (GKI).
-Gunakan kedua fragment saat membangun branch port X6871. `OVERLAYS=""`
+Tidak ada perubahan pada tree `kernel-6.12` (GKI). Pola fragment yang sama
+juga dipakai di `kernel_device_modules-6.18/kernel/configs/` untuk build
+6.18. Gunakan kedua fragment saat membangun branch port X6871. `OVERLAYS=""`
 ditujukan untuk checkout baseline MTK yang dijelaskan di bawah.
 
 Audit 106 commit modul perangkat (`06079c2..fa18f7f`):
@@ -214,10 +226,8 @@ termasuk penyiapan base TWRP dan packer.
 Skrip ini menjalankan build di `### Perintah build`, mengambil staging
 **hasil build itu**, men-stage 222 modul dari `tools/recovery-modules.txt`
 (221 modul pada `tools/recovery-modules-6.18.txt` untuk 6.18), menghapus debug
-info, meregenerasi `modules.dep`/`alias`/`softdep`, pack dengan `vbwork-twrp`,
-lalu membongkar hasilnya dan **gagal** kalau ada `.ko` yang beda dari staging.
-Modul tidak pernah disalin dari image lama. Info commit/md5 ditulis ke
-`<out>.buildinfo`.
+info, meregenerasi `modules.dep`/`alias`/`softdep`, pack dengan
+`Android_boot_image_editor`, lalu membongkar hasilnya dan **gagal** kalau ada `.ko` yang beda dari staging. Modul tidak pernah disalin dari image lama. Info commit/md5 ditulis ke `<out>.buildinfo`.
 
 Menambah/mengurangi modul recovery: edit `tools/recovery-modules*.txt`,
 `tools/modules.load*`, dan `tools/modules.load.recovery*` sekaligus.
@@ -334,7 +344,8 @@ Catatan penting profil ini:
   dan tidak menyentuh `r13` maupun revisi LTS yang lebih baru. Set 5 image
   `6.18.65-android17-6-g39d19ad1a460-rama982-4k` (`4cc5bb220b50` + `39d19ad1a460`)
   sudah lulus uji live di X6871 (boot, kamera/VENC, VP8/VP9/AV1, DPE, CMDQ, thermal
-  LVTS, dan touch dengan `0` panic/Oops; rincian di
+  LVTS, touch, serta fix minor `kthread_run_worker` dan `/proc/mtk_typec`
+  dengan `0` panic/Oops; rincian di
   [`STATUS.md`](../6.18/STATUS.md) dan [`TRACKER.md`](../6.18/TRACKER.md)).
 - `patches/kleaf-localversion-suffix.patch` menambah env var opsional
   `LOCALVERSION_SUFFIX` di `build/kernel/kleaf/workspace_status_stamp.py`
@@ -358,14 +369,12 @@ Catatan penting profil ini:
   `pigz -dc file.tar.gz | tar -x -C dir` — 7.106 file <60 s.
 - **Jangan menyalin `.ko` dari image lama sebagai baseline repack.** Itu
   penyebab `usb-replug` memuat panel driver pra-perbaikan layar
-  ([`PRETEST.md` §43](../archive/6.12/PRETEST.md)). Selalu pakai `tools/repack-vendor-boot-latest.sh`;
-  direktori baseline lama (`cmp-out/vbverify5`, `cmp-out/xcmp`) sudah
-  dihapus.
+  ([`PRETEST.md` §43](../archive/6.12/PRETEST.md)). Selalu pakai `tools/repack-vendor-boot-latest.sh`.
 
 ## Resep verifikasi
 
 ```bash
-B=<staging di atas>; F=~/tmp/x6871/vr/root/lib/modules
+B=<dir-modul-staging>; F=<dir-modul-stock>
 # ekspor
 diff <(readelf -sW $B/<m>.ko | awk '$4=="FUNC"&&$7!="UND"&&$5=="GLOBAL"&&$8!=""{print $8}' | sort -u) \
      <(readelf -sW $F/<m>.ko | awk '$4=="FUNC"&&$7!="UND"&&$5=="GLOBAL"&&$8!=""{print $8}' | sort -u)

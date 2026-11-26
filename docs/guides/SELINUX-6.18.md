@@ -1,6 +1,6 @@
 # SELinux `firmware_load` — syarat boot sistem 6.18
 
-Diperbarui: 2026-11-23
+Diperbarui: 2026-11-26
 
 Kernel 6.18 memeriksa `READING_FIRMWARE` di
 `selinux_kernel_read_file()`, sedangkan 6.12 tidak. Policy Android 16
@@ -106,6 +106,11 @@ WiFi/Bluetooth bisa dinyalakan.
   `connsys_vendor_file`. Setelah `vendor_sepolicy.cil` (md5
   `5b0827a140e928900a4b91006fba301d`) memakai allow tersebut,
   **WiFi dan Bluetooth PASS** (dikonfirmasi pengguna 2026-11-23).
+- Uji live `6.18.65-android17-6-g39d19ad1a460-rama982-4k` (2026-11-25): patch
+  `firmware_load` yang sama tetap **PASS** (`0` kegagalan pemuatan firmware
+  karena `firmware_load`; AVC userspace `tranhalconfig` yang tercatat di
+  [`TRACKER.md` §5.5](../6.18/TRACKER.md#55-tranhalconfig--userspacesepolicy)
+  merupakan isu terpisah pada vendor service/sepolicy).
 - TWRP touch/vibrator tidak memakai patch ini; itu diperbaiki lewat
   policy TWRP di `vendor_boot` (lihat
   [`BRINGUP-LOG.md`](../archive/6.18/BRINGUP-LOG.md#twrp-touch--vibrator-test12)).
