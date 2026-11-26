@@ -1,10 +1,10 @@
 # Tabel perangkat X6871 (dari DTBO + base DTB)
 
-Sumber: hasil decompile DT yang dipakai X6871.
+Sumber: hasil decompile DT stock yang dipakai X6871.
 
 ```text
-base DTB : ~/tmp/x6871/base.dts
-overlay  : ~/tmp/x6871/frag0.dts   (dtbo.img, fragment@0-73)
+base DTB : DTB vendor_boot stock
+overlay  : dtbo.img stock (fragment@0-73)
 ```
 
 Kolom **Asal** dihasilkan otomatis:
@@ -20,51 +20,53 @@ Kolom **Asal** dihasilkan otomatis:
 
 ## Cara regenerasi
 
-Contoh ini mereproduksi snapshot KMI 5 dengan dump DT dan direktori modul
-lokal; input tersebut tidak disertakan di repo. Untuk memetakan build lain,
-sesuaikan `W`, `KD`, dan direktori modul dengan artefak yang ingin diaudit.
+Contoh ini mereproduksi pemetaan DT dengan dump DT dan direktori modul
+lokal; input tersebut tidak disertakan di repo. Sesuaikan `W`, `DT_DIR`,
+`WORK`, `KD`, dan direktori modul dengan artefak yang ingin diaudit.
 Tabel ini memetakan driver, bukan hasil uji runtime (lihat [riwayat hasil uji](../archive/6.12/HANDOFF-HISTORY.md)).
 
 ```sh
-cd ~
 M=x6871-kernel-manifest/tools
-W=w1vo  # workspace kernel untuk snapshot ini; sesuaikan dengan checkout lokal
-L=tmp
-KD=6.12.38-android16-5-g2c4fd33ae6d8-4k
-mkdir -p cmp-out
+W=<ws>             # workspace kernel (6.12 atau 6.18)
+DT_DIR=<dir-dt>    # direktori berisi base.dts dan overlay.dts hasil dtc
+WORK=<work-dir>
+KD=<kver>          # mis. 6.12.92-android16-6-... atau 6.18.65-android17-6-...
+mkdir -p "$WORK"
 
 # 1. node DT -> compatible
-./$M/dts-devices.py tmp/x6871/base.dts tmp/x6871/frag0.dts > cmp-out/devices-raw.tsv
-cut -f2 cmp-out/devices-raw.tsv | tr '|' '\n' | sort -u > cmp-out/allcompat.txt
+./"$M"/dts-devices.py "$DT_DIR"/base.dts "$DT_DIR"/overlay.dts > "$WORK"/devices-raw.tsv
+cut -f2 "$WORK"/devices-raw.tsv | tr '|' '\n' | sort -u > "$WORK"/allcompat.txt
 
 # 2. compatible -> modul (alias of: di .ko)
-./$M/dt-compat-map.py $L/twrp-src/lib/modules/$KD \
-    $L/dlkm-src/vendor_dlkm/lib/modules/$KD \
-    $L/dlkm-src/odm_dlkm/lib/modules/$KD \
-    $L/twrp-set2/lib/modules/$KD \
-    $L/stock-dlkm/vendor_dlkm/lib/modules \
-    $L/stock-dlkm/odm_dlkm/lib/modules > cmp-out/compat-map.tsv
+./"$M"/dt-compat-map.py <dir-modul-vendor_boot>/lib/modules/"$KD" \
+    <dir-modul-vendor_dlkm>/lib/modules/"$KD" \
+    <dir-modul-odm_dlkm>/lib/modules/"$KD" \
+    <dir-modul-stock-vendor_dlkm>/lib/modules \
+    <dir-modul-stock-odm_dlkm>/lib/modules > "$WORK"/compat-map.tsv
 
 # 3. compatible -> berkas sumber
-./$M/compat-source-index.py cmp-out/allcompat.txt \
-    $W/kernel_device_modules-6.12 $W/kernel-6.12 $W/vendor/mediatek/kernel_modules \
-    > cmp-out/compat-src.txt
-./$M/compat-source-index.py cmp-out/allcompat.txt \
-    $W/kernel_device_modules-6.12 $W/kernel-6.12 $W/vendor/mediatek/kernel_modules \
-    --ext .dtsi,.dts > cmp-out/compat-dtsi.txt
+./"$M"/compat-source-index.py "$WORK"/allcompat.txt \
+    "$W"/kernel_device_modules-<kver-short> "$W"/<gki-dir> "$W"/vendor/mediatek/kernel_modules \
+    > "$WORK"/compat-src.txt
+./"$M"/compat-source-index.py "$WORK"/allcompat.txt \
+    "$W"/kernel_device_modules-<kver-short> "$W"/<gki-dir> "$W"/vendor/mediatek/kernel_modules \
+    --ext .dtsi,.dts > "$WORK"/compat-dtsi.txt
 
 # 4. berkas sumber -> nama modul
-./$M/src-to-module.py $W/kernel_device_modules-6.12 \
-    $W/vendor/mediatek/kernel_modules > cmp-out/src-module.tsv
+./"$M"/src-to-module.py "$W"/kernel_device_modules-<kver-short> \
+    "$W"/vendor/mediatek/kernel_modules > "$WORK"/src-module.tsv
 
 # 5. susun tabel
-./$M/dt-device-table.py cmp-out/devices-raw.tsv cmp-out/compat-map.tsv \
-    cmp-out/compat-src.txt cmp-out/src-module.tsv cmp-out/compat-dtsi.txt
+./"$M"/dt-device-table.py "$WORK"/devices-raw.tsv "$WORK"/compat-map.tsv \
+    "$WORK"/compat-src.txt "$WORK"/src-module.tsv "$WORK"/compat-dtsi.txt
 ```
 
 ## Ringkasan
 
-Node dengan `compatible` dan status `okay`: **978**. Sebaran:
+Snapshot awal mencatat **978** node dengan `compatible` (diambil sebelum
+perbaikan urutan parsing `status` pada `tools/dts-devices.py`, sehingga
+beberapa node yang berstatus `disabled` di DTB stock — terutama ADSP —
+ikut tercantum). Sebaran:
 
 ```text
 module=470, dt=371, builtin=130, ?=7
@@ -91,7 +93,7 @@ module=470, dt=371, builtin=130, ?=7
 | Audio codec | `/spmi@1c804000/second_pmic@5/mt6368codec` | `mediatek,mt6368-sound` | `snd_soc_mt6368` | source |
 | Audio amp (FS15xx) | `frag@5/fs15xx_pa@34` | `foursemi,fs15xx` | `snd_soc_fs1599` | source |
 | SCP | `/scp@1c700000` | `mediatek,scp` | `scp` | source |
-| ADSP | `/soc/adsp-core0@1e020000` | `mediatek,mt6895-adsp_core_0` | `drivers/misc/mediatek/adsp/v2/adsp_driver_v2.c` | built-in |
+| ADSP (`disabled` di DTB stock; [TRACKER §4](../6.18/TRACKER.md#4-adsp-stock-dtb-disabled-dt-tree-tidak-dipakai)) | `/soc/adsp-core0@1e020000` | `mediatek,mt6895-adsp_core_0` | `drivers/misc/mediatek/adsp/v2/adsp_driver_v2.c` | built-in |
 | WiFi | `/wifi@18000000` | `mediatek,wifi` | `connectivity/wlan/core/gen4m/os/linux/hif/axi/axi.c` | built-in |
 | NFC | `frag@9/nfc_nxp@28` | `nxp,pn544` | `nfc_i2c` | source |
 | Fingerprint | `frag@13/fingerprint@0` | `tran_fp_legacy` | `tran_fp` | source |
@@ -423,9 +425,9 @@ module=470, dt=371, builtin=130, ?=7
 | `/mtk-btcvsd-snd@18830000` | `mediatek,mtk-btcvsd-snd` | `mtk_btcvsd` | source |
 | `/snd-audio-dsp` | `mediatek,snd-audio-dsp` | `snd_soc_audiodsp_common` | source |
 | `/snd-scp-ultra` | `mediatek,snd-scp-ultra` | `snd_soc_mtk_scp_ultra` | source |
-| `/soc/adsp-core0@1e020000` | `mediatek,mt6895-adsp_core_0` | `drivers/misc/mediatek/adsp/v2/adsp_driver_v2.c` | built-in |
-| `/soc/adsp-core1@1e090000` | `mediatek,mt6895-adsp_core_1` | `drivers/misc/mediatek/adsp/v2/adsp_driver_v2.c` | built-in |
-| `/soc/adspsys@1e000000` | `mediatek,mt6895-adspsys` | `drivers/misc/mediatek/adsp/v2/adsp_driver_v2.c` | built-in |
+| `/soc/adsp-core0@1e020000` (`disabled` di DTB stock) | `mediatek,mt6895-adsp_core_0` | `drivers/misc/mediatek/adsp/v2/adsp_driver_v2.c` | built-in |
+| `/soc/adsp-core1@1e090000` (`disabled` di DTB stock) | `mediatek,mt6895-adsp_core_1` | `drivers/misc/mediatek/adsp/v2/adsp_driver_v2.c` | built-in |
+| `/soc/adspsys@1e000000` (`disabled` di DTB stock) | `mediatek,mt6895-adspsys` | `drivers/misc/mediatek/adsp/v2/adsp_driver_v2.c` | built-in |
 | `/sound` | `mediatek,mt6895-mt6368-sound` | `mt6895-mt6368` | source |
 | `/spmi@1c804000/second_pmic@5/accdet` | `mediatek,mt6368-accdet` | `mt6368-accdet` | source |
 | `/spmi@1c804000/second_pmic@5/mt6368codec` | `mediatek,mt6368-sound` | `snd_soc_mt6368` | source |

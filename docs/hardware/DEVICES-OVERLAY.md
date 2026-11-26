@@ -1,8 +1,8 @@
 # Perangkat X6871 yang hanya ada di fragment overlay (DTBO)
 
-Tabel ini hanya memuat node yang **datang dari overlay** (`frag0.dts`,
-hasil decompile `dtbo.img`, `fragment@0`–`fragment@73`), dan bukan dari
-base DTB (`base.dts`, 916 node ber-`compatible`).
+Tabel ini hanya memuat node yang **datang dari overlay** (`dtbo.img` stock,
+`fragment@0`–`fragment@73`), dan bukan dari base DTB (`vendor_boot` stock,
+916 node ber-`compatible`).
 
 ```text
 overlay saja         : 62 node (status okay)
@@ -25,16 +25,15 @@ Kolom **Asal**:
 | `**MISMATCH**` | stock punya `of_match`, build kita tidak -> driver tidak akan bind |
 | `tidak ada` | tidak ada driver |
 
-Cara regenerasi (gunakan input DT dan indeks modul dari [DEVICES](DEVICES.md#cara-regenerasi)):
+Cara regenerasi (gunakan `DT_DIR`, `WORK`, dan indeks modul dari [DEVICES](DEVICES.md#cara-regenerasi)):
 
 ```sh
-cd ~
 M=x6871-kernel-manifest/tools
-./$M/dts-devices.py tmp/x6871/frag0.dts > cmp-out/dev-overlay.tsv
-./$M/dts-devices.py tmp/x6871/base.dts > cmp-out/dev-base.tsv
-BASE_TSV=cmp-out/dev-base.tsv ./$M/dt-device-table.py \
-    cmp-out/dev-overlay.tsv cmp-out/compat-map.tsv \
-    cmp-out/compat-src.txt cmp-out/src-module.tsv cmp-out/compat-dtsi.txt
+./"$M"/dts-devices.py "$DT_DIR"/overlay.dts > "$WORK"/dev-overlay.tsv
+./"$M"/dts-devices.py "$DT_DIR"/base.dts > "$WORK"/dev-base.tsv
+BASE_TSV="$WORK"/dev-base.tsv ./"$M"/dt-device-table.py \
+    "$WORK"/dev-overlay.tsv "$WORK"/compat-map.tsv \
+    "$WORK"/compat-src.txt "$WORK"/src-module.tsv "$WORK"/compat-dtsi.txt
 ```
 
 ## Ringkasan
