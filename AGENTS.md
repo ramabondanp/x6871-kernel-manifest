@@ -116,6 +116,13 @@ Jangan commit file donor, tarball, atau dump firmware ke repo.
   - Setiap menambah, memindahkan, atau menghapus dokumen di `docs/`, wajib
     memperbarui `docs/README.md` (serta `README.md` dan `AGENTS.md` bila
     relevan) dan memastikan tidak ada broken link relatif.
+  - **Keterbacaan ganda (manusia & agen):** dokumen aktif harus mudah
+    dipindai pembaca manusia, bukan sekadar dump catatan/handoff untuk LLM.
+    Taruh ringkasan/status terkini atau langkah operasional di atas, pecah
+    data padat (MD5, daftar status, matriks) menjadi tabel ringkas, dan
+    hindari *blockquote*/paragraf raksasa maupun jargon internal tanpa
+    konteks, sambil tetap mempertahankan bukti teknis (commit hash, MD5,
+    dan kutipan baris log).
 
 ## 6. Build, GKI, DTB/DTBO, dan image
 
@@ -175,5 +182,6 @@ Jangan commit file donor, tarball, atau dump firmware ke repo.
 - [ ] Bahasa, prefix/akhiran commit, dan `Signed-off-by` sesuai aturan.
 - [ ] Checkpatch commit message bersih (0 error).
 - [ ] Dokumentasi memakai kutipan log, tanpa nama file log lokal, path lokal mesin, maupun URL temporer.
+- [ ] Dokumentasi aktif mudah dipindai pembaca manusia (status terkini/langkah utama jelas di atas, tanpa jargon internal tanpa konteks).
 - [ ] Struktur `docs/` rapi sesuai aturan dan `docs/README.md` terbarui bila file berubah.
 - [ ] Testing yang belum dilakukan dicatat.
