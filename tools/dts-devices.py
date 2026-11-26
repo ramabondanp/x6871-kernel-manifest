@@ -37,13 +37,22 @@ def walk(path):
     text = re.sub(r"//[^\n]*", "", text)
 
     stack = []
-    ctxs = [{"compatible": None, "status": None}]
-    results = []
+    root_ctx = {
+        "path": "/",
+        "compatible": None,
+        "has_compat": False,
+        "status": None,
+        "parent": None,
+    }
+    ctxs = [root_ctx]
+    nodes = [root_ctx]
 
-    def eff_status():
-        for ctx in reversed(ctxs):
-            if ctx.get("status"):
-                return ctx["status"]
+    def eff_status(ctx):
+        cur = ctx
+        while cur is not None:
+            if cur["status"]:
+                return cur["status"]
+            cur = cur["parent"]
         return "okay"
 
     for raw in text.splitlines():
@@ -59,7 +68,15 @@ def walk(path):
         if m:
             name = m.group(1) + (m.group(2) or "")
             stack.append(name)
-            ctxs.append({"compatible": None, "status": None})
+            ctx = {
+                "path": "/" + "/".join(stack),
+                "compatible": None,
+                "has_compat": False,
+                "status": None,
+                "parent": ctxs[-1],
+            }
+            ctxs.append(ctx)
+            nodes.append(ctx)
             continue
         m = PROP_RE.match(line)
         if m:
@@ -67,15 +84,17 @@ def walk(path):
             if key == "compatible":
                 vals = split_compat(val)
                 ctxs[-1]["compatible"] = "|".join(vals) if vals else None
-                results.append(
-                    ("/" + "/".join(stack), ctxs[-1]["compatible"], eff_status())
-                )
+                ctxs[-1]["has_compat"] = True
             elif key == "status":
                 vals = split_compat(val)
                 ctxs[-1]["status"] = vals[0] if vals else None
             continue
 
-    return results
+    return [
+        (node["path"], node["compatible"], eff_status(node))
+        for node in nodes
+        if node["has_compat"]
+    ]
 
 
 if __name__ == "__main__":
