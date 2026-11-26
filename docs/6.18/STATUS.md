@@ -32,15 +32,20 @@ modul termuat, `8/8` `verify-kmi-abi.py` PASS):
   menjaga seluruh worker kthread di state `S` (`blocked for more than: 0`) dan
   `/proc/mtk_typec` (`112de113630b`, `587a0a7`) bersih (`already registered: 0`,
   `/proc/mtk_typec/smt_u2_cc_mode = 0`).
+- **Display C3D dual-pipe (`ac19f94d5e3e`, `b0786849b492`):** boot & PQ aktif
+  normal (`persist.vendor.sys.pq.disp.c3d.bypass=0`, `0` `skip flip`/`SRAM
+  config`/`flush failed`); pemakaian harian tetap dipantau untuk memastikan gejala
+  setengah hijau/biru intermiten tidak muncul kembali.
 - **Terbuka / belum diuji / skip:** pengukuran terpisah recovery report rate
-  pasca sleep/wake pada `report_rate_switch=1`; isu tersisa `tranhalconfig`
-  userspace (`222` AVC, `audit_lost: 21`); TEE/Widevine masuk kategori skip.
+  pasca sleep/wake pada `report_rate_switch=1`; pemantauan harian jangka
+  panjang fix C3D dual-pipe; isu tersisa `tranhalconfig` userspace (`222` AVC,
+  `audit_lost: 21`); TEE/Widevine masuk kategori skip.
 
 | Image Teruji (`6.18.65-android17-6-g39d19ad1a460-rama982-4k`) | MD5 |
 |---|---|
 | `boot-lz4.img` | `b62605570ef07c9ffe5a7fe4aaf1040d` |
 | `system_dlkm.flatten.erofs.img` | `8857cbd0d7de0bbaf087cbe80e0253ec` |
-| `vendor_boot.img` | `5395e3faaf9ed636177e2a0b45e941a7` |
+| `vendor_boot.img` | `d66511af5d0b1df39a3f670fd5d7f938` |
 | `vendor_dlkm.img` | `540b0a7cda2cf90ed2197ee061f1be78` |
 | `odm_dlkm.img` | `c1f97ae3fe5cf030f2b9e3e416055e58` |
 
@@ -64,6 +69,7 @@ diterapkan (`39d19ad1a460`) hingga upstream fix masuk.
 | Thermal LVTS (`soc_temp_lvts`) | **PASS di device** | Tabel 25 sensor stock (`cbabf0ea8c34`); `0` `Failed to register lvts tz`, `40` thermal zone aktif (`soc_max` `59.5°C` -> `72.6°C`; `apu2` `No data available` saat idle; `camera0..4` belum didaftarkan `imgsensor`) |
 | DPE `v4l2_fh` & CMDQ `vote mminfra` | **PASS di device** | `b83dca0` (`0` `v4l2_open` WARN, `[DPE]DPE open`/`release` bersih) & `a71cfd2` (`0` `vote mminfra on err`) |
 | Video VP8 / VP9 / AV1 | **PASS di device** | `213a184315ef` + `a719a23cee6d` + `ac2e63fe0411` (`VDEC_VP8 = 5`); VP9 (`25` sesi s.d. `1080x1920`), VP8 720p (`c2.mtk.vpx.decoder`, 120/120 frame, `132.0 fps`), dan AV1 720p/1080p (`c2.mtk.av1.decoder`, 120/120 frame, `228.0 / 110.5 fps`) PASS (`0` error) |
+| Display C3D dual-pipe (`mediatek_drm_v1`) | **Boot PASS / pantau harian** | Fix `ac19f94d5e3e` (`6.18`) & `b0786849b492` (`6.12`, belum dibuild): validasi SRAM kedua pipe + serialisasi `clk_lock -> data_lock` saat resume; di boot `6.18.65` (`vendor_boot_a` `d66511af5d0b1df39a3f670fd5d7f938`), `0` `skip flip`/`SRAM config`/`flush failed`; pemakaian harian tetap dipantau |
 | `tranhalconfig` | **Terbuka (userspace)** | Service/sepolicy vendor belum aktif (`222` AVC di `dmesg`, `audit_lost: 21`) |
 | ADSP / `fpsgo`/`trans_sched` / TEE Widevine | **Known limitation / skip** | ADSP disabled di DTB stock (`total 0` core; saat early boot `t=5.77s` modul tetap mencetak 1x `adsp_system_bootup fail ret(-14)` dan 80x `invalid cid` lalu berhenti); `trans_sched`/`fpsgo` wrapper tanpa source; TEE/Widevine isu provisioning/TA (di-skip) |
 

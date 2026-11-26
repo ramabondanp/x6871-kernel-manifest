@@ -21,10 +21,10 @@ Diperbarui: 2026-11-26 (UTC)
 ### Yang Masih Terbuka & Belum Diuji
 
 - **Terbuka (userspace/SELinux):** service `tranhalconfig` vendor belum aktif (`222` AVC, `audit_lost: 21` di `6.18.65` — §5.5).
-- **Belum diuji terpisah:** pengukuran recovery report rate touch GT9916 pasca sleep/wake pada kondisi `report_rate_switch=1` (§5.8).
+- **Belum diuji terpisah:** pengukuran recovery report rate touch GT9916 pasca sleep/wake pada kondisi `report_rate_switch=1` (§5.8), serta pemantauan pemakaian harian untuk fix C3D dual-pipe pasca boot PASS (`ac19f94d5e3e` / `b0786849b492` — §5.9).
 - **Known limitation / skip:** ADSP (`disabled` di DTB stock — §4), wrapper `fpsgo.ko`/`trans_sched.ko` tanpa source (§5.6), serta TEE/Widevine (isu provisioning/TA — §5.7).
 
-Seluruh crash/Oops, RCU stall/MIUMPU, VP8/VP9/AV1, H.264/VENC, kamera/AIE, DPE `v4l2_fh`, CMDQ `vote mminfra`, thermal LVTS, dan error minor kernel (`kthread_run_worker`, `/proc/mtk_typec`) sudah **terverifikasi PASS** di perangkat nyata (`6.18.65`).
+Seluruh crash/Oops, RCU stall/MIUMPU, VP8/VP9/AV1, H.264/VENC, kamera/AIE, DPE `v4l2_fh`, CMDQ `vote mminfra`, thermal LVTS, dan error minor kernel (`kthread_run_worker`, `/proc/mtk_typec`) sudah **terverifikasi PASS** di perangkat nyata (`6.18.65`). Fix C3D dual-pipe juga **boot & PQ PASS** di perangkat (`6.18.65`), tinggal pemantauan harian agar gejala intermiten dipastikan tidak kambuh.
 
 | Kategori | Status | Tindakan |
 |---|---|---|
@@ -36,6 +36,7 @@ Seluruh crash/Oops, RCU stall/MIUMPU, VP8/VP9/AV1, H.264/VENC, kamera/AIE, DPE `
 | CMDQ/GCE + MML | **Terverifikasi PASS di device** | `0` `vote mminfra on err` di boot `6.18.65`; display, kamera, codec, MML normal |
 | Thermal `lvts`/`soc_max` | **Terverifikasi PASS di device** | `0` `Failed to register lvts tz`; 40 zone aktif (`soc_max` `59.5°C` -> `72.6°C`) |
 | Touch (`gt9916_common` + `adaptive-ts`) | **Terverifikasi PASS di device** | Node & `vendor.hardware.trantp-service` aktif, `~352–354 Hz`, charger anti-noise PASS; sisa ukur sleep/wake pada `report_rate_switch=1` |
+| Display C3D dual-pipe (`mtk_disp_c3d`) | **Boot PASS / pantau harian** | `ac19f94d5e3e` (`6.18`) / `b0786849b492` (`6.12`); boot `6.18.65` & PQ aktif normal (`0` `skip flip`/`SRAM config`/`flush failed`), pantau pemakaian harian |
 | `tranhalconfig` | **Terbuka, userspace** | Masih `222` AVC & `audit_lost: 21` di `6.18.65`; perlu fix service/sepolicy vendor |
 | `fpsgo`/`trans_sched` | **Known limitation; skip di 6.18** | Jangan buat stub palsu; core FPSGO tetap jalan |
 | TEE/Widevine | **Skip (known limitation)** | Provisioning/TA, bukan DT/driver (sama dengan 6.12 port); cek `DRM Info`/DRM di-skip |
@@ -783,6 +784,57 @@ runtime, `9.843` simbol ABI).
   `fuelgauged` (`charge_full=5000000`, `Charging`), `/dev/goodix_fp`,
   `/dev/aw8697_haptic`, dan `/dev/pn553`.
 
+### 5.9 Display C3D dual-pipe (layar setengah hijau/biru intermiten)
+
+**Status:** **Boot PASS di `6.18.65` (`ac19f94d5e3e`, `b0786849b492`); pantau pemakaian harian.**
+
+Gejala di perangkat: separuh kanan layar dual-pipe (`1080x2436`) sesekali
+berwarna hijau/biru, lalu normal kembali setelah layar dimatikan dan
+dinyalakan lewat tombol power.
+
+**Akar masalah (`drivers/gpu/drm/mediatek/mediatek_v2/v1/mtk_disp_c3d.c`):**
+
+1. `disp_c3d_check_sram()` hanya mengembalikan `false` saat `sram_int !=
+   c3d_force_sram_apb` pada pipe kiri (`!is_right_pipe`) dan memutasi
+   `C3D_SRAM_CFG` sebelum validasi selesai, sehingga pipe kanan bisa
+   mengisi bank SRAM yang berlawanan sebelum flip bersamaan.
+2. `disp_c3d_config()` hanya memegang `data_lock` sementara
+   `disp_c3d_set_3dlut()` memegang `clk_lock` saat check/flush/flip, menyisakan
+   jendela balapan antara konfigurasi pipe kiri dan pipe kanan saat resume.
+3. `disp_c3d_set_3dlut()` mengembalikan `0` ketika CRTC tidak aktif dan
+   mengabaikan status gagal `disp_c3d_flush_3dlut_sram()`, sehingga
+   `disp_c3d_cfg_set_lut()` menganggap `ret == 0` sebagai sukses dan terlalu
+   dini menonaktifkan bypass C3D serta menandai `c3d_sram_hw_init = 1`.
+
+**Commit fix:**
+
+- `ac19f94d5e3e` (`x6871-android17-6.18`): validasi kedua pipe (`disp_c3d_check_sram_all()`)
+  serta kecocokan `c3d_force_sram_apb` sebelum mengubah mode ping-pong,
+  serialisasi config vs LUT userspace di bawah `clk_lock -> data_lock` dengan
+  guard `sram_need_restore` lintas resume dual-pipe, cek status `cmdq_pkt_flush()`
+  sebelum flip, serta kembalikan `1` hanya setelah flush + flip nyata berhasil.
+- `b0786849b492` (`x6871-android16-6.12`): commit identik diterapkan langsung
+  ke branch 6.12 (belum dibuild sesuai scope rilis).
+
+**Artefak & hasil verifikasi (`6.18.65-android17-6-g39d19ad1a460-rama982-4k`):**
+
+- `vendor_boot.img` MD5 `d66511af5d0b1df39a3f670fd5d7f938` (`221` modul, `dtb`
+  identik stock `ead6a965b0aaacc2a9c520721693f342`, `8/8` `verify-kmi-abi.py`
+  PASS; terverifikasi cocok di partisi aktif `vendor_boot_a`).
+- Uji boot & status PQ di perangkat nyata **PASS** (`495` modul termuat,
+  `vendor.mediatek.hardware.pq_aidl-service` aktif, layar `1080 x 2436` normal):
+
+```text
+[    6.266330] init: SysPropSet: persist.vendor.sys.pq.disp.c3d.bypass to 0
+[   11.608995] init: ReapLogP Persist PropSet [persist.vendor.sys.pq.disp.c3d.bypass] = [0] at 11601, Done
+[   11.796239] [DISP]CRTC0 hold wakelock mtk_drm_crtc_atomic_resume 15481 cnt(1)
+Internal error: 0 / WARNING: CPU: 0 / Oops: 0 / rcu_preempt detected stalls: 0 / blocked for more than: 0
+EMIMPU: 0 / MIUMPU: 0 / skip flip: 0 / SRAM config: 0 / force_sram_apb mismatch: 0 / flush failed: 0
+```
+
+- **Uji belum selesai:** pemantauan pemakaian harian jangka panjang untuk
+  memastikan gejala intermiten setengah hijau/biru tidak berulang.
+
 ## 6. Error Minor/Rendah
 
 Hasil analisa seluruh 11 item error minor dari log boot `6.18`, source tree,
@@ -846,6 +898,10 @@ Status verifikasi pada uji live `6.18.65-android17-6-g39d19ad1a460-rama982-4k`:
     `getevent -lt` terukur `~352–354 Hz`, `charger mode in/out` & `resume restore charger mode`
     tanpa `failed send charger_cmd` — **PASS** (recovery pasca sleep/wake
     pada `report_rate_switch=1` **belum diukur terpisah**).
+11. Display C3D dual-pipe (`ac19f94d5e3e`, `b0786849b492`): boot `6.18.65` &
+    PQ aktif normal (`persist.vendor.sys.pq.disp.c3d.bypass=0`, `0` `skip flip`/
+    `SRAM config`/`flush failed`) — **Boot PASS** (pemantauan pemakaian harian
+    tetap berjalan).
 
 ## 8. Urutan Kerja yang Disarankan
 
@@ -853,6 +909,7 @@ Status verifikasi pada uji live `6.18.65-android17-6-g39d19ad1a460-rama982-4k`:
 |---|---|---|
 | P0 | Verifikasi crash/EMI pasca-fix dengan log baru | **Selesai (PASS di `6.18.65`)** — 7 Oops + RCU stall + EMI `0` kemunculan |
 | P0 | Video VP9 / VP8 / AV1 | **Selesai (PASS di `6.18.65`)** — VP9, VP8 720p, dan AV1 720p/1080p terverifikasi PASS (`0` error) |
+| P1 | Display C3D dual-pipe (`mtk_disp_c3d`) | **Boot PASS di `6.18.65`** (`ac19f94d5e3e`, `b0786849b492`); pantau pemakaian harian |
 | P1 | Pastikan DTB/DTBO stock yang dipakai, bukan DT tree | **Selesai (PASS di `6.18.65`)** — ADSP `disabled` sesuai stock |
 | P1 | Thermal LVTS: verifikasi fix di device | **Selesai (PASS di `6.18.65`)** — 40 zone aktif, `soc_max` responsif |
 | P1 | `tranhalconfig` | **Terbuka (userspace)** — `222` AVC & `audit_lost: 21`, perlu fix vendor/sepolicy |
