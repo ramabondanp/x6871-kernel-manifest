@@ -1,5 +1,10 @@
 # Referensi Firmware OPPO PMX110 (MediaTek 6.18)
 
+> Catatan: dokumen ini adalah snapshot referensi historis (2026-11-23) untuk
+> porting Fase 2 yang kini sudah selesai. Untuk status build dan uji
+> perangkat terkini, lihat [`STATUS.md`](STATUS.md) dan
+> [`TRACKER.md`](TRACKER.md).
+
 Dump: `rama-firmware-dumps/oppo/PMX110`, branch
 `sys_mssi_64_cn_armv82-user-17-CP2A.260605.016-1789749211753-release-keys`
 (Android 17, MediaTek 6.18).

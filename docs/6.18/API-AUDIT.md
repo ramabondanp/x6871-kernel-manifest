@@ -1,6 +1,6 @@
 # Audit API 6.18 pada Modul OOT X6871
 
-Diperbarui: 2026-11-25
+Diperbarui: 2026-11-26
 
 > Catatan: audit statis awal dilakukan sebelum bringup di perangkat, lalu diperbarui dengan temuan runtime 6.18. Untuk status boot dan hasil uji terkini, lihat [`STATUS.md`](STATUS.md) dan [`TRACKER.md`](TRACKER.md).
 
@@ -34,7 +34,8 @@ perubahan signature). Audit dilakukan tanpa hardware, memakai hasil build
 | layout `module_sect_attrs`/`module_notes_attrs` | `attribute_group.bin_attrs` terminator NULL | `mrdump` | diperbaiki |
 | prototipe probe `ufshcd_*` | `enum ufs_trace_str_t` | `ufs-mediatek-dbg` | diperbaiki |
 | probe `pm_qos_*` | `s32` / `enum pm_qos_req_action` | `met` | diperbaiki |
-| V4L2 ioctl `priv` | 6.18 mengirim `NULL` ke semua handler; driver harus ambil fh dari `file->private_data` | `mtk-vcodec-dec/enc`, `mtk-jpeg` | diperbaiki: `fh_to_ctx(file->private_data)`; qbuf jpeg tidak lagi menolak `priv == NULL` |
+| V4L2 ioctl `priv` | 6.18 mengirim `NULL` ke semua handler; driver harus ambil fh dari `file->private_data` | `mtk-vcodec-dec/enc`, `mtk-jpeg`, `mtk-aie` | diperbaiki: `fh_to_ctx(file->private_data)` (`41f442c`, `29ba44c`, `96f4120`); qbuf jpeg tidak lagi menolak `priv == NULL` |
+| `v4l2_open` (`V4L2_FL_USES_V4L2_FH`) | 6.18 mewajibkan `v4l2_fh` pada setiap video node V4L2 (`WARN` + `-ENODEV` bila tidak ada) | `camera_dpe_isp70` | diperbaiki: tambah `struct v4l2_fh` di `DPE_USER_INFO_STRUCT` + `v4l2_fh_init/add/del/exit` (`b83dca0`) |
 | `kthread_create_worker` | 6.18 tidak lagi memanggil `wake_up_process()`, memicu `hung_task` pada worker idle (`hf_manager`, `mml_work1`) | `hf_manager`, `mtk-mml`, `mtk_drm`, `ufcs_class`, Mali Avalon `a16w` | diperbaiki: `kthread_run_worker()` (`7d92fc24ce41`, `611ad1f`) |
 
 ## Perubahan yang diperiksa dan dinilai aman
@@ -57,10 +58,12 @@ perubahan signature). Audit dilakukan tanpa hardware, memakai hasil build
 | `devm_gpio_request_one`, `dma_pool_create_node` | wrapper dengan argumen tambahan |
 | `hrtimer_setup`, `timer_init_key`, `debugfs_create_file_full`, `alloc_workqueue_noprof` | rename/wrapper profil |
 
-## Sisa risiko yang hanya bisa dibuktikan saat boot
+## Status verifikasi runtime pasca-bringup
 
-Hal-hal berikut tidak dapat dipastikan lewat scan statis dan perlu uji
-hardware setelah `vendor_boot-6.18-test4.img`:
+Daftar area berikut pada awalnya tidak dapat dipastikan lewat scan statis,
+dan pada uji boot penuh `6.18.65-android17-6-g39d19ad1a460-rama982-4k`
+seluruh subsistem terkait berjalan normal tanpa crash/Oops maupun kernel
+warning pada jalur berikut:
 
 - field EEVDF `cfs_rq`/`rq` di `scheduler.ko`, `cpufreq_sugov_ext.ko`,
   `task_turbo.ko`, `vip_engine.ko`;
@@ -71,8 +74,9 @@ hardware setelah `vendor_boot-6.18-test4.img`:
   `ufs-mediatek-dbg.ko` dan `mtk_core_ctl.ko`;
 - private io-pgtable di `iommu_debug.ko`;
 - runtime hwparams dan DAPM audio (`snd-soc-mt6895-afe`,
-  `snd-soc-mt6368`);
-- apakah `bridge`/panel dan IOMMU display menunggu driver dengan benar.
+  `snd-soc-mt6368`, speaker & amplifier aktif);
+- `bridge`/panel dan IOMMU display (termasuk `mtk_iommu_hw_program()` untuk
+  APU IOMMU pasca-RCX resume `6ebc4934a74a`).
 
 ## Reproduksi
 

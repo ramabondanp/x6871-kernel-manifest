@@ -11,7 +11,8 @@
        .repo/local_manifests/x6871-6.18.xml
     repo sync -j16
 
-  Profil ini adalah target PLAN-6.18 (docs/PLAN-6.18.md):
+  Profil ini adalah target port 6.18 (docs/6.18/STATUS.md dan
+  docs/archive/6.18/PLAN-INITIAL.md):
     - GKI AOSP murni dipin ke tag android17-6.18-2026-09_r13
       (kernel/common 910ab23e44c4, Linux 6.18.32, KMI 5, 4 KB)
       di path bawaan common.

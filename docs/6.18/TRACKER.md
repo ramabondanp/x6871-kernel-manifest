@@ -1,6 +1,6 @@
 # PLAN 6.18 Lanjutan — Temuan Log dan Prioritas Perbaikan
 
-Diperbarui: 2026-11-25 (UTC)
+Diperbarui: 2026-11-26 (UTC)
 
 > Dokumen ini adalah lanjutan dari [`STATUS.md`](STATUS.md).
 > Fokusnya bukan menambah fitur, tetapi menutup temuan dari log boot 6.18:
@@ -58,15 +58,16 @@ atau masih terbuka di userspace ditandai eksplisit pada tiap subbagian.
 
 ## 3. Crash/Oops yang Sudah Punya Fix
 
-Semua temuan di bawah sudah punya commit yang menyasar signature yang sama.
-Belum ada log baru setelah commit, jadi tetap perlu verifikasi.
+Semua temuan di bawah sudah punya commit yang menyasar signature yang sama
+dan telah terverifikasi **PASS** pada uji live `6.18.65` (lihat hasil
+verifikasi di bawah tabel).
 
 | Gejala | Fix yang cocok |
 |---|---|
 | Oops `__pi_strcmp` dari `load_ko_addr_list [mrdump]` | `3fd701c` mrdump section attrs; `089b49c` treewide mrdump API |
 | Oops CFI di `ufshcd_add_uic_command_trace` | `6d2e8d1` UFS tracepoint prototypes; `3661489` UFS headers |
 | Oops `tfa_debug_probe [atf_logger]` | `54d86b4` ATF debug mapping |
-| Oops `device_link_add` setelah `mtk_ipesys_me_probe: larb node not found` | `e37b531` ipesys ME SMI LARB (vendor) |
+| Oops `device_link_add` setelah `mtk_ipesys_me_probe: larb node not found` | `b6da48e` ipesys ME SMI LARB (vendor; `5e9b2d8` di `6.12`) |
 | Oops `vidioc_vdec_querycap` | `41f442c` querycap file handle |
 | Oops `vidioc_vdec_s_fmt` | `29ba44c` V4L2 ioctl NULL priv |
 | Oops `mtk_aie_s_fmt_out_mp` | `96f4120` mtk-aie NULL fh (vendor) |
@@ -225,6 +226,9 @@ mtk_vdec_g_v_ctrl: Error!! Cannot get param                (7x)
   `drivers/media/platform/mtk-vcodec/mtk_vcodec_drv.h`, menyelaraskan ID
   decoder `VDEC_VP8..VDEC_AV1` ke `5..13` tanpa mengubah `VENC_H264..VENC_H263`
   (`1..7`) maupun `VDEC_VENC_MAX = 20`.
+- Fix lintas-branch untuk `6.12` juga sudah di-commit ke
+  `x6871-android16-6.12` (`5f5e6db` untuk `VDEC_VENC_MAX = 20` dan `b59e7dd`
+  untuk `VDEC_VP8 = 5`; belum dibuild `6.12` sesuai aturan).
 
 **Verifikasi:**
 
@@ -359,9 +363,10 @@ bagian itu.
 
 **`vote mminfra on err:1`:** `pm_runtime_get_sync()` mengembalikan 1
 kalau device sudah aktif. Tiga lokasi memeriksa `ret != 0` dan
-menganggap 1 sebagai error. Commit `a71cfd2` mengubahnya menjadi
-`ret < 0` di `cmdq-sec-mailbox.c` dan `mtk-cmdq-mailbox-ext.c`,
-konsisten dengan jalur `fast_mtcmos` yang sudah memakai `ret < 0`.
+menganggap 1 sebagai error. Commit `a71cfd2` (`d336937` di `6.12`)
+mengubahnya menjadi `ret < 0` di `cmdq-sec-mailbox.c` dan
+`mtk-cmdq-mailbox-ext.c`, konsisten dengan jalur `fast_mtcmos` yang sudah
+memakai `ret < 0`.
 
 **Gejala MML:**
 
@@ -449,10 +454,11 @@ dan driver mencoba id 26. Stock DTB hanya punya zone LVTS id 0..25, jadi
 sudah didaftarkan. Semua zone LVTS hilang; device hanya menyisakan zone
 non-LVTS, sehingga jumlahnya jauh lebih sedikit dari stock.
 
-Tabel 26 sensor yang sama juga ada di module 6.12 hasil port. Perlu dicek
-apakah 6.12 juga kehilangan zone LVTS; sumber donor MT6896 memakai tabel
-yang sama, jadi donor source bukan acuan untuk perilaku stock X6871.
-Acuannya adalah `soc_temp_lvts.ko` stock.
+Tabel 26 sensor yang sama juga ada di module 6.12 hasil port. Fix
+lintas-branch sudah di-commit ke `x6871-android16-6.12` (`64bf7a2`; belum
+dibuild `6.12` sesuai aturan). Sumber donor MT6896 memakai tabel yang sama,
+jadi donor source bukan acuan untuk perilaku stock X6871. Acuannya adalah
+`soc_temp_lvts.ko` stock.
 
 **Rencana fix:**
 
@@ -662,10 +668,10 @@ regresi L1 terukur dan source `V010`/`V013` tersedia.
 - Kalau L1 wajib, perlu provisioning vendor (SP Meta/DRM key install)
   dan bootloader terkunci; itu di luar scope kernel 6.18.
 
-**Verifikasi:** `DRM Info` menunjukkan level Widevine; playback DRM
-berjalan sesuai level yang tersedia. `gp_read_raw`, `insecure default`,
-dan `drDcihInit` boleh tetap muncul sebagai known limitation selama tidak
-ada crash dan level DRM sesuai kebijakan perangkat.
+**Kriteria verifikasi rujukan (bila dibuka kembali):** `DRM Info`
+menunjukkan level Widevine dan playback DRM berjalan sesuai level yang
+tersedia; `gp_read_raw`, `insecure default`, dan `drDcihInit` tetap
+diterima sebagai known limitation selama tidak ada crash.
 
 **Status di boot `6.18.65`:** **Skip** (known limitation non-kernel /
 provisioning TEE; cek `DRM Info` dan playback DRM dilewati).
@@ -707,7 +713,9 @@ firmware/config Goodix sudah sama.
    supply `"battery"` untuk mengirim command anti-noise charger (`0xaf`) dan
    memulihkannya saat resume ketika terpasang charger.
 
-*(Catatan: `fpsgo.ko` dan `trans_sched.ko` tetap menjadi known limitation
+*(Catatan: fix lintas-branch `adaptive-ts` + `gt9916_common` sudah di-commit
+ke `x6871-android16-6.12` pada `2418d20`, `131958d`, dan `0840327`; belum
+dibuild `6.12`. `fpsgo.ko` dan `trans_sched.ko` tetap menjadi known limitation
 terpisah di 6.18 pada §5.6.)*
 
 **Artefak teruji (`6.18.65-android17-6-g39d19ad1a460-rama982-4k`):**
@@ -848,5 +856,6 @@ Status verifikasi pada uji live `6.18.65-android17-6-g39d19ad1a460-rama982-4k`:
   perilaku stock.
 - Code warning checkpatch, DOS line endings, dan MAINTAINERS di luar scope
   dokumen ini.
-- `audit_lost=437` berarti sebagian denial SELinux mungkin tidak terlihat;
+- `audit_lost=437` pada log awal (dan `222` AVC / `audit_lost: 21` di boot
+  `6.18.65`) berarti sebagian denial SELinux mungkin tidak terlihat;
   setelah `tranhalconfig` dibereskan, audit perlu dicek ulang.

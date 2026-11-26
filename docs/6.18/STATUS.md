@@ -1,6 +1,6 @@
 # Status Eksekusi Port 6.18
 
-Diperbarui: 2026-11-25 (UTC)
+Diperbarui: 2026-11-26 (UTC)
 
 > Dokumen ini merangkum status port **6.18** dari rencana awal
 > ([`PLAN-INITIAL.md`](../archive/6.18/PLAN-INITIAL.md)). Baseline
@@ -17,9 +17,9 @@ Diperbarui: 2026-11-25 (UTC)
 > simbol ABI; `495` modul termuat di perangkat), dan lulus uji runtime di
 > perangkat (`boot-lz4.img` md5 `b62605570ef07c9ffe5a7fe4aaf1040d`,
 > `system_dlkm.flatten.erofs.img` `8857cbd0d7de0bbaf087cbe80e0253ec`,
-> `vendor_boot.img` `ea13b6dfe2de10b20f8a046d40c429f3`, `vendor_dlkm.img`
-> `c7aa223e09de1b1b50545edcb1fc0a08`, `odm_dlkm.img`
-> `773a5910abfac89c2dbd4fcf7bd74613`):
+> `vendor_boot.img` `5395e3faaf9ed636177e2a0b45e941a7`, `vendor_dlkm.img`
+> `540b0a7cda2cf90ed2197ee061f1be78`, `odm_dlkm.img`
+> `c1f97ae3fe5cf030f2b9e3e416055e58`):
 > - **Crash / EMI / Thermal:** `0` kemunculan `Internal error`, `WARNING: CPU`,
 >   `rcu_preempt detected stalls`, `[MIUMPU]srinfo_r 3`, `EMIMPU`,
 >   maupun `Failed to register lvts tz`.
@@ -85,7 +85,9 @@ Rincian langkah verifikasi dan prioritas P0–P3 ada di [`TRACKER.md`](TRACKER.m
 - **Target build:** `//kernel_device_modules-6.18:mgk_64_k618_customer_modules_install.user`
 - **Staging penuh:** 546 `.ko` (379 device OOT + 39 vendor OOT + 128 GKI)
 - **Set runtime:** 487 `.ko` = **221** `vendor_boot` (tanpa `mkp.ko`) + **209** `vendor_dlkm` + **57** `odm_dlkm`
-- **Verifier (`tools/verify-kmi-abi.py --kver 6.18`):** **8/8 PASS** terhadap `6.18.32-android17-5-gecdaacc9a0ee-4k` (`abi.stg`: 9.593 simbol, 0 mismatch CRC, 0 impor `vmlinux` non-KMI, 0 kolisi `CONFIG_MODULE_SIG_PROTECT`, 0 unresolved symbol).
+- **Verifier (`tools/verify-kmi-abi.py --kver 6.18`):** **8/8 PASS** pada kedua profil (0 mismatch CRC, 0 impor `vmlinux` non-KMI, 0 kolisi `CONFIG_MODULE_SIG_PROTECT`, 0 unresolved symbol):
+  - Baseline default `r13` (`6.18.32-android17-5-gecdaacc9a0ee-4k`, KMI 5): `abi.stg` `9.593` simbol.
+  - Profil uji `6.18-lts` (`6.18.65-android17-6-g39d19ad1a460-rama982-4k`, KMI 6): `abi.stg` `9.843` simbol.
 
 ## Perintah kerja
 
@@ -116,8 +118,11 @@ cd "$HOME/x6871-kernel-manifest"
   karena tidak memakai `kconfig`/`defconfig`, namun setiap perubahan config wajib
   melewati 8 gerbang `verify-kmi-abi.py` dan uji boot.
 - Jangan pernah mencampur image KMI 6 (6.12) dengan image 6.18.
-- `kernel-6.18` / `common` **tidak boleh diedit**; seluruh adaptasi berada di
-  device modules, vendor modules, atau overlay manifest.
+- `kernel-6.18` / `common` **tidak boleh diedit** untuk adaptasi modul; seluruh
+  adaptasi berada di device modules, vendor modules, atau overlay manifest
+  (pengecualian sementara hanya untuk profil uji `6.18-lts`: `setup.sh`
+  menerapkan patch SHA-gated `patches/common-6.18-blk-plug-invalidate-ts.patch`
+  hingga upstream fix masuk).
 - Boot ke sistem 6.18 memerlukan patch SELinux `firmware_load` ([`SELINUX-6.18.md`](../guides/SELINUX-6.18.md)).
 
 ## Dokumen 6.18 terkait
