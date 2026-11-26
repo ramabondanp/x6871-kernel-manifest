@@ -1,55 +1,39 @@
 # FLASH & TEST — Prosedur Uji Boot & Checklist X6871
 
-> **Status 2026-11-22:** Android 16 berhasil boot sampai launcher pada build
-> uji 6.12 KMI 6 (`v19-kmi6`) dengan GKI resmi Google. Log uji TWRP dan
-> subsistem berasal dari build KMI 5 (lihat [HANDOFF-HISTORY](../archive/6.12/HANDOFF-HISTORY.md#hasil-uji-perangkat-sebelum-migrasi-kmi-5)).
-> Maintainer mengonfirmasi bahwa fitur yang didokumentasikan berfungsi pada
-> unit yang ia uji langsung (GitHub Release lama sudah dihapus karena
-> kedaluwarsa).
-> Bug USB cabut-colok tercatat pada GKI kustom; §67–§68 di [`PRETEST.md`](../archive/6.12/PRETEST.md)
-> tidak memuat log khusus uji cabut-colok pada GKI resmi KMI 6.
-> Untuk arsip percobaan repack manual lama, lihat [REPACK-HISTORY](../archive/6.12/REPACK-HISTORY.md).
->
-> **Pratinjau 6.18:** status uji dan komposisi 6.18 ada di
-> [STATUS.md](../6.18/STATUS.md). Boot sistem 6.18 memerlukan
-> [patch SELinux `firmware_load`](SELINUX-6.18.md). Jangan mencampur image
-> **6.12** (KMI 6) dengan **6.18** (KMI 5 atau 6.18-lts KMI 6).
+Panduan membuat image partisi kernel (`vendor_boot`, `vendor_dlkm`, `odm_dlkm`),
+prosedur flash & rollback, serta checklist pengujian subsistem di perangkat.
 
-Tujuan: memvalidasi **seluruh boot** (recovery + Android system), bukan hanya satu modul.
+- **Baseline stabil (6.12, KMI 6):** lulus boot Android 16 dengan GKI resmi
+  Google `android16-6.12-2026-09_r16` ([riwayat hasil uji subsistem](../archive/6.12/HANDOFF-HISTORY.md#hasil-uji-perangkat-sebelum-migrasi-kmi-5)).
+- **Pratinjau 6.18:** status uji dan komposisi ada di [STATUS.md](../6.18/STATUS.md).
+  Boot sistem 6.18 membutuhkan [patch SELinux `firmware_load`](SELINUX-6.18.md).
+- **Aturan keras:** jangan mencampur image **6.12** (KMI 6) dengan **6.18**
+  (KMI 5 atau `6.18-lts` KMI 6). Untuk arsip repack manual lama, lihat
+  [REPACK-HISTORY](../archive/6.12/REPACK-HISTORY.md).
 
 ## 0. Tiga kenyataan yang menentukan prosedur
 
 1. **Pembagian partisi modul di X6871:**
-   - **`vendor_boot`** (`vendor_ramdisk00/lib/modules/`, flat tanpa subdirektori versi): memuat **222 modul** first-stage/recovery pada KMI 6 (221 pada 6.18) bersama `modules.dep`, `modules.alias`, `modules.softdep`, `modules.load` (165 entri), dan `modules.load.recovery` (216 entri).
-   - **`vendor_dlkm` + `odm_dlkm`** (partisi logis di `super`, format EROFS + AVB hashtree footer): memuat **266 modul** pada KMI 6 (**209** `vendor_dlkm` + **57** `odm_dlkm`, `modules.load` 191/57).
+   - **`vendor_boot`** (`vendor_ramdisk00/lib/modules/`, flat tanpa subdirektori versi): memuat **222 modul** first-stage/recovery pada 6.12 KMI 6 (**221** pada 6.18) bersama `modules.dep`, `modules.alias`, `modules.softdep`, `modules.load` (165 entri), dan `modules.load.recovery` (216 entri).
+   - **`vendor_dlkm` + `odm_dlkm`** (partisi logis di `super`, format EROFS + AVB hashtree footer): memuat **266 modul** (**209** `vendor_dlkm` + **57** `odm_dlkm`, `modules.load` 191/57); modul GKI terproteksi dikecualikan.
 2. **Kernel dan modul terikat oleh simbol + CRC, bukan release string.**
    Build ini memakai `CONFIG_MODVERSIONS`, dan `same_magic()` di
    `kernel/module/version.c` melewati token pertama vermagic saat modul punya
    CRC (`/* First part is kernel version, which we ignore if module has crcs */`).
-   Yang dibandingkan hanya ` SMP preempt mod_unload modversions aarch64`.
-   Konsekuensinya: release string boleh berbeda (`gcc51d883045d` vs
-   `g2c4fd33ae6d8`) selama simbol dan CRC-nya sama.
-
-   Perbandingan historis KMI 5 (bukan acuan kompatibilitas KMI 6):
-
-   | Uji | Hasil |
-   |---|---|
-   | simbol kernel yang dipakai kedua build | 2174 |
-   | CRC identik | **2174 / 2174** |
-   | modul build kita yang cocok CRC-nya dengan kernel stock | **795 / 795** (snapshot 2026-11-19) |
-
-   Hasil itu hanya berlaku untuk pasangan yang diuji. Untuk rilis KMI 6,
-   gunakan set image yang cocok di §1; jangan mencampurnya dengan KMI 5.
+   Yang dibandingkan hanya ` SMP preempt mod_unload modversions aarch64`,
+   sehingga release string boleh berbeda selama simbol dan CRC-nya cocok
+   (perbandingan historis KMI 5 mencatat `2174/2174` CRC kernel cocok). Untuk
+   setiap build rilis, gunakan pasangan image dari generasi KMI yang sama (§1).
 3. **Build modul tidak menghasilkan DTB/DTBO perangkat.** Repack
    `vendor_boot` mempertahankan DTB dari image dasar TWRP. `dtbo.img`
    bawaan perangkat tidak diubah atau di-flash dalam panduan ini.
 
 ## 1. Komposisi Artefak 6.12 (KMI 6)
 
-Semua GitHub Release lama sudah dihapus karena sudah kedaluwarsa. Bangun
-ketiga image modul X6871 sendiri lewat [§2](#2-membuat-image-vendor_boot--dlkm),
+Bangun ketiga image modul X6871 sendiri lewat [§2](#2-membuat-image-vendor_boot--dlkm),
 lalu pasangkan dengan dua image GKI resmi Google di bawah. Tabel ini mencatat
-komposisi dan checksum referensi dari build uji `v19-kmi6`.
+komposisi dan checksum referensi dari build uji `v19-kmi6` (semua GitHub Release
+lama sudah dihapus).
 
 | Artefak | Sumber | Catatan |
 |---|---|---|
@@ -103,9 +87,7 @@ image lama.
 Gunakan `--work-dir` kosong atau direktori kerja yang sudah ditandai oleh
 skrip DLKM. Jika direktori lama belum bertanda, gunakan path baru; direktori
 kerja yang ditandai akan dibuat ulang saat repack berikutnya. Hanya lanjut
-ke flash jika semua langkah lulus. Untuk hasil build sendiri, gunakan
-`vendor_boot-test.img` sebagai pengganti image `vendor_boot` rilis pada
-contoh flash di bawah.
+ke flash jika semua langkah lulus.
 
 `tools/pack-vendor-boot.sh` adalah tool legacy dan **jangan dipakai untuk
 X6871**: ia memfilter berdasarkan nama stock sehingga modul build-only
@@ -197,6 +179,10 @@ Ambil `dmesg` penuh setelah boot, lalu periksa:
    ada gadget aktif saat replug. Lihat [`PRETEST.md` §65](../archive/6.12/PRETEST.md) untuk pembeda
    dari kegagalan pullup dengan gadget masih terikat.
 
+*(Catatan historis: bug USB cabut-colok sebelumnya tercatat pada GKI kustom;
+[`PRETEST.md` §67–§68](../archive/6.12/PRETEST.md) tidak memuat log khusus uji
+cabut-colok pada GKI resmi KMI 6.)*
+
 ## 5. Delta yang **wajar** terlihat (bukan bug)
 
 - **20 modul stock tidak ada**: 2 panel + alias panel, 3 MMC/SD, 7 fork
@@ -238,7 +224,7 @@ Ambil `dmesg` penuh setelah boot, lalu periksa:
 
 Gejala di `pstore`/`dmesg`:
 
-```
+```text
 init: Loading module /lib/modules/usb_dp_selector.ko with args ''
 usb_dp_selector: Unknown symbol mtk_dp_SWInterruptSet (err -2)
 usb_dp_selector: Unknown symbol mtk_dp_aux_swap_enable (err -2)
