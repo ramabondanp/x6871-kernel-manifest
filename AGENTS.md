@@ -1,4 +1,4 @@
-# Aturan Kerja X6871 6.18
+# Aturan Kerja X6871
 
 Dokumen ini hanya berisi aturan umum untuk agen AI. Detail teknis, temuan,
 perintah build/repack, dan status terbaru ada di `docs/`; jangan menduplikasi
@@ -24,7 +24,9 @@ detail tersebut di sini.
   **6.12** kecuali diminta.
 - 6.12 dipakai untuk penggunaan harian; 6.18 masih pratinjau dan belum punya
   image rilis publik.
-- Jangan mencampur image KMI 6 (6.12) dengan KMI 5/6.18.
+- Jangan mencampur image antar versi kernel maupun antar generasi/set build
+  KMI (**6.12 KMI 6**, **6.18 `r13` KMI 5**, dan **6.18-lts KMI 6 build GKI
+  lokal**).
 - README bersifat user-facing. Info 6.18 ditulis sederhana.
 
 ## 2. Sumber kebenaran
@@ -44,61 +46,49 @@ detail tersebut di sini.
 | Infinix Open Source Center | <https://opensource.dev.infinixmobility.com/> | Halaman resmi source Infinix |
 | Stock X6871 GitLab | <https://gitlab.com/rama-firmware-dumps/infinix/Infinix-X6871> | DTB, DTBO, image, dan `.ko` stock |
 | Stock X6871 branch | `X6871-16.3.0.155SP20(OP008PF001AZ)` | Versi referensi stock |
+| OPPO PMX110 (MTK 6.18) | <https://gitlab.com/rama-firmware-dumps/oppo/PMX110> | Referensi biner `.ko` 6.18 (lihat `docs/6.18/PMX110-REFERENCE.md`) |
 
-Clone/unduh langsung:
-
-```bash
-mkdir -p donor && cd donor
-
-# Donor OPPO MT6896
-git clone --depth 1 --single-branch \
-  --branch oppo/mt6896_b_16.0_reno12 \
-  https://github.com/oppo-source/android_kernel_modules_oppo_mt6896.git \
-  oppo-mt6896
-
-# Donor Transsion/Infinix MT6897
-curl -L --retry 3 -o infinix-mt6897.tar.gz \
-  https://d1wd32b69guoqm.cloudfront.net/opensource/android15_kernel_modules_and_devicetree_mt6897.tar.gz
-mkdir -p infinix-mt6897
-tar -xzf infinix-mt6897.tar.gz -C infinix-mt6897
-
-# Firmware stock X6871
-git clone --depth 1 --single-branch \
-  --branch 'X6871-16.3.0.155SP20(OP008PF001AZ)' \
-  https://gitlab.com/rama-firmware-dumps/infinix/Infinix-X6871.git \
-  stock-x6871
-```
-
+Langkah unduh referensi ada di [`docs/guides/BUILD.md`](docs/guides/BUILD.md#unduhan-referensi).
 Jangan commit file donor, tarball, atau dump firmware ke repo.
 
-## 4. Commit dan checkpatch
+## 4. Commit, checkpatch, dan push
 
 - Satu commit untuk satu topik. Jangan menggabungkan beberapa bugfix.
 - **Jangan amend commit fix.** Kalau ada perbaikan, buat commit baru.
 - Di **manifest**, fix/analisa juga harus menjadi **commit baru**, bukan amend.
-- Jangan menambahkan prefix `6.18:` kalau bug yang diperbaiki juga ada di 6.12.
-- Jika fix kernel/vendor berlaku untuk kedua kernel (6.18 dan 6.12), terapkan
-  dan commit langsung ke kedua branch (`x6871-android17-6.18` dan
-  `x6871-android16-6.12`) tanpa akhiran `for 6.18`; tidak perlu build 6.12
-  kecuali diminta.
-- Untuk commit kernel yang khusus 6.18: tanpa prefix `6.18:`, subjek diakhiri
-  `for 6.18`.
-- Commit manifest/docs wajib berbahasa **Indonesia** (subjek dan body),
-  memakai prefix `6.18:` dan subjek hanya boleh punya satu `6.18`.
-- Commit kernel/vendor wajib berbahasa **Inggris** (subjek dan body),
-  memakai format kernel, body sekitar 72 kolom, dan
-  `Signed-off-by: Rama Bondan Prakoso <ramanarubp@gmail.com>`.
-- Sebelum push, jalankan checkpatch untuk commit.
-- Untuk kernel/vendor, checkpatch difokuskan ke **commit message**, bukan code
-  warning.
-- Warning `MAINTAINERS` di-skip. Code warning checkpatch, DOS line endings, dan
-  MAINTAINERS di luar scope dokumen plan.
+- **Format commit repo manifest (`x6871-kernel-manifest`):**
+  - Wajib berbahasa **Indonesia** (subjek dan body sekitar 72 kolom) serta
+    menyertakan `Signed-off-by: Rama Bondan Prakoso <ramanarubp@gmail.com>`.
+  - Gunakan prefix `6.18:` **hanya** untuk topik khusus 6.18 (dan subjek
+    hanya boleh memiliki satu `6.18`). Untuk topik umum atau lintas 6.12 &
+    6.18 (mis. `AGENTS.md`, `tools/`, `BUILD.md`, `DEVICES.md`), pakai prefix
+    topik (`docs:`, `tools:`, `manifest:`) tanpa `6.18:`.
+- **Format commit repo kernel/vendor (`alps-kernel_device_modules`,
+  `alps-vendor_mediatek_kernel_modules`):**
+  - Wajib berbahasa **Inggris** (subjek dan body sekitar 72 kolom), memakai
+    format commit kernel, dan `Signed-off-by: Rama Bondan Prakoso <ramanarubp@gmail.com>`.
+  - **Jangan** menambahkan prefix `6.18:`. Untuk commit yang khusus 6.18,
+    akhiri subjek dengan `for 6.18`.
+  - Jika fix berlaku untuk kedua kernel (6.18 dan 6.12), terapkan dan commit
+    langsung ke kedua branch (`x6871-android17-6.18` dan
+    `x6871-android16-6.12`) tanpa akhiran `for 6.18`; tidak perlu build 6.12
+    kecuali diminta.
+- **Checkpatch:**
+  - Sebelum push, jalankan `checkpatch` untuk setiap commit, difokuskan pada
+    **commit message**, bukan code warning.
+  - Warning `MAINTAINERS`, `FILE_PATH_CHANGES`, code warning checkpatch, DOS
+    line endings, dan false positive ejaan kata Indonesia (mis. `modul`) di-skip.
+- **Push:**
+  - Langsung `git push` setelah commit dan checkpatch bersih untuk tugas
+    perubahan yang diminta, kecuali perubahan masih eksperimental/belum
+    diverifikasi atau pengguna meminta untuk menahan push.
 
 ## 5. Dokumentasi dan bukti
 
 - Jangan menulis nama file log lokal (`pstoreX`, `dmesgX`, `logcatX`,
-  `twrpX`) atau path lokal di repo (aturan ketat pada seluruh dokumen aktif;
-  arsip historis lama di `docs/archive/` bersifat read-only).
+  `twrpX`) atau path lokal mesin di repo (aturan ketat pada seluruh dokumen
+  aktif; arsip historis lama di `docs/archive/` bersifat *read-only* setelah
+  ditutup).
 - Jangan menyertakan URL unduhan sementara (seperti `gofile.io`) di repo;
   cukup catat nama artefak, MD5/commit, dan kutipan baris log.
 - Bukti log harus dikutip sebagai baris log.
@@ -111,8 +101,10 @@ Jangan commit file donor, tarball, atau dump firmware ke repo.
   - `docs/hardware/` — pemetaan hardware dan DT/DTBO stock lintas versi.
   - `docs/6.18/` — status (`STATUS.md`), tracker temuan/prioritas
     (`TRACKER.md`), dan referensi teknis aktif 6.18.
-  - `docs/archive/<versi>/` — arsip historis *read-only* (rencana awal,
-    riwayat rilis lama, log bringup yang sudah ditutup).
+  - `docs/archive/<versi>/` — arsip historis *read-only setelah ditutup*
+    (rencana awal, riwayat rilis lama, log bringup yang sudah ditutup; tidak
+    diaudit/diubah rutin dan hanya ditambah saat mengarsipkan fase baru yang
+    sudah selesai).
 - **Disiplin penambahan & pembaruan dokumen:**
   - Satu topik = satu file; jangan membuat file catatan ad-hoc campur aduk.
   - Temuan baru, prioritas fix, dan known limitation 6.18 dicatat di
@@ -125,15 +117,24 @@ Jangan commit file donor, tarball, atau dump firmware ke repo.
     memperbarui `docs/README.md` (serta `README.md` dan `AGENTS.md` bila
     relevan) dan memastikan tidak ada broken link relatif.
 
-## 6. DTB, DTBO, dan image
+## 6. Build, GKI, DTB/DTBO, dan image
 
-- **Hard rule:** semua `dtb` dan `dtbo.img` yang dipakai di vendor berasal
-  dari stock.
-- Jangan berasumsi ada DTBO kustom.
+- **Jangan pakai `/tmp`** — gunakan `~/tmp` / `$TMPDIR`.
+- **Tree GKI (`kernel-6.12` / `common`) tidak boleh diedit** untuk adaptasi
+  modul atau KMI (pengecualian sementara hanya patch SHA-gated
+  `patches/common-6.18-blk-plug-invalidate-ts.patch` pada profil uji `6.18-lts`
+  lewat `setup.sh` hingga upstream fix masuk).
+- **Wajib lulus 8/8 `tools/verify-kmi-abi.py`** sebelum uji/rilis; jangan
+  memasukkan modul GKI terproteksi (`CONFIG_MODULE_SIG_PROTECT`) ke
+  `vendor_boot`, `vendor_dlkm`, atau `odm_dlkm`.
+- **Hard rule DTB/DTBO:** semua `dtb` dan `dtbo.img` yang dipakai di vendor
+  berasal dari stock. Jangan berasumsi ada DTBO kustom dan jangan mengubah
+  `dtbo.img` stock.
 - DT di tree tidak pernah dipakai untuk membuat image; tree hanya untuk build
   modul.
-- Repack harus mempertahankan `dtb`, `bootconfig`, dan recovery ramdisk
-  byte-identical dengan stock.
+- Repack `vendor_boot` harus mempertahankan `dtb` dan `bootconfig`
+  byte-identical dengan stock/base packer, serta mempertahankan
+  `vendor_ramdisk01` dari base TWRP.
 - Node yang disabled di stock tetap disabled.
 - Jangan menambah node, thermal zone, GCE event, atau channel CMDQ yang tidak
   ada di stock.
@@ -141,11 +142,13 @@ Jangan commit file donor, tarball, atau dump firmware ke repo.
 
 ## 7. Branch dan backup
 
-- Default branch repo kernel/vendor: `x6871-android17-6.18`.
-- Branch `android16` dihapus hanya dari repo device.
+- Repo modul resmi: `alps-kernel_device_modules` dan
+  `alps-vendor_mediatek_kernel_modules`.
+- Default branch repo kernel/vendor: `x6871-android17-6.18`; baseline stabil:
+  `x6871-android16-6.12`.
 - History lama dipertahankan di branch `backup/*`.
-- Repo publik harus bersih dari rujukan log lokal dan dokumentasi 6.18 harus
-  akurat.
+- Repo publik harus bersih dari rujukan log lokal dan path lokal mesin, dan
+  dokumentasi 6.18 harus akurat.
 
 ## 8. Testing dan artefak
 
@@ -155,6 +158,7 @@ Jangan commit file donor, tarball, atau dump firmware ke repo.
   - `docs/README.md` — peta/indeks dokumentasi
   - `docs/6.18/STATUS.md` — status eksekusi dan perintah kerja 6.18
   - `docs/6.18/TRACKER.md` — temuan, prioritas fix, dan checklist verifikasi 6.18
+  - `docs/6.18/API-AUDIT.md` — audit perubahan semantik API 6.13–6.18 & scan KCFI
   - `docs/guides/BUILD.md` — build, repack, konfigurasi, troubleshooting
   - `docs/guides/FLASH-AND-TEST.md` — flash, rollback, dan checklist uji
   - `docs/guides/SELINUX-6.18.md` — patch SELinux `firmware_load` untuk boot 6.18
@@ -164,12 +168,12 @@ Jangan commit file donor, tarball, atau dump firmware ke repo.
 
 - [ ] Build difokuskan ke 6.18; jika fix berlaku untuk kedua kernel, sudah di-commit ke branch 6.18 dan 6.12 tanpa perlu build 6.12.
 - [ ] Perubahan hanya pada topik yang diminta.
-- [ ] DTB/DTBO stock tidak diubah.
-- [ ] Tidak menambah node/zone/event yang tidak ada di stock.
+- [ ] GKI (`common`/`kernel-6.12`) tidak diedit (kecuali patch SHA-gated `6.18-lts` via `setup.sh`).
+- [ ] DTB/DTBO stock tidak diubah dan tidak menambah node/zone/event di luar stock.
+- [ ] Jika melakukan build/repack, `tools/verify-kmi-abi.py` lulus 8/8.
 - [ ] Commit baru, bukan amend, untuk fix/analisa.
-- [ ] Prefix/akhiran commit sesuai aturan.
-- [ ] `Signed-off-by` ada.
-- [ ] Checkpatch commit message bersih.
-- [ ] Dokumentasi memakai kutipan log, bukan nama file lokal.
-- [ ] Struktur `docs/` rapi sesuai aturan, tanpa URL temporer, dan `docs/README.md` terbarui bila file berubah.
+- [ ] Bahasa, prefix/akhiran commit, dan `Signed-off-by` sesuai aturan.
+- [ ] Checkpatch commit message bersih (0 error).
+- [ ] Dokumentasi memakai kutipan log, tanpa nama file log lokal, path lokal mesin, maupun URL temporer.
+- [ ] Struktur `docs/` rapi sesuai aturan dan `docs/README.md` terbarui bila file berubah.
 - [ ] Testing yang belum dilakukan dicatat.
