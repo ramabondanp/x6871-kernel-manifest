@@ -1,4 +1,4 @@
-# PLAN 6.18 Lanjutan — Temuan Log dan Prioritas Perbaikan
+# Tracker 6.18 — Status Isu, Verifikasi, dan Known Limitation
 
 Diperbarui: 2026-11-26 (UTC)
 
@@ -17,6 +17,14 @@ Diperbarui: 2026-11-26 (UTC)
 > ini dikutip sebagai baris log, bukan nama file lokal.
 
 ## 1. Ringkasan
+
+### Yang Masih Terbuka & Belum Diuji
+
+- **Terbuka (userspace/SELinux):** service `tranhalconfig` vendor belum aktif (`222` AVC, `audit_lost: 21` di `6.18.65` — §5.5).
+- **Belum diuji terpisah:** pengukuran recovery report rate touch GT9916 pasca sleep/wake pada kondisi `report_rate_switch=1` (§5.8).
+- **Known limitation / skip:** ADSP (`disabled` di DTB stock — §4), wrapper `fpsgo.ko`/`trans_sched.ko` tanpa source (§5.6), serta TEE/Widevine (isu provisioning/TA — §5.7).
+
+Seluruh crash/Oops, RCU stall/MIUMPU, VP8/VP9/AV1, H.264/VENC, kamera/AIE, DPE `v4l2_fh`, CMDQ `vote mminfra`, thermal LVTS, dan error minor kernel (`kthread_run_worker`, `/proc/mtk_typec`) sudah **terverifikasi PASS** di perangkat nyata (`6.18.65`).
 
 | Kategori | Status | Tindakan |
 |---|---|---|
@@ -57,6 +65,8 @@ atau masih terbuka di userspace ditandai eksplisit pada tiap subbagian.
   image.
 
 ## 3. Crash/Oops yang Sudah Punya Fix
+
+**Status:** Seluruh crash/Oops pada tabel di bawah resmi **ditutup** (terverifikasi PASS pada uji live `6.18.65`, `0` kemunculan).
 
 Semua temuan di bawah sudah punya commit yang menyasar signature yang sama
 dan telah terverifikasi **PASS** pada uji live `6.18.65` (lihat hasil
@@ -103,6 +113,8 @@ tanpa Oops `mtk_aie_s_fmt_out_mp` (`96f4120`). Tabel crash di atas resmi
 **ditutup**.
 
 ## 4. ADSP: Stock DTB Disabled, DT Tree Tidak Dipakai
+
+**Status:** **Known limitation / skip** (ADSP `disabled` di DTB stock; audio berjalan via SCP/`fs15xx`).
 
 DTB `vendor_boot` stock menunjukkan:
 
@@ -164,6 +176,8 @@ audio `fs15xx` (`6-0034`/`6-0035`); ADSP tetap berstatus non-bug / skip.
 ## 5. Temuan Non-Crash dan Rencana Fix
 
 ### 5.1 Video VP9 — prioritas utama user-facing
+
+**Status:** **Terverifikasi PASS di `6.18.65`** (VP9, VP8, AV1, dan H.264/VENC 1080p@30fps berfungsi; `0` error).
 
 **Gejala:**
 
@@ -297,6 +311,8 @@ mtk_vdec_g_v_ctrl: Error!! Cannot get param                (7x)
 
 ### 5.2 DPE `v4l2_fh` — fixed di isp_70
 
+**Status:** **Terverifikasi PASS di `6.18.65`** (`0` `v4l2_open` WARN).
+
 **Gejala:**
 
 ```text
@@ -345,6 +361,8 @@ S5KHM6SX[s5khm6sx_feedback_awbgain] set_awbgain: r_gain = 0x6fa b_gain = 0x5f2 s
 
 ### 5.3 CMDQ/GCE dan MML — `vote mminfra` fixed; sisanya historis
 
+**Status:** **Terverifikasi PASS di `6.18.65`** (`0` `vote mminfra on err`).
+
 **Gejala CMDQ:**
 
 ```text
@@ -388,7 +406,7 @@ md5 `bcf3801494067a5d1cca578cdf3174c5` dan `vendor_dlkm.img` md5
 **PASS** — `0` kemunculan `vote mminfra on err` di `dmesg`; display, kamera,
 codec, dan MML berjalan normal.
 
-**Artefak gabungan thermal + DPE + CMDQ:**
+**Artefak intermediate (sebelum build final `6.18.65` di `STATUS.md`):**
 
 | Image | Ukuran | MD5 |
 |---|---:|---|
@@ -402,6 +420,8 @@ codec, dan MML berjalan normal.
 dipakai untuk verifikasi thermal sekaligus.
 
 ### 5.4 Thermal LVTS — semua zone hilang karena tabel sensor beda dari stock
+
+**Status:** **Terverifikasi PASS di `6.18.65`** (`40` thermal zone aktif, `0` `Failed to register lvts tz`).
 
 **Gejala:**
 
@@ -511,6 +531,8 @@ with stock DTB`) terkonfirmasi aktif di perangkat (`vendor_dlkm.img` md5
 
 ### 5.5 `tranhalconfig` — userspace/sepolicy
 
+**Status:** **Terbuka (userspace/SELinux)** (`222` AVC dan `audit_lost: 21` di `6.18.65`).
+
 **Gejala:**
 
 ```text
@@ -540,6 +562,8 @@ service/sepolicy, bukan kernel.
 masih mencatat `222` AVC `tranhalconfig` dan `audit_lost: 21`.
 
 ### 5.6 `fpsgo`/`trans_sched`/`msync2` — module stock yang belum ada di 6.18
+
+**Status:** **Known limitation / skip di 6.18** (core `mtk_fpsgo_v8.ko` aktif; tanpa stub palsu).
 
 **Gejala:**
 
@@ -606,6 +630,8 @@ tree juga hasil port, bukan source stock.
 known limitation 6.18.
 
 ### 5.7 TEE/Widevine — known limitation, sama dengan 6.12 port
+
+**Status:** **Skip / known limitation** (isu provisioning/TA vendor, bukan regresi 6.18).
 
 **Gejala:**
 
@@ -677,6 +703,8 @@ diterima sebagai known limitation selama tidak ada crash.
 provisioning TEE; cek `DRM Info` dan playback DRM dilewati).
 
 ### 5.8 Touch (`gt9916_common` + `adaptive-ts`) — dynamic report rate, `tppolldrv`, dan charger anti-noise
+
+**Status:** **PASS di `6.18.65`** (`~352–354 Hz` & charger anti-noise aktif; sisa ukur recovery sleep/wake pada `report_rate_switch=1`).
 
 **Gejala:** pergerakan sentuh di port terasa kurang mulus dibandingkan stock
 pada panel 120/144 Hz meskipun kecepatan SPI (`8 MHz`), resolusi 16x, dan

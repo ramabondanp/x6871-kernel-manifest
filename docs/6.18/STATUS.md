@@ -2,64 +2,53 @@
 
 Diperbarui: 2026-11-26 (UTC)
 
-> Dokumen ini merangkum status port **6.18** dari rencana awal
-> ([`PLAN-INITIAL.md`](../archive/6.18/PLAN-INITIAL.md)). Baseline
-> **6.12** (`android16-6.12-2026-09_r16`, KMI 6) tidak berubah.
->
-> - Isu terbuka, prioritas fix, dan checklist verifikasi: [`TRACKER.md`](TRACKER.md)
-> - Syarat SELinux `firmware_load` untuk boot sistem 6.18: [`SELINUX-6.18.md`](../guides/SELINUX-6.18.md)
-> - Kronologi bringup `test1`–`test13` dan analisa yang sudah ditutup: [`BRINGUP-LOG.md`](../archive/6.18/BRINGUP-LOG.md)
->
-> Per 2026-11-25 (uji live di X6871, `6.18-lts` `6.18.65-android17-6-g39d19ad1a460-rama982-4k`):
-> set 5 image profil `android17-6.18-lts` (`4cc5bb220b50` + patch
-> `39d19ad1a460` untuk `blk_plug_invalidate_ts`, KMI 6, build GKI lokal)
-> sudah dibuild, lolos 8/8 `verify-kmi-abi.py` (487 modul runtime, `9.843`
-> simbol ABI; `495` modul termuat di perangkat), dan lulus uji runtime di
-> perangkat (`boot-lz4.img` md5 `b62605570ef07c9ffe5a7fe4aaf1040d`,
-> `system_dlkm.flatten.erofs.img` `8857cbd0d7de0bbaf087cbe80e0253ec`,
-> `vendor_boot.img` `5395e3faaf9ed636177e2a0b45e941a7`, `vendor_dlkm.img`
-> `540b0a7cda2cf90ed2197ee061f1be78`, `odm_dlkm.img`
-> `c1f97ae3fe5cf030f2b9e3e416055e58`):
-> - **Crash / EMI / Thermal:** `0` kemunculan `Internal error`, `WARNING: CPU`,
->   `rcu_preempt detected stalls`, `[MIUMPU]srinfo_r 3`, `EMIMPU`,
->   maupun `Failed to register lvts tz`.
-> - **Video & kamera:** VP9 **PASS** (25x `check_codec_id ipi id 6 svp 0 is correct`,
->   25 sesi `Init Vdec OK bs VP90` s.d. 1080x1920, `0` error), VP8 720p
->   (`c2.mtk.vpx.decoder`, 120/120 frame, `132.0 fps` surface / `129.4 fps`
->   bytebuffer) dan AV1 720p/1080p (`c2.mtk.av1.decoder`, 120/120 frame,
->   `228.0 fps` 720p / `110.5 fps` 1080p) **PASS**, H.264/VENC 1080p@30fps
->   **PASS**, kamera (`s5khm6sx_mipi_raw`), AIE (`96f4120`), flashlight
->   (`ocp81375_v4l2`), DPE `v4l2_fh` (`b83dca0`), dan CMDQ `vote mminfra`
->   (`a71cfd2`) **PASS**.
-> - **Thermal LVTS & Touch:** `40` thermal zone aktif (`soc_max` merespons
->   beban `59.5°C` -> `72.6°C`); GT9916 + `adaptive-ts` aktif (`~352–354 Hz`,
->   `charger mode in/out`, `resume restore charger mode`, `0` error kirim).
-> - **Fix minor PASS di device (`495` modul termuat pada boot baru):**
->   `kthread_run_worker()` (`7d92fc24ce41`, `611ad1f`) memastikan seluruh
->   worker kthread berjalan di state `S` (`kthread_worker_fn`, `blocked for
->   more than: 0`) dan `/proc/mtk_typec` (`112de113630b`, `587a0a7`) bersih
->   (`already registered: 0`, `/proc/mtk_typec/smt_u2_cc_mode = 0`).
-> - **Belum diuji / terbuka:** pengukuran terpisah recovery report rate pasca
->   sleep/wake pada `report_rate_switch=1`; isu tersisa: `tranhalconfig`
->   userspace (`222` AVC, `audit_lost: 21`). TEE/Widevine masuk kategori skip.
->
-> Profil uji opsional `android17-6.18-lts` tersedia lewat
-> `local_manifest-6.18-lts.xml` (lihat
-> [`BUILD.md`](../guides/BUILD.md#profil-uji-618-lts-android17-618-lts-61865-kmi-6-build-gki-lokal));
-> patch SHA-gated `patches/common-6.18-blk-plug-invalidate-ts.patch` tetap
-> diterapkan (`39d19ad1a460`).
+Dokumen ini merangkum status port **6.18** dari rencana awal
+([`PLAN-INITIAL.md`](../archive/6.18/PLAN-INITIAL.md)). Baseline stabil harian
+tetap **6.12** (`android16-6.12-2026-09_r16`, KMI 6).
 
-## Ringkasan Fase
+- Isu terbuka, prioritas fix, dan rincian bukti log: [`TRACKER.md`](TRACKER.md)
+- Syarat SELinux `firmware_load` untuk boot sistem 6.18: [`SELINUX-6.18.md`](../guides/SELINUX-6.18.md)
+- Kronologi bringup `test1`–`test13` dan analisa yang sudah ditutup: [`BRINGUP-LOG.md`](../archive/6.18/BRINGUP-LOG.md)
 
-| Fase | Status | Catatan |
-|---|---|---|
-| 0 — Manifest, branch, workspace | **Selesai** | Workspace 6.18 terisolasi dari baseline 6.12 (`local_manifest-6.18.xml`) |
-| 1 — Kleaf/MGK + device tree 6.18 | **Selesai** | Kernel `6.18.32` (`android17-6.18-2026-09_r13`), target `mgk_64_k618` |
-| 2 — Codemod API 6.13–6.18 | **Selesai** | Build penuh 546 `.ko` berhasil |
-| 3 — Milestone `vendor_boot` | **Selesai** | 221 modul (tanpa `mkp.ko`), `emi-mpu-hook-v1.ko` di stage-1 |
-| Gerbang boot #1 | **Lulus** | TWRP PASS (touch + vibrator); boot sistem PASS setelah patch SELinux; Wi-Fi/BT PASS |
-| 4 — DLKM berat | **Selesai** | Sched, Mali, WLAN, cam/vcodec/audio |
-| 5 — Repack + verifier 8 gerbang | **Selesai** | 8/8 PASS, 487 modul runtime |
+## Ringkasan Uji Terbaru (6.18.65 LTS)
+
+Uji live di X6871 pada profil `android17-6.18-lts`
+(`6.18.65-android17-6-g39d19ad1a460-rama982-4k`, KMI 6 build GKI lokal; `495`
+modul termuat, `8/8` `verify-kmi-abi.py` PASS):
+
+- **Crash / EMI / Thermal:** `0` kemunculan `Internal error`, `WARNING: CPU`,
+  `rcu_preempt detected stalls`, `[MIUMPU]srinfo_r 3`, `EMIMPU`, maupun
+  `Failed to register lvts tz`.
+- **Video & Kamera:** VP9 **PASS** (25 sesi `Init Vdec OK bs VP90` s.d.
+  1080x1920, `0` error), VP8 720p (`132.0 fps` surface / `129.4 fps`
+  bytebuffer) dan AV1 720p/1080p (`228.0 fps` / `110.5 fps`) **PASS**,
+  H.264/VENC 1080p@30fps **PASS**, kamera (`s5khm6sx_mipi_raw`), AIE
+  (`96f4120`), flashlight (`ocp81375_v4l2`), DPE `v4l2_fh` (`b83dca0`), dan
+  CMDQ `vote mminfra` (`a71cfd2`) **PASS**.
+- **Thermal LVTS & Touch:** `40` thermal zone aktif (`soc_max` merespons
+  beban `59.5°C` -> `72.6°C`); GT9916 + `adaptive-ts` aktif (`~352–354 Hz`,
+  `charger mode in/out`, `resume restore charger mode`, `0` error kirim).
+- **Fix minor PASS:** `kthread_run_worker()` (`7d92fc24ce41`, `611ad1f`)
+  menjaga seluruh worker kthread di state `S` (`blocked for more than: 0`) dan
+  `/proc/mtk_typec` (`112de113630b`, `587a0a7`) bersih (`already registered: 0`,
+  `/proc/mtk_typec/smt_u2_cc_mode = 0`).
+- **Terbuka / belum diuji / skip:** pengukuran terpisah recovery report rate
+  pasca sleep/wake pada `report_rate_switch=1`; isu tersisa `tranhalconfig`
+  userspace (`222` AVC, `audit_lost: 21`); TEE/Widevine masuk kategori skip.
+
+| Image Teruji (`6.18.65-android17-6-g39d19ad1a460-rama982-4k`) | MD5 |
+|---|---|
+| `boot-lz4.img` | `b62605570ef07c9ffe5a7fe4aaf1040d` |
+| `system_dlkm.flatten.erofs.img` | `8857cbd0d7de0bbaf087cbe80e0253ec` |
+| `vendor_boot.img` | `5395e3faaf9ed636177e2a0b45e941a7` |
+| `vendor_dlkm.img` | `540b0a7cda2cf90ed2197ee061f1be78` |
+| `odm_dlkm.img` | `c1f97ae3fe5cf030f2b9e3e416055e58` |
+
+Profil uji opsional `android17-6.18-lts` tersedia lewat
+`local_manifest-6.18-lts.xml` (lihat
+[`BUILD.md`](../guides/BUILD.md#profil-uji-618-lts-android17-618-lts-61865-kmi-6-build-gki-lokal));
+patch SHA-gated `patches/common-6.18-blk-plug-invalidate-ts.patch` tetap
+diterapkan (`39d19ad1a460`) hingga upstream fix masuk.
 
 ## Status Subsistem Saat Ini
 
@@ -79,6 +68,18 @@ Diperbarui: 2026-11-26 (UTC)
 | ADSP / `fpsgo`/`trans_sched` / TEE Widevine | **Known limitation / skip** | ADSP disabled di DTB stock (`total 0` core; saat early boot `t=5.77s` modul tetap mencetak 1x `adsp_system_bootup fail ret(-14)` dan 80x `invalid cid` lalu berhenti); `trans_sched`/`fpsgo` wrapper tanpa source; TEE/Widevine isu provisioning/TA (di-skip) |
 
 Rincian langkah verifikasi dan prioritas P0–P3 ada di [`TRACKER.md`](TRACKER.md).
+
+## Ringkasan Fase
+
+| Fase | Status | Catatan |
+|---|---|---|
+| 0 — Manifest, branch, workspace | **Selesai** | Workspace 6.18 terisolasi dari baseline 6.12 (`local_manifest-6.18.xml`) |
+| 1 — Kleaf/MGK + device tree 6.18 | **Selesai** | Kernel `6.18.32` (`android17-6.18-2026-09_r13`), target `mgk_64_k618` |
+| 2 — Codemod API 6.13–6.18 | **Selesai** | Build penuh 546 `.ko` berhasil |
+| 3 — Milestone `vendor_boot` | **Selesai** | 221 modul (tanpa `mkp.ko`), `emi-mpu-hook-v1.ko` di stage-1 |
+| Gerbang boot #1 | **Lulus** | TWRP PASS (touch + vibrator); boot sistem PASS setelah patch SELinux; Wi-Fi/BT PASS |
+| 4 — DLKM berat | **Selesai** | Sched, Mali, WLAN, cam/vcodec/audio |
+| 5 — Repack + verifier 8 gerbang | **Selesai** | 8/8 PASS, 487 modul runtime |
 
 ## Komposisi Build & Verifikasi 8 Gerbang
 
