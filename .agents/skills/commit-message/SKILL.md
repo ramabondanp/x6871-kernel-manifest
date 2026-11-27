@@ -17,8 +17,9 @@ commit d19a42b5d636). Modified for X6871 manifest and OOT modules on 2026-11-27.
 # Write a commit message
 
 Draft or review commit messages in accordance with `AGENTS.md`. Do not run
-`git commit` or `git commit --amend` unless explicitly asked. Never amend an
-existing fix or analysis commit; follow-up corrections must be new commits.
+`git commit` or `git commit --amend` unless explicitly asked. Do not amend an
+existing fix or analysis commit unless requested by the user; follow-up
+corrections must be new commits.
 
 ## Repository-specific format (`AGENTS.md` rules)
 

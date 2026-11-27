@@ -54,15 +54,17 @@ Jangan commit file donor, tarball, atau dump firmware ke repo.
 ## 4. Commit, checkpatch, dan push
 
 - Satu commit untuk satu topik. Jangan menggabungkan beberapa bugfix.
-- **Jangan amend commit fix.** Kalau ada perbaikan, buat commit baru.
-- Di **manifest**, fix/analisa juga harus menjadi **commit baru**, bukan amend.
+- **Jangan amend commit fix**, kecuali diminta pengguna. Kalau ada perbaikan,
+  buat commit baru.
+- Di **manifest**, fix/analisa juga harus menjadi **commit baru**, bukan amend
+  (kecuali diminta pengguna).
 - **Format commit repo manifest (`x6871-kernel-manifest`):**
   - Wajib berbahasa **Indonesia** (subjek dan body sekitar 72 kolom) serta
     menyertakan `Signed-off-by: Rama Bondan Prakoso <ramanarubp@gmail.com>`.
   - Gunakan prefix `6.18:` **hanya** untuk topik khusus 6.18 (dan subjek
     hanya boleh memiliki satu `6.18`). Untuk topik umum atau lintas 6.12 &
-    6.18 (mis. `AGENTS.md`, `tools/`, `BUILD.md`, `DEVICES.md`), pakai prefix
-    topik (`docs:`, `tools:`, `manifest:`) tanpa `6.18:`.
+    6.18 (mis. `AGENTS.md`, `.agents/`, `tools/`, `BUILD.md`, `DEVICES.md`),
+    pakai prefix topik (`docs:`, `tools:`, `manifest:`, `agents:`) tanpa `6.18:`.
 - **Format commit repo kernel/vendor (`alps-kernel_device_modules`,
   `alps-vendor_mediatek_kernel_modules`):**
   - Wajib berbahasa **Inggris** (subjek dan body sekitar 72 kolom), memakai
@@ -217,7 +219,7 @@ Aturan pencegahan *blocker* lintas versi major Android/Linux:
 - [ ] DTB/DTBO stock tidak diubah dan tidak menambah node/zone/event di luar stock.
 - [ ] Jika melakukan build/repack, `tools/verify-kmi-abi.py` lulus 8/8.
 - [ ] Porting/perubahan modul tidak menyalin header `common`, tidak menambah salinan struct privat atau *compat shim* mati, dan lulus `tools/check-private-structs.py` (serta `tools/scan-cfi-tracepoints.py` saat naik versi kernel major).
-- [ ] Commit baru, bukan amend, untuk fix/analisa.
+- [ ] Commit baru, bukan amend (kecuali diminta pengguna), untuk fix/analisa.
 - [ ] Bahasa, prefix/akhiran commit, dan `Signed-off-by` sesuai aturan.
 - [ ] Checkpatch commit message bersih (0 error).
 - [ ] Dokumentasi memakai kutipan log, tanpa nama file log lokal, path lokal mesin, maupun URL temporer.
