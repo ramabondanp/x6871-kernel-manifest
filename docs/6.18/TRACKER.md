@@ -1,6 +1,6 @@
 # Tracker 6.18 — Status Isu, Verifikasi, dan Known Limitation
 
-Diperbarui: 2026-11-26 (UTC)
+Diperbarui: 2026-11-27 (UTC)
 
 > Dokumen ini adalah lanjutan dari [`STATUS.md`](STATUS.md).
 > Fokusnya bukan menambah fitur, tetapi menutup temuan dari log boot 6.18:
@@ -21,7 +21,7 @@ Diperbarui: 2026-11-26 (UTC)
 ### Yang Masih Terbuka & Belum Diuji
 
 - **Terbuka (userspace/SELinux):** service `tranhalconfig` vendor belum aktif (`222` AVC, `audit_lost: 21` di `6.18.65` — §5.5).
-- **Belum diuji terpisah:** pengukuran recovery report rate touch GT9916 pasca sleep/wake pada kondisi `report_rate_switch=1` (§5.8), serta pemantauan pemakaian harian untuk fix C3D dual-pipe pasca boot PASS (`ac19f94d5e3e` / `b0786849b492` — §5.9).
+- **Belum diuji terpisah:** pengukuran recovery report rate touch GT9916 pasca sleep/wake pada kondisi `report_rate_switch=1` (§5.8), serta uji live reboot dari TWRP untuk fix `panel-rm69220-vdo-x6871` (`175efc9f11d7` / `175263d9b928`) dan pemantauan harian C3D (§5.9).
 - **Known limitation / skip:** ADSP (`disabled` di DTB stock — §4), wrapper `fpsgo.ko`/`trans_sched.ko` tanpa source (§5.6), serta TEE/Widevine (isu provisioning/TA — §5.7).
 
 Seluruh crash/Oops, RCU stall/MIUMPU, VP8/VP9/AV1, H.264/VENC, kamera/AIE, DPE `v4l2_fh`, CMDQ `vote mminfra`, thermal LVTS, dan error minor kernel (`kthread_run_worker`, `/proc/mtk_typec`) sudah **terverifikasi PASS** di perangkat nyata (`6.18.65`). Fix C3D dual-pipe juga **boot & PQ PASS** di perangkat (`6.18.65`), tinggal pemantauan harian agar gejala intermiten dipastikan tidak kambuh.
@@ -36,7 +36,7 @@ Seluruh crash/Oops, RCU stall/MIUMPU, VP8/VP9/AV1, H.264/VENC, kamera/AIE, DPE `
 | CMDQ/GCE + MML | **Terverifikasi PASS di device** | `0` `vote mminfra on err` di boot `6.18.65`; display, kamera, codec, MML normal |
 | Thermal `lvts`/`soc_max` | **Terverifikasi PASS di device** | `0` `Failed to register lvts tz`; 40 zone aktif (`soc_max` `59.5°C` -> `72.6°C`) |
 | Touch (`gt9916_common` + `adaptive-ts`) | **Terverifikasi PASS di device** | Node & `vendor.hardware.trantp-service` aktif, `~352–354 Hz`, charger anti-noise PASS; sisa ukur sleep/wake pada `report_rate_switch=1` |
-| Display C3D dual-pipe (`mtk_disp_c3d`) | **Boot PASS / pantau harian** | `ac19f94d5e3e` (`6.18`) / `b0786849b492` (`6.12`); boot `6.18.65` & PQ aktif normal (`0` `skip flip`/`SRAM config`/`flush failed`), pantau pemakaian harian |
+| Display dual-pipe (`mtk_disp_c3d` & `panel-rm69220`) | **C3D boot PASS; fix panel TWRP-reboot siap uji** | C3D (`ac19f94d5e3e` / `b0786849b492`) aktif normal (`0` `skip flip`/`SRAM config`/`flush failed`); fix `panel-rm69220` (`175efc9f11d7` / `175263d9b928`, `vendor_boot.img` `56f9d11ba8a44c348d96de2b8cabdc43`) lolos `8/8` KMI/ABI, belum diuji reboot TWRP |
 | `tranhalconfig` | **Terbuka, userspace** | Masih `222` AVC & `audit_lost: 21` di `6.18.65`; perlu fix service/sepolicy vendor |
 | `fpsgo`/`trans_sched` | **Known limitation; skip di 6.18** | Jangan buat stub palsu; core FPSGO tetap jalan |
 | TEE/Widevine | **Skip (known limitation)** | Provisioning/TA, bukan DT/driver (sama dengan 6.12 port); cek `DRM Info`/DRM di-skip |
@@ -835,6 +835,52 @@ EMIMPU: 0 / MIUMPU: 0 / skip flip: 0 / SRAM config: 0 / force_sram_apb mismatch:
 - **Uji belum selesai:** pemantauan pemakaian harian jangka panjang untuk
   memastikan gejala intermiten setengah hijau/biru tidak berulang.
 
+#### Kasus lanjutan: setengah layar langsung saat boot animation pasca reboot dari TWRP
+
+Gejala kembali teramati secara intermiten **langsung saat boot animation**
+(hanya sesudah reboot dari TWRP, tidak pernah saat screen off/on normal, dan
+kembali normal setelah sekali screen off/on). Pada titik boot animation,
+`vendor.mediatek.hardware.pq_aidl-service` belum berjalan (`t≈11.3s`) sehingga
+seluruh blok PQ (`C3D0/1`, `GAMMA0/1`, `CCORR`, `COLOR`, `TDSHP`, `AAL`)
+masih berstatus bypass/relay; pemeriksaan register & `mtkfb diagnose` pada
+kondisi normal di `6.18.65-android17-6-gc985884f48da-rama982-4k` mengonfirmasi
+seluruh pipe CRTC0 simetris (`0` warning).
+
+Perbandingan biner `rm69220_fhdp_dsi_vdo_dsc_csot_csot_144hz_x6871.ko` stock
+menunjukkan 4 selisih non-stock pada `panel-rm69220-vdo-x6871.c` di jalur
+TWRP reboot -> LK -> boot animation (TWRP melakukan reboot saat layar masih
+aktif `ctx->prepared == true` sehingga `device_shutdown()` memanggil
+`lcm_shutdown()` sebelum `mtk_drm_shutdown()`):
+
+1. `lcm_shutdown()` menarik `reset_gpio = 0` sementara video DSI dan rail
+   `VCI`/`DVDD` masih aktif sebelum `mtk_drm_shutdown()` memanggil
+   `lcm_unprepare()`; biner stock hanya mengirim `{0x53, 0x20}` -> `17 ms` ->
+   `{0x51, 0x00, 0x00}` lalu `lcm_disable()`.
+2. `panel_ext_reset()` dan `panel_ext_lcm_power_set(0)` meminta `reset_gpio`
+   dengan `GPIOD_OUT_HIGH` sebelum menariknya LOW, menimbulkan glitch HIGH
+   sesaat menjelang power-off.
+3. `lcm_unprepare()` mengirim perintah donor `0xFE 0x9a`/`0xFE 0x9b` dan jeda
+   Sleep-In `msleep(20)` terlalu pendek (stock: `0x28` + `10 ms`, `0x10` +
+   `100 ms`).
+4. `lcm_probe()` menunda inisialisasi regulator `dvdd` lewat workqueue 3 detik
+   (aktif di tengah boot animation) dan tidak menyetel tegangan `vci`; stock
+   menginisialisasi dan mengaktifkan `dvdd` (`1254000 uV`) serta `vci`
+   (`3000000 uV`) secara sinkron di `lcm_probe()`.
+
+**Commit fix & artefak:**
+
+- `175efc9f11d7` (`x6871-android17-6.18`) / `175263d9b928` (`x6871-android16-6.12`):
+  menyamakan `lcm_shutdown()`, `lcm_unprepare()`, reset GPIO level, dan
+  inisialisasi sinkron regulator `dvdd`/`vci` di `lcm_probe()` dengan stock
+  (`6.12` belum dibuild sesuai scope rilis).
+- `vendor_boot.img` (`6.18.65-android17-6-gc985884f48da-rama982-4k`, MD5
+  `56f9d11ba8a44c348d96de2b8cabdc43`, `221` modul, `dtb` identik stock
+  `ead6a965b0aaacc2a9c520721693f342`): lolos **8/8** `verify-kmi-abi.py`
+  (`9.877` simbol ABI, `487` modul) dan `check-private-structs.py` PASS.
+- **Uji belum selesai:** uji live reboot berulang dari TWRP pada `vendor_boot.img`
+  baru (dan bila masih pernah muncul sebelum screen off/on, tangkap `dmesg` +
+  `mtkfb diagnose` saat gejala masih aktif).
+
 ## 6. Error Minor/Rendah
 
 Hasil analisa seluruh 11 item error minor dari log boot `6.18`, source tree,
@@ -909,7 +955,7 @@ Status verifikasi pada uji live `6.18.65-android17-6-g39d19ad1a460-rama982-4k`:
 |---|---|---|
 | P0 | Verifikasi crash/EMI pasca-fix dengan log baru | **Selesai (PASS di `6.18.65`)** — 7 Oops + RCU stall + EMI `0` kemunculan |
 | P0 | Video VP9 / VP8 / AV1 | **Selesai (PASS di `6.18.65`)** — VP9, VP8 720p, dan AV1 720p/1080p terverifikasi PASS (`0` error) |
-| P1 | Display C3D dual-pipe (`mtk_disp_c3d`) | **Boot PASS di `6.18.65`** (`ac19f94d5e3e`, `b0786849b492`); pantau pemakaian harian |
+| P1 | Display dual-pipe (`mtk_disp_c3d` & `panel-rm69220`) | **C3D boot PASS; panel fix siap uji** (`175efc9f11d7`, `175263d9b928`, `56f9d11ba8a44c348d96de2b8cabdc43`); sisa uji live reboot dari TWRP |
 | P1 | Pastikan DTB/DTBO stock yang dipakai, bukan DT tree | **Selesai (PASS di `6.18.65`)** — ADSP `disabled` sesuai stock |
 | P1 | Thermal LVTS: verifikasi fix di device | **Selesai (PASS di `6.18.65`)** — 40 zone aktif, `soc_max` responsif |
 | P1 | `tranhalconfig` | **Terbuka (userspace)** — `222` AVC & `audit_lost: 21`, perlu fix vendor/sepolicy |
