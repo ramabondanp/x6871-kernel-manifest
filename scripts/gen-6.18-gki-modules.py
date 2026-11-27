@@ -3,8 +3,9 @@
 
 `get_gki_modules_list()` in main-kernel-2026 returns a select(), but MGK's
 `mgk_64.bzl` treats the module list as a plain list (append/remove).  Extract
-the default (unconditional) lists from the pinned GKI tree and emit them as a
-plain .bzl file.
+the default (unconditional) GKI lists from the pinned GKI tree and emit them
+as a plain .bzl file.  KUnit modules are loaded dynamically from
+`//common:bazel/modules.bzl` (`get_kunit_modules_superset("arm64")`).
 
 Usage:
     scripts/gen-6.18-gki-modules.py
@@ -40,15 +41,12 @@ def main():
     src = f"{args.gki}/bazel/modules_private.bzl"
     gki = extract(src, "_COMMON_GKI_MODULES_LIST")
     gki += extract(src, "_ARM64_GKI_MODULES_LIST")
-    kunit = extract(src, "_KUNIT_FRAMEWORK_MODULES")
-    kunit += extract(src, "_KUNIT_COMMON_MODULES_LIST")
-    kunit += extract(src, "_KUNIT_CLK_MODULES_LIST")
 
     def dedup(seq):
         seen = set()
         return [x for x in seq if not (x in seen or seen.add(x))]
 
-    gki, kunit = dedup(gki), dedup(kunit)
+    gki = dedup(gki)
     try:
         gki_rev = subprocess.check_output(
             ["git", "-C", args.gki, "rev-parse", "--short=12", "HEAD"],
@@ -65,12 +63,10 @@ def main():
         "GKI_MODULES = [",
     ]
     lines += [f'    "{m}",' for m in gki]
-    lines += ["]", "", "KUNIT_MODULES = ["]
-    lines += [f'    "{m}",' for m in kunit]
     lines += ["]", ""]
     with open(args.out, "w") as f:
         f.write("\n".join(lines))
-    print(f"{args.out}: {len(gki)} GKI + {len(kunit)} KUnit modules")
+    print(f"{args.out}: {len(gki)} GKI modules")
 
 
 if __name__ == "__main__":
