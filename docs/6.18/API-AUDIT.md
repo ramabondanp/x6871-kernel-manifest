@@ -1,6 +1,6 @@
 # Audit API 6.18 pada Modul OOT X6871
 
-Diperbarui: 2026-11-26
+Diperbarui: 2026-11-27
 
 > Catatan: audit statis awal dilakukan sebelum bringup di perangkat, lalu diperbarui dengan temuan runtime 6.18. Untuk status boot dan hasil uji terkini, lihat [`STATUS.md`](STATUS.md) dan [`TRACKER.md`](TRACKER.md).
 
@@ -37,6 +37,8 @@ perubahan signature). Audit dilakukan tanpa hardware, memakai hasil build
 | V4L2 ioctl `priv` | 6.18 mengirim `NULL` ke semua handler; driver harus ambil fh dari `file->private_data` | `mtk-vcodec-dec/enc`, `mtk-jpeg`, `mtk-aie` | diperbaiki: `fh_to_ctx(file->private_data)` (`41f442c`, `29ba44c`, `96f4120`); qbuf jpeg tidak lagi menolak `priv == NULL` |
 | `v4l2_open` (`V4L2_FL_USES_V4L2_FH`) | 6.18 mewajibkan `v4l2_fh` pada setiap video node V4L2 (`WARN` + `-ENODEV` bila tidak ada) | `camera_dpe_isp70` | diperbaiki: tambah `struct v4l2_fh` di `DPE_USER_INFO_STRUCT` + `v4l2_fh_init/add/del/exit` (`b83dca0`) |
 | `kthread_create_worker` | 6.18 tidak lagi memanggil `wake_up_process()`, memicu `hung_task` pada worker idle (`hf_manager`, `mml_work1`) | `hf_manager`, `mtk-mml`, `mtk_drm`, `ufcs_class`, Mali Avalon `a16w` | diperbaiki: `kthread_run_worker()` (`7d92fc24ce41`, `611ad1f`) |
+| `io-pgtable-arm.h` & `ARM_SMMU_V3` | 6.18 memindahkan `arm_lpae_io_pgtable` ke `io-pgtable-arm.c`; MT6895 memakai M4U, bukan SMMUv3 (sesuai biner referensi 6.18 non-SMMU) | `iommu_debug`, `mtk-vcodec-dec/enc` | diperbaiki: nonaktifkan `CONFIG_DEVICE_MODULES_ARM_SMMU_V3` di `X6871.config`, hapus `io-pgtable-arm-compat.h`, dan pakai `dma_buf_vunmap_unlocked()` (`10b7f43af200`) |
+| `drivers/devfreq/governor.h` | Kleaf 6.18 memindahkan header privat `common` ke `user_ddk_unsafe_headers` | `apu_top`, `mali_kbase` | diperbaiki: ekspos `//common:drivers/devfreq/governor.h` via `ack_headers.bzl` + `-I$(srctree)/drivers/devfreq` dan hapus kedua salinan lokal (`2d57eec0284b`, `a4558d5`) |
 
 ## Perubahan yang diperiksa dan dinilai aman
 
@@ -72,7 +74,7 @@ warning pada jalur berikut:
   `dvfsrc_get_required_opp_peak_bw` (WLAN, ccmni, mmc);
 - sinkronisasi `synchronize_rcu_tasks_trace` pada
   `ufs-mediatek-dbg.ko` dan `mtk_core_ctl.ko`;
-- private io-pgtable di `iommu_debug.ko`;
+- jalur M4U di `iommu_debug.ko` (`CONFIG_DEVICE_MODULES_ARM_SMMU_V3` & `io-pgtable` privat dinonaktifkan di `X6871.config` melalui `10b7f43af200`; build pembersihan header `10b7f43af200`/`2d57eec0284b`/`a4558d5` lulus `8/8` `verify-kmi-abi.py`, uji boot langsung belum dijalankan);
 - runtime hwparams dan DAPM audio (`snd-soc-mt6895-afe`,
   `snd-soc-mt6368`, speaker & amplifier aktif);
 - `bridge`/panel dan IOMMU display (termasuk `mtk_iommu_hw_program()` untuk
