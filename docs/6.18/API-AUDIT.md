@@ -39,6 +39,8 @@ perubahan signature). Audit dilakukan tanpa hardware, memakai hasil build
 | `kthread_create_worker` | 6.18 tidak lagi memanggil `wake_up_process()`, memicu `hung_task` pada worker idle (`hf_manager`, `mml_work1`) | `hf_manager`, `mtk-mml`, `mtk_drm`, `ufcs_class`, Mali Avalon `a16w` | diperbaiki: `kthread_run_worker()` (`7d92fc24ce41`, `611ad1f`) |
 | `io-pgtable-arm.h` & `ARM_SMMU_V3` | 6.18 memindahkan `arm_lpae_io_pgtable` ke `io-pgtable-arm.c`; MT6895 memakai M4U, bukan SMMUv3 (sesuai biner referensi 6.18 non-SMMU) | `iommu_debug`, `mtk-vcodec-dec/enc` | diperbaiki: nonaktifkan `CONFIG_DEVICE_MODULES_ARM_SMMU_V3` di `X6871.config`, hapus `io-pgtable-arm-compat.h`, dan pakai `dma_buf_vunmap_unlocked()` (`10b7f43af200`) |
 | `drivers/devfreq/governor.h` | Kleaf 6.18 memindahkan header privat `common` ke `user_ddk_unsafe_headers` | `apu_top`, `mali_kbase` | diperbaiki: ekspos `//common:drivers/devfreq/governor.h` via `ack_headers.bzl` + `-I$(srctree)/drivers/devfreq` dan hapus kedua salinan lokal (`2d57eec0284b`, `a4558d5`) |
+| `ack_headers.bzl` | 4.050 entri awal memuat ribuan header non-MTK/desktop DRM | `kernel/kleaf/ack_headers.bzl` | dipangkas ke `110` header privat terpakai (`74f1812dda2d`), diverifikasi `tools/check-private-structs.py` (`3002c73`) |
+| `FB_EVENT_BLANK` compat shim | `CONFIG_FB` nonaktif di 6.18; driver aktif memakai `mtk_disp_notify`/`adaptive-ts` | touchscreen & konektivitas | dihapus dari 18 file device (`27d69789e37d`) & 6 file vendor (`e99fff9`) |
 
 ## Perubahan yang diperiksa dan dinilai aman
 
@@ -74,7 +76,7 @@ warning pada jalur berikut:
   `dvfsrc_get_required_opp_peak_bw` (WLAN, ccmni, mmc);
 - sinkronisasi `synchronize_rcu_tasks_trace` pada
   `ufs-mediatek-dbg.ko` dan `mtk_core_ctl.ko`;
-- jalur M4U di `iommu_debug.ko` (`CONFIG_DEVICE_MODULES_ARM_SMMU_V3` & `io-pgtable` privat dinonaktifkan di `X6871.config` melalui `10b7f43af200`; build pembersihan header `10b7f43af200`/`2d57eec0284b`/`a4558d5` lulus `8/8` `verify-kmi-abi.py`, uji boot langsung belum dijalankan);
+- jalur M4U di `iommu_debug.ko` (`CONFIG_DEVICE_MODULES_ARM_SMMU_V3` & `io-pgtable` privat dinonaktifkan di `X6871.config` melalui `10b7f43af200`; build pembersihan header & pengerasan `74f1812dda2d`/`27d69789e37d`/`e99fff9` lulus `8/8` `verify-kmi-abi.py`, uji boot langsung belum dijalankan);
 - runtime hwparams dan DAPM audio (`snd-soc-mt6895-afe`,
   `snd-soc-mt6368`, speaker & amplifier aktif);
 - `bridge`/panel dan IOMMU display (termasuk `mtk_iommu_hw_program()` untuk
@@ -89,4 +91,7 @@ S18=<staging-6.18>/lib/modules/6.18.*
 
 # pemindai KCFI
 tools/scan-cfi-tracepoints.py --vmlinux <vmlinux-6.18> --modules "$S18"
+
+# audit paritas struct privat kernel (vb2_dc_buf, dll.) & ack_headers.bzl
+tools/check-private-structs.py --kver 6.18 --ws <workspace-6.18>
 ```
