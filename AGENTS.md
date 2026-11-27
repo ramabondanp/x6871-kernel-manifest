@@ -147,7 +147,41 @@ Jangan commit file donor, tarball, atau dump firmware ke repo.
   ada di stock.
 - Fix driver/HAL, bukan DT.
 
-## 7. Branch dan backup
+## 7. Porting ke versi kernel baru
+
+Aturan pencegahan *blocker* lintas versi major Android/Linux:
+
+- **Jangan menyalin header dari `common`/GKI ke repo OOT** selama header
+  tersebut masih ada di tree `common`. Ekspos lewat daftar header tidak aman
+  Kleaf (`kernel/kleaf/ack_headers.bzl`) dan tambahkan include path
+  (`-I$(srctree)/...`) hanya pada target yang membutuhkan.
+- **Jaga `ack_headers.bzl` tetap minimal:** hanya daftarkan header privat
+  `common` yang benar-benar di-`#include` modul OOT aktif; jangan memasukkan
+  header subsistem/GPU yang tidak dipakai.
+- **Nonaktifkan fitur hardware yang tidak ada di X6871** daripada menambal
+  atau menyalin struct/header internalnya (verifikasi terhadap DT/modul
+  stock dan referensi biner kernel target; contoh: menonaktifkan
+  `CONFIG_DEVICE_MODULES_ARM_SMMU_V3` daripada menyalin header page-table).
+- **Jangan mendefinisikan ulang struct privat internal kernel** dari file
+  `.c` `common`. Bila salinan struct privat memang sudah ada di driver aktif
+  (mis. `struct vb2_dc_buf`), wajib diverifikasi paritas layout-nya pada
+  setiap kenaikan versi kernel.
+- **Jangan menambah *compat shim* mati (*dead code*)** pada cabang
+  `#ifdef`/`#else` yang tidak aktif (mis. macro `FB_EVENT_BLANK` saat
+  `CONFIG_FB` mati); pastikan dulu jalur kode tersebut benar-benar
+  dikompilasi dan dipakai X6871 sebelum mem-patch.
+- **Wajib jalankan audit statis saat naik versi kernel major** sebelum uji
+  boot: `tools/check-private-structs.py`, `tools/scan-cfi-tracepoints.py`,
+  audit perubahan semantik API yang tidak tertangkap compiler (diff
+  `static inline`/macro di `common`), dan `tools/verify-kmi-abi.py` (8/8).
+- **Jaga isolasi modul hook/opsional dan ABI userspace:** modul opsional
+  yang bergantung berat pada vendor hook internal (scheduler/binder/MM)
+  harus tetap dapat di-drop bersih bila hook-nya dihapus di GKI baru;
+  driver yang terikat ABI userspace vendor stock (seperti GPU Mali) harus
+  mempertahankan ioctl ABI-nya dan menonaktifkan fitur MM opsional yang
+  bentrok bila diperlukan.
+
+## 8. Branch dan backup
 
 - Repo modul resmi: `alps-kernel_device_modules` dan
   `alps-vendor_mediatek_kernel_modules`.
@@ -157,7 +191,7 @@ Jangan commit file donor, tarball, atau dump firmware ke repo.
 - Repo publik harus bersih dari rujukan log lokal dan path lokal mesin, dan
   dokumentasi 6.18 harus akurat.
 
-## 8. Testing dan artefak
+## 9. Testing dan artefak
 
 - Uji yang belum dilakukan harus dicatat di dokumen.
 - Jangan commit log, image, atau artefak uji ke repo.
@@ -171,13 +205,14 @@ Jangan commit file donor, tarball, atau dump firmware ke repo.
   - `docs/guides/SELINUX-6.18.md` — patch SELinux `firmware_load` untuk boot 6.18
   - `docs/hardware/DEVICES.md` — pemetaan hardware
 
-## 9. Checklist agen
+## 10. Checklist agen
 
 - [ ] Build difokuskan ke 6.18; jika fix berlaku untuk kedua kernel, sudah di-commit ke branch 6.18 dan 6.12 tanpa perlu build 6.12.
 - [ ] Perubahan hanya pada topik yang diminta.
 - [ ] GKI (`common`/`kernel-6.12`) tidak diedit (kecuali patch SHA-gated `6.18-lts` via `setup.sh`).
 - [ ] DTB/DTBO stock tidak diubah dan tidak menambah node/zone/event di luar stock.
 - [ ] Jika melakukan build/repack, `tools/verify-kmi-abi.py` lulus 8/8.
+- [ ] Porting/perubahan modul tidak menyalin header `common`, tidak menambah salinan struct privat atau *compat shim* mati, dan lulus `tools/check-private-structs.py` (serta `tools/scan-cfi-tracepoints.py` saat naik versi kernel major).
 - [ ] Commit baru, bukan amend, untuk fix/analisa.
 - [ ] Bahasa, prefix/akhiran commit, dan `Signed-off-by` sesuai aturan.
 - [ ] Checkpatch commit message bersih (0 error).
