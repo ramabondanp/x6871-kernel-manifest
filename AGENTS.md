@@ -204,6 +204,10 @@ Aturan pencegahan *blocker* lintas versi major Android/Linux:
   - `docs/guides/FLASH-AND-TEST.md` — flash, rollback, dan checklist uji
   - `docs/guides/SELINUX-6.18.md` — patch SELinux `firmware_load` untuk boot 6.18
   - `docs/hardware/DEVICES.md` — pemetaan hardware
+- Skill agen tersedia di `.agents/skills/` (diadaptasi dari `sashal/linux.git` branch `agents`, `GPL-2.0-only`):
+  - `find-siblings` — melacak bug serupa pada driver/modul OOT lain
+  - `find-fixes` — menentukan dan memverifikasi tag `Fixes:` pada history OOT
+  - `commit-message` — menyusun/meninjau pesan commit sesuai aturan repo ini
 
 ## 10. Checklist agen
 
