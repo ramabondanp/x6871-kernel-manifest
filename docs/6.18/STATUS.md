@@ -32,14 +32,18 @@ modul termuat, `8/8` `verify-kmi-abi.py` PASS):
   menjaga seluruh worker kthread di state `S` (`blocked for more than: 0`) dan
   `/proc/mtk_typec` (`112de113630b`, `587a0a7`) bersih (`already registered: 0`,
   `/proc/mtk_typec/smt_u2_cc_mode = 0`).
-- **Display C3D dual-pipe (`ac19f94d5e3e`, `b0786849b492`):** boot & PQ aktif
+- **Display dual-pipe (`ac19f94d5e3e`, `175efc9f11d7`):** boot & PQ C3D aktif
   normal (`persist.vendor.sys.pq.disp.c3d.bypass=0`, `0` `skip flip`/`SRAM
-  config`/`flush failed`); pemakaian harian tetap dipantau untuk memastikan gejala
-  setengah hijau/biru intermiten tidak muncul kembali.
-- **Terbuka / belum diuji / skip:** pengukuran terpisah recovery report rate
-  pasca sleep/wake pada `report_rate_switch=1`; pemantauan harian jangka
-  panjang fix C3D dual-pipe; isu tersisa `tranhalconfig` userspace (`222` AVC,
-  `audit_lost: 21`); TEE/Widevine masuk kategori skip.
+  config`/`flush failed`); pemakaian harian tetap dipantau. Fix
+  `panel-rm69220` pasca reboot TWRP (`175efc9f11d7` / `175263d9b928`) sudah
+  dibuild pada `gc985884f48da` (`vendor_boot.img` MD5
+  `56f9d11ba8a44c348d96de2b8cabdc43`, `8/8` KMI/ABI PASS) dan siap uji live.
+- **Terbuka / belum diuji / skip:** uji live reboot berulang dari TWRP untuk
+  fix `panel-rm69220` (`56f9d11ba8a44c348d96de2b8cabdc43`); pengukuran terpisah
+  recovery report rate pasca sleep/wake pada `report_rate_switch=1`;
+  pemantauan harian jangka panjang fix C3D dual-pipe; isu tersisa
+  `tranhalconfig` userspace (`222` AVC, `audit_lost: 21`); TEE/Widevine masuk
+  kategori skip.
 
 | Image Teruji (`6.18.65-android17-6-g39d19ad1a460-rama982-4k`) | MD5 |
 |---|---|
@@ -53,8 +57,10 @@ Profil uji opsional `android17-6.18-lts` tersedia lewat
 `local_manifest-6.18-lts.xml` (lihat
 [`BUILD.md`](../guides/BUILD.md#profil-uji-618-lts-android17-618-lts-61865-kmi-6-build-gki-lokal));
 pin saat ini menunjuk ke `c22205f6c5bc` dengan patch SHA-gated tunggal
-`patches/common-6.18-blk-plug-invalidate-ts.patch` (`c985884f48da`, belum
-dibuild/uji live; set teruji terakhir adalah
+`patches/common-6.18-blk-plug-invalidate-ts.patch` (`c985884f48da`, sudah
+dibuild & lulus `8/8` `verify-kmi-abi.py` dengan `9.877` simbol ABI;
+`vendor_boot.img` `56f9d11ba8a44c348d96de2b8cabdc43` menunggu uji live reboot
+TWRP, sementara set 5 image terakhir yang teruji live penuh adalah
 `6.18.65-android17-6-g39d19ad1a460-rama982-4k`).
 
 ## Status Subsistem Saat Ini
@@ -71,7 +77,7 @@ dibuild/uji live; set teruji terakhir adalah
 | Thermal LVTS (`soc_temp_lvts`) | **PASS di device** | Tabel 25 sensor stock (`cbabf0ea8c34`); `0` `Failed to register lvts tz`, `40` thermal zone aktif (`soc_max` `59.5°C` -> `72.6°C`; `apu2` `No data available` saat idle; `camera0..4` belum didaftarkan `imgsensor`) |
 | DPE `v4l2_fh` & CMDQ `vote mminfra` | **PASS di device** | `b83dca0` (`0` `v4l2_open` WARN, `[DPE]DPE open`/`release` bersih) & `a71cfd2` (`0` `vote mminfra on err`) |
 | Video VP8 / VP9 / AV1 | **PASS di device** | `213a184315ef` + `a719a23cee6d` + `ac2e63fe0411` (`VDEC_VP8 = 5`); VP9 (`25` sesi s.d. `1080x1920`), VP8 720p (`c2.mtk.vpx.decoder`, 120/120 frame, `132.0 fps`), dan AV1 720p/1080p (`c2.mtk.av1.decoder`, 120/120 frame, `228.0 / 110.5 fps`) PASS (`0` error) |
-| Display C3D dual-pipe (`mediatek_drm_v1`) | **Boot PASS / pantau harian** | Fix `ac19f94d5e3e` (`6.18`) & `b0786849b492` (`6.12`, belum dibuild): validasi SRAM kedua pipe + serialisasi `clk_lock -> data_lock` saat resume; di boot `6.18.65` (`vendor_boot_a` `d66511af5d0b1df39a3f670fd5d7f938`), `0` `skip flip`/`SRAM config`/`flush failed`; pemakaian harian tetap dipantau |
+| Display dual-pipe (`mediatek_drm_v1` & `panel-rm69220`) | **C3D boot PASS; fix panel siap uji** | C3D (`ac19f94d5e3e` / `b0786849b492` di `6.12`) boot `6.18.65` PASS (`0` `skip flip`/`SRAM config`/`flush failed`, pantau harian); fix `panel-rm69220` pasca reboot TWRP (`175efc9f11d7` / `175263d9b928` di `6.12`, `vendor_boot.img` `56f9d11ba8a44c348d96de2b8cabdc43`) lulus `8/8` KMI/ABI, belum diuji live |
 | `tranhalconfig` | **Terbuka (userspace)** | Service/sepolicy vendor belum aktif (`222` AVC di `dmesg`, `audit_lost: 21`) |
 | ADSP / `fpsgo`/`trans_sched` / TEE Widevine | **Known limitation / skip** | ADSP disabled di DTB stock (`total 0` core; saat early boot `t=5.77s` modul tetap mencetak 1x `adsp_system_bootup fail ret(-14)` dan 80x `invalid cid` lalu berhenti); `trans_sched`/`fpsgo` wrapper tanpa source; TEE/Widevine isu provisioning/TA (di-skip) |
 
@@ -96,7 +102,7 @@ Rincian langkah verifikasi dan prioritas P0–P3 ada di [`TRACKER.md`](TRACKER.m
 - **Set runtime:** 487 `.ko` = **221** `vendor_boot` (tanpa `mkp.ko`) + **209** `vendor_dlkm` + **57** `odm_dlkm`
 - **Verifier (`tools/verify-kmi-abi.py --kver 6.18`):** **8/8 PASS** pada kedua profil (0 mismatch CRC, 0 impor `vmlinux` non-KMI, 0 kolisi `CONFIG_MODULE_SIG_PROTECT`, 0 unresolved symbol):
   - Baseline default `r13` (`6.18.32-android17-5-gecdaacc9a0ee-4k`, KMI 5): `abi.stg` `9.593` simbol.
-  - Profil uji `6.18-lts` (`6.18.65-android17-6-g39d19ad1a460-rama982-4k`, KMI 6): `abi.stg` `9.843` simbol.
+  - Profil uji `6.18-lts` (`6.18.65`, KMI 6): `abi.stg` `9.843` simbol pada set teruji live penuh (`g39d19ad1a460`) dan `9.877` simbol pada pin `c22205f6c5bc` (`gc985884f48da`).
 
 ## Perintah kerja
 

@@ -944,10 +944,13 @@ Status verifikasi pada uji live `6.18.65-android17-6-g39d19ad1a460-rama982-4k`:
     `getevent -lt` terukur `~352–354 Hz`, `charger mode in/out` & `resume restore charger mode`
     tanpa `failed send charger_cmd` — **PASS** (recovery pasca sleep/wake
     pada `report_rate_switch=1` **belum diukur terpisah**).
-11. Display C3D dual-pipe (`ac19f94d5e3e`, `b0786849b492`): boot `6.18.65` &
-    PQ aktif normal (`persist.vendor.sys.pq.disp.c3d.bypass=0`, `0` `skip flip`/
-    `SRAM config`/`flush failed`) — **Boot PASS** (pemantauan pemakaian harian
-    tetap berjalan).
+11. Display dual-pipe: C3D (`ac19f94d5e3e`, `b0786849b492`) pada boot `6.18.65`
+    & PQ aktif normal (`persist.vendor.sys.pq.disp.c3d.bypass=0`, `0`
+    `skip flip`/`SRAM config`/`flush failed`) — **Boot PASS** (pemantauan
+    pemakaian harian tetap berjalan); fix `panel-rm69220` pasca reboot TWRP
+    (`175efc9f11d7`, `175263d9b928`, `vendor_boot.img`
+    `56f9d11ba8a44c348d96de2b8cabdc43`) lulus `8/8` KMI/ABI, **belum diuji
+    live reboot TWRP**.
 
 ## 8. Urutan Kerja yang Disarankan
 
@@ -970,9 +973,10 @@ Status verifikasi pada uji live `6.18.65-android17-6-g39d19ad1a460-rama982-4k`:
 
 - Hasil verifikasi live pada `6.18.65-android17-6-g39d19ad1a460-rama982-4k`
   sudah menutup temuan crash, ADSP, VP8/VP9/AV1, DPE, CMDQ, thermal LVTS, dan
-  touch di atas; pengujian yang belum dijalankan (recovery sleep/wake
-  `report_rate_switch=1`) tetap dicatat eksplisit, sedangkan TEE/Widevine
-  masuk kategori skip.
+  touch di atas; pengujian yang belum dijalankan (uji live reboot TWRP untuk
+  fix `panel-rm69220` `56f9d11ba8a44c348d96de2b8cabdc43`, pemantauan harian C3D,
+  serta recovery sleep/wake `report_rate_switch=1`) tetap dicatat eksplisit,
+  sedangkan TEE/Widevine masuk kategori skip.
 - Dokumen ini tidak mengubah kode. Perubahan tetap harus melalui commit baru
   sesuai aturan commit di `AGENTS.md` (prefix `6.18:` di manifest; format
   kernel dengan akhiran `for 6.18` di repo kernel/vendor bila khusus 6.18).

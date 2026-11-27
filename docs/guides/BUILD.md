@@ -96,10 +96,12 @@ Catatan penting profil ini:
   `setup.sh` menerapkan `patches/common-6.18-blk-plug-invalidate-ts.patch`
   lewat `git am` **hanya** pada satu commit yang dipin saat ini
   (`c22205f6c5bc`, menghasilkan `c985884f48da`, tree bersih tanpa `-dirty`),
-  dan tidak menyentuh `r13` maupun revisi lain. Pin baru `c22205f6c5bc` (+
-  `c985884f48da`) belum dibuild/uji live di perangkat; set 5 image terakhir yang
-  lulus uji live di X6871 adalah
-  `6.18.65-android17-6-g39d19ad1a460-rama982-4k` (`4cc5bb220b50` + `39d19ad1a460`,
+  dan tidak menyentuh `r13` maupun revisi lain. Build pada pin `c22205f6c5bc`
+  (+ `c985884f48da`) sudah lulus `8/8` `verify-kmi-abi.py` (`9.877` simbol ABI;
+  `vendor_boot.img` `56f9d11ba8a44c348d96de2b8cabdc43` menunggu uji live reboot
+  TWRP), sedangkan set 5 image terakhir yang lulus uji live penuh di X6871
+  adalah `6.18.65-android17-6-g39d19ad1a460-rama982-4k` (`4cc5bb220b50` +
+  `39d19ad1a460`,
   boot, kamera/VENC, VP8/VP9/AV1, DPE, CMDQ, thermal LVTS, touch, serta fix minor
   `kthread_run_worker` dan `/proc/mtk_typec` dengan `0` panic/Oops; rincian di
   [`STATUS.md`](../6.18/STATUS.md) dan [`TRACKER.md`](../6.18/TRACKER.md)).
@@ -247,7 +249,7 @@ vendor tidak berubah. Untuk mengganti SoC build, set `PLATFORM` (default `mt6895
 | DLKM (`vendor_dlkm` + `odm_dlkm`) | **266** `.ko` (`209` + `57`) dibangun dari kode sumber (KMI 6, tanpa bentrok `CONFIG_MODULE_SIG_PROTECT`) |
 | Build target | `//kernel_device_modules-6.12:mgk_64_k612_customer_modules_install.user` |
 | Build terakhir | sukses (clean KMI 6 + trimmed X6871 allowlist), 2026-11-22 |
-| Revisi modul perangkat untuk build dari source | [`0fba8e7`](https://github.com/ramabondanp/alps-kernel_device_modules/commit/0fba8e7f20f47dc5814acd28fba14d6854b00520) (`x6871-android16-6.12`, referensi build uji `v19-kmi6` memakai `fa18f7f`; backport lintas-branch terbaru hingga `587a0a7`, belum dibuild ulang) |
+| Revisi modul perangkat untuk build dari source | [`0fba8e7`](https://github.com/ramabondanp/alps-kernel_device_modules/commit/0fba8e7f20f47dc5814acd28fba14d6854b00520) (`x6871-android16-6.12`, referensi build uji `v19-kmi6` memakai `fa18f7f`; backport lintas-branch terbaru hingga `175263d9b928`, belum dibuild ulang) |
 | Vendor MTK modules HEAD | `83b4fa6` (`alps-vendor_mediatek_kernel_modules`, `x6871-android16-6.12` saat uji `v19-kmi6`; backport lintas-branch terbaru hingga `5e9b2d8`, belum dibuild ulang) |
 | Active clean workspace | `~/x6871-kernel` |
 | Runtime | **Lulus boot di GKI KMI 6 (`android16-6.12-2026-09_r16`, `v19-kmi6`)** dengan `boot-lz4.img` + `system_dlkm.erofs.img` resmi Google (0 mismatch CRC vs `abi.stg` `10.630` simbol, 0 kolisi `CONFIG_MODULE_SIG_PROTECT`, 0 unresolved symbol). Rincian log fitur berasal dari KMI 5; konfirmasi uji langsung oleh maintainer dicatat pada build uji `v19-kmi6` (GitHub Release lama sudah dihapus). |
