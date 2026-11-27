@@ -3,6 +3,6 @@
      Profil uji GKI build lokal android17-6.18-lts (6.18.65, KMI 6, 4 KB). -->
 <manifest>
   <extend-project name="kernel/common"
-                  revision="4cc5bb220b502648f1bfca7541b1d09f0c9160e7"
+                  revision="c22205f6c5bc5c483d45ffd8d39340a505976a2a"
                   upstream="refs/heads/android17-6.18-lts" />
 </manifest>

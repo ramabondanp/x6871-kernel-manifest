@@ -158,9 +158,7 @@ if [ "$KVER" = "6.18" ]; then
   COMMON_HEAD=$(git -C common rev-parse HEAD 2>/dev/null || true)
   if git -C common apply --reverse --check "$COMMON_LTS_PATCH" 2>/dev/null; then
     echo 'common: patch blk_plug_invalidate_ts sudah terpasang'
-  elif [ "$COMMON_HEAD" = 17b8bfe5ce7568445def263dc609f839f3b469f6 ] ||
-       [ "$COMMON_HEAD" = aeb47e4961274be51dd582e00796110922f558e7 ] ||
-       [ "$COMMON_HEAD" = 4cc5bb220b502648f1bfca7541b1d09f0c9160e7 ]; then
+  elif [ "$COMMON_HEAD" = c22205f6c5bc5c483d45ffd8d39340a505976a2a ]; then
     git -C common -c core.hooksPath=/dev/null \
       -c user.name="Rama Bondan Prakoso" -c user.email="ramanarubp@gmail.com" \
       am --committer-date-is-author-date "$COMMON_LTS_PATCH"

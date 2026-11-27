@@ -1,6 +1,6 @@
 # Status Eksekusi Port 6.18
 
-Diperbarui: 2026-11-26 (UTC)
+Diperbarui: 2026-11-27 (UTC)
 
 Dokumen ini merangkum status port **6.18** dari rencana awal
 ([`PLAN-INITIAL.md`](../archive/6.18/PLAN-INITIAL.md)). Baseline stabil harian
@@ -52,8 +52,10 @@ modul termuat, `8/8` `verify-kmi-abi.py` PASS):
 Profil uji opsional `android17-6.18-lts` tersedia lewat
 `local_manifest-6.18-lts.xml` (lihat
 [`BUILD.md`](../guides/BUILD.md#profil-uji-618-lts-android17-618-lts-61865-kmi-6-build-gki-lokal));
-patch SHA-gated `patches/common-6.18-blk-plug-invalidate-ts.patch` tetap
-diterapkan (`39d19ad1a460`) hingga upstream fix masuk.
+pin saat ini menunjuk ke `c22205f6c5bc` dengan patch SHA-gated tunggal
+`patches/common-6.18-blk-plug-invalidate-ts.patch` (`c985884f48da`, belum
+dibuild/uji live; set teruji terakhir adalah
+`6.18.65-android17-6-g39d19ad1a460-rama982-4k`).
 
 ## Status Subsistem Saat Ini
 

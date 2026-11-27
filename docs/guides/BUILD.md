@@ -68,7 +68,7 @@ Verifikasi 6.18: lihat [STATUS.md](../6.18/STATUS.md#perintah-kerja).
 Default `local_manifest-6.18.xml` tetap pada tag pure-GKI
 `android17-6.18-2026-09_r13` (`6.18.32`, KMI 5). Profil uji
 `local_manifest-6.18-lts.xml` mem-pin `kernel/common` ke
-`4cc5bb220b502648f1bfca7541b1d09f0c9160e7` (`android17-6.18-lts`, `6.18.65`,
+`c22205f6c5bc5c483d45ffd8d39340a505976a2a` (`android17-6.18-lts`, `6.18.65`,
 KMI 6) sebagai **profil build GKI lokal (*self-built*)**:
 
 ```bash
@@ -89,18 +89,19 @@ Catatan penting profil ini:
   ephemeral dari build tersebut. Flash kelima image (`boot`, `vendor_boot`,
   `system_dlkm`, `vendor_dlkm`, `odm_dlkm`) sekaligus di `fastbootd` dan jangan
   dicampur dengan image Google CI atau KMI 5.
-- **Patch sementara `common` (`17b8bfe5ce75` / `aeb47e496127` / `4cc5bb220b50`):** `6.18.63+`
-  upstream sempat menghapus guard NULL di `blk_plug_invalidate_ts()` sehingga
-  preemption IRQ di dalam `blk_finish_plug+0x54/0x78` memicu
+- **Patch sementara `common` (`c22205f6c5bc`):** `6.18.63+` upstream sempat
+  menghapus guard NULL di `blk_plug_invalidate_ts()` sehingga preemption IRQ di
+  dalam `blk_finish_plug+0x54/0x78` memicu
   `Unable to handle kernel NULL pointer dereference at virtual address 0000000000000020`.
   `setup.sh` menerapkan `patches/common-6.18-blk-plug-invalidate-ts.patch`
-  lewat `git am` **hanya** bila `common` berada di SHA yang terdampak
-  (`17b8bfe5ce75`, `aeb47e496127`, atau `4cc5bb220b50`) agar tree tetap bersih (tanpa `-dirty`),
-  dan tidak menyentuh `r13` maupun revisi LTS yang lebih baru. Set 5 image
-  `6.18.65-android17-6-g39d19ad1a460-rama982-4k` (`4cc5bb220b50` + `39d19ad1a460`)
-  sudah lulus uji live di X6871 (boot, kamera/VENC, VP8/VP9/AV1, DPE, CMDQ, thermal
-  LVTS, touch, serta fix minor `kthread_run_worker` dan `/proc/mtk_typec`
-  dengan `0` panic/Oops; rincian di
+  lewat `git am` **hanya** pada satu commit yang dipin saat ini
+  (`c22205f6c5bc`, menghasilkan `c985884f48da`, tree bersih tanpa `-dirty`),
+  dan tidak menyentuh `r13` maupun revisi lain. Pin baru `c22205f6c5bc` (+
+  `c985884f48da`) belum dibuild/uji live di perangkat; set 5 image terakhir yang
+  lulus uji live di X6871 adalah
+  `6.18.65-android17-6-g39d19ad1a460-rama982-4k` (`4cc5bb220b50` + `39d19ad1a460`,
+  boot, kamera/VENC, VP8/VP9/AV1, DPE, CMDQ, thermal LVTS, touch, serta fix minor
+  `kthread_run_worker` dan `/proc/mtk_typec` dengan `0` panic/Oops; rincian di
   [`STATUS.md`](../6.18/STATUS.md) dan [`TRACKER.md`](../6.18/TRACKER.md)).
 - `patches/kleaf-localversion-suffix.patch` menambah env var opsional
   `LOCALVERSION_SUFFIX` di `build/kernel/kleaf/workspace_status_stamp.py`
