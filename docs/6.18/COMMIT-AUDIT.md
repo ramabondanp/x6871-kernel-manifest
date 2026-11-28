@@ -220,7 +220,7 @@ Akar masalah: `tadapter_device_register()` hanya mengisi `dev_set_drvdata(&tadap
 |---|---|---|---|
 | `pca_tfcp_ta`: NULL dereference `tadapter_dev_get_drvdata` | Tambahkan `tadapter_dev_set_drvdata(info->tadapter_dev, info);` di `pca_tfcp_probe()` (`Fixes: 649b928bd4cc` di `6.18`) | `160ce5443d2b` | `6c472b95` |
 
-Temuan non-fatal tambahan di `console-ramoops-0` (`t=7.511687`): `WARNING` `sysfs: cannot create duplicate filename '/class/MT_pmic_adc_cali'` dari `adc_cali_cdev_init()` (`tc_gauge`) karena `mt6375-gauge` sudah mendaftarkan class tersebut sebelumnya (belum diubah).
+Temuan non-fatal tambahan di `console-ramoops-0` (`t=7.511687`): `WARNING` `sysfs: cannot create duplicate filename '/class/MT_pmic_adc_cali'` dari `adc_cali_cdev_init()` (`tc_gauge`) karena `mt6375-gauge` sudah mendaftarkan class tersebut sebelumnya (sudah diperbaiki pada `c57b6faadd68` / `f2b01e7c`).
 
 Verifikasi build & repack `6.18` (`160ce5443d2b`):
 - `tools/check-private-structs.py`: PASS `3/3` (`vb2_dc_buf`, `0` untracked structs, `110` entri `ack_headers.bzl`).
