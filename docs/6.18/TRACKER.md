@@ -1,6 +1,6 @@
 # Tracker 6.18 — Status Isu, Verifikasi, dan Known Limitation
 
-Diperbarui: 2026-11-27 (UTC)
+Diperbarui: 2026-11-29 (UTC)
 
 > Dokumen ini adalah lanjutan dari [`STATUS.md`](STATUS.md).
 > Fokusnya bukan menambah fitur, tetapi menutup temuan dari log boot 6.18:
@@ -40,7 +40,7 @@ Seluruh crash/Oops, RCU stall/MIUMPU, VP8/VP9/AV1, H.264/VENC, kamera/AIE, DPE `
 | `tranhalconfig` | **Terbuka, userspace** | Masih `222` AVC & `audit_lost: 21` di `6.18.65`; perlu fix service/sepolicy vendor |
 | `fpsgo`/`trans_sched` | **Known limitation; skip di 6.18** | Jangan buat stub palsu; core FPSGO tetap jalan |
 | TEE/Widevine | **Skip (known limitation)** | Provisioning/TA, bukan DT/driver (sama dengan 6.12 port); cek `DRM Info`/DRM di-skip |
-| Error minor | **2 bug kernel PASS di device; 9 item skip** | `kthread_run_worker` (`7d92fc24ce41`, `611ad1f`) & `/proc/mtk_typec` (`112de113630b`, `587a0a7`) terverifikasi PASS di boot baru (`6.18.65`); 9 item lain paritas stock/userspace |
+| Error minor | **4 item fixed (2 PASS device, 2 build-only); 9 item skip** | `kthread_run_worker` (`7d92fc24ce41`, `611ad1f`) & `/proc/mtk_typec` (`112de113630b`, `587a0a7`) PASS di `6.18.65`; IRQ `spmi-mtk-pmif` (`efe9fd0a24e5` / `64711ac3`) & class `tc_gauge` (`c57b6faadd68` / `f2b01e7c`) lulus build 6.18, belum uji live; 9 item lain paritas stock/userspace |
 
 Tidak ada `am_crash` atau `am_anr` di logcat historis yang dianalisis. Pada
 uji live terbaru (`6.18.65-android17-6-g39d19ad1a460-rama982-4k`), seluruh fix
@@ -899,6 +899,8 @@ DTB/DTBO stock, dan biner `.ko` stock SP20:
 | `fgauged: open .../cus_save_data fail`, `nv_fail(1)` | **Skip (userspace)** | Daemon `fuelgauged` saat file kalibrasi kustom belum tersedia; pengisian baterai normal |
 | `healthd: battery...Path not found` | **Skip (userspace / kosmetik)** | Health HAL mencari properti opsional yang tidak ada di DT stock |
 | `WARNING: CPU ... rcu_note_context_switch`, `Workqueue: ... susfs_guard_lkm` | **Skip (modul pihak ketiga)** | Berasal dari modul root KernelSU/SUSFS, bukan source port kernel |
+| `spmi-mtk ... error -EINVAL: request_irq(4294967290)` + `request event_N irq fail` | **Fixed (`efe9fd0a24e5` / `64711ac3`); build-only** | `platform_get_irq_byname("pmif_irq")` gagal karena DTB stock tidak punya `pmif_irq`, tetapi handler tetap diminta dengan IRQ `-6`. Loop registrasi handler kini di-guard `irq >= 0`; register `irq-event-en` tetap diprogram. |
+| `sysfs: cannot create duplicate filename '/class/MT_pmic_adc_cali'` | **Fixed (`c57b6faadd68` / `f2b01e7c`); build-only** | `mt6375-gauge` sudah memiliki class/char device tersebut; `tc_gauge` kini berhenti bila power supply `mt6375-gauge` ada. Bergantung urutan probe: bila urutan berubah, WARN dapat muncul dari sisi `mt6375-gauge`. |
 
 Build gabungan fix minor (`6.18.65-android17-6-g39d19ad1a460-rama982-4k`, 487
 modul runtime, `9.843` simbol ABI) lolos **8/8** `verify-kmi-abi.py`

@@ -1,6 +1,6 @@
 # Audit Commit Awal 6.12 & Bringup 6.18 pada Repo Modul OOT
 
-Diperbarui: 2026-11-28 (UTC) — Batch 1–4, follow-up review, tiga fix uji live, fix `pca_tfcp_ta`, dan fix `tc_tfcp_ta` sudah diterapkan
+Diperbarui: 2026-11-29 (UTC) — Batch 1–4, follow-up review, tiga fix uji live, fix `pca_tfcp_ta`, fix `tc_tfcp_ta`, serta fix IRQ `spmi-mtk-pmif` dan class `tc_gauge` sudah diterapkan
 
 > Dokumen ini mencatat hasil **audit statis kode** atas seluruh commit awal porting 6.12 dan bringup 6.18 pada kedua repositori modul *out-of-tree* (`alps-kernel_device_modules` dan `alps-vendor_mediatek_kernel_modules`). Batch 1 (`P0-1`–`P0-6`), Batch 2 (`P1-1`–`P1-3`, `P1-6`–`P1-11`), Batch 3 (`P2`: dua backport 6.12 + cleanup), dan Batch 4 (`P1-4`/`P1-5`, setelah verifikasi ulang `.ko` stock) sudah diterapkan sebagai commit *forward-fix* dan diverifikasi kompilasi 6.18; belum ada uji perangkat. Temuan `P3` (modul tidak aktif) masih berupa rencana. Untuk status boot terkini lihat [`STATUS.md`](STATUS.md), daftar isu log di [`TRACKER.md`](TRACKER.md), dan audit API 6.13–6.18 sebelumnya di [`API-AUDIT.md`](API-AUDIT.md).
 
@@ -285,6 +285,36 @@ Verifikasi build, repack, & uji live `6.18` (`0f5b97affe91`):
 - Checkpatch pesan commit: `0` error pada kedua branch `alps-kernel_device_modules`.
 - **Uji live perangkat (`vendor_dlkm.img` `54283b9f32b0f25a7f5a075f7235f834`):** **PASS** boot penuh ke sistem Android (`sys.boot_completed=1`, `vendor.all.modules.ready=1`, `505` modul dimuat termasuk `scheduler`/`task_turbo`/`mtk_fpsgo_v8`/`vip_engine`, layanan `fpsgo` aktif, `0` `put_prev_entity`/`set_next_entity`/`WARNING:`/`Oops` baru di `dmesg`).
 - Status belum diuji: branch `6.12` (`1e21bf056aa0`..`fb1b344d97c2`) **belum** di-build, dan kestabilan harian jangka panjang (`6.18`) tetap dipantau.
+
+### Fix IRQ `spmi-mtk-pmif` dan class `tc_gauge` (6.18.65)
+
+Dua temuan boot yang sebelumnya tidak terlihat karena ring buffer `dmesg`
+tergulir (muncul pada detik ke-1 sampai ke-7) sudah diperbaiki di kedua
+branch:
+
+| Topik | Ringkasan Perbaikan | Commit 6.18 | Commit 6.12 |
+|---|---|---|---|
+| `spmi-mtk-pmif`: IRQ event invalid | `pmif_irq_register()` memakai hasil `platform_get_irq_byname()` yang negatif saat DTB stock tidak punya `pmif_irq`, sehingga `devm_request_threaded_irq()` dipanggil dengan IRQ `-6`. Loop registrasi handler kini di-guard `irq >= 0`; pemrograman register `irq-event-en` tetap berjalan. | `efe9fd0a24e5` | `64711ac3` |
+| `tc_gauge`: class `MT_pmic_adc_cali` ganda | `mt6375-gauge` sudah mendaftarkan class dan char device yang sama lebih dulu. `adc_cali_cdev_init()` kini berhenti bila power supply `mt6375-gauge` ada, sehingga `class_create()`/`device_create()` kedua tidak dicoba. | `c57b6faadd68` | `f2b01e7c` |
+
+Gejala yang hilang:
+
+```text
+spmi-mtk 1c804000.spmi: error -EINVAL: request_irq(4294967290) ...
+spmi-mtk 1c804000.spmi: request event_0 irq fail
+sysfs: cannot create duplicate filename '/class/MT_pmic_adc_cali'
+```
+
+Verifikasi dan catatan:
+
+- Build `user` `6.18` sukses; tidak ada compiler warning baru (warning
+  `-Wmissing-prototypes` pada `tc_gauge.c` sudah ada sebelumnya).
+- Checkpatch keempat commit: `0` error, `0` warning.
+- Belum diuji live: image belum di-repack/flash, dan branch `6.12` belum
+  di-build.
+- Fix `spmi` menutup ketiga pemanggil. Fix `tc_gauge` bergantung urutan
+  probe: hanya aktif bila `mt6375-gauge` sudah mendaftarkan power supply-nya;
+  bila urutan berubah, WARN dapat muncul dari sisi `mt6375-gauge`.
 
 ---
 
