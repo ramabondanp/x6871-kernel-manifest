@@ -1,8 +1,8 @@
 # Audit Commit Awal 6.12 & Bringup 6.18 pada Repo Modul OOT
 
-Diperbarui: 2026-11-28 (UTC) — Batch 1–3 (`P0`–`P2`) sudah diterapkan
+Diperbarui: 2026-11-28 (UTC) — Batch 1–4 sudah diterapkan
 
-> Dokumen ini mencatat hasil **audit statis kode** atas seluruh commit awal porting 6.12 dan bringup 6.18 pada kedua repositori modul *out-of-tree* (`alps-kernel_device_modules` dan `alps-vendor_mediatek_kernel_modules`). Batch 1 (`P0-1`–`P0-6`), Batch 2 (`P1-1`–`P1-3`, `P1-6`–`P1-11`), dan Batch 3 (`P2`: dua backport 6.12 + cleanup) sudah diterapkan sebagai commit *forward-fix* dan diverifikasi kompilasi 6.18; belum ada uji perangkat. `P1-4`/`P1-5` (Batch 4) dan `P3` masih berupa rencana. Untuk status boot terkini lihat [`STATUS.md`](STATUS.md), daftar isu log di [`TRACKER.md`](TRACKER.md), dan audit API 6.13–6.18 sebelumnya di [`API-AUDIT.md`](API-AUDIT.md).
+> Dokumen ini mencatat hasil **audit statis kode** atas seluruh commit awal porting 6.12 dan bringup 6.18 pada kedua repositori modul *out-of-tree* (`alps-kernel_device_modules` dan `alps-vendor_mediatek_kernel_modules`). Batch 1 (`P0-1`–`P0-6`), Batch 2 (`P1-1`–`P1-3`, `P1-6`–`P1-11`), Batch 3 (`P2`: dua backport 6.12 + cleanup), dan Batch 4 (`P1-4`/`P1-5`, setelah verifikasi ulang `.ko` stock) sudah diterapkan sebagai commit *forward-fix* dan diverifikasi kompilasi 6.18; belum ada uji perangkat. Temuan `P3` (modul tidak aktif) masih berupa rencana. Untuk status boot terkini lihat [`STATUS.md`](STATUS.md), daftar isu log di [`TRACKER.md`](TRACKER.md), dan audit API 6.13–6.18 sebelumnya di [`API-AUDIT.md`](API-AUDIT.md).
 
 ## Kebijakan & Ringkasan
 
@@ -66,8 +66,8 @@ Semua commit di atas belum diuji di perangkat; status boot tetap mengacu ke [`ST
 | `P1-1` | `kdm` (`6.18`) | `ufs-mediatek-mod`, `ufs-mediatek-dbg`<br>`drivers/ufs/ufs-mediatek.c:1894-2030, 2163-2171`, `ufs-mediatek-dbg.c:1938-1946`, `ufs-mediatek-mimic.c:86-94` | `2a48d6af08b5`, `859c68811e62` | (a) Penghapusan `hba->scsi_block_reqs_cnt` menghilangkan refcount sementara `scsi_block_requests()` di 6.18 hanya assignment bool; pemanggil nested nyata (`ufs_mtk_dynamic_clock_scaling()` → `ufs_mtk_config_pwr_mode()`) meng-unblock SCSI I/O terlalu dini sebelum devfreq/caps selesai. (b) `.negotiate_pwr_mode` belum dipisah dari `ufs_mtk_pwr_change_notify(PRE_CHANGE)`. **Fix:** tambah `atomic_t scsi_block_reqs_cnt` di `struct ufs_mtk_host` dan pisahkan `.negotiate_pwr_mode` sesuai kontrak vops 6.18. | Selesai — `96c17fd9446c` |
 | `P1-2` | `kdm` (`6.18`) | `scheduler`<br>`drivers/misc/mediatek/sched/eas/balance.c:435-440` | `b7fb33e9422e` | Penggantian mekanis `h_nr_running` → `this_rq->cfs.h_nr_runnable` keliru untuk EEVDF 6.18: task `sched_delayed` mengurangi `h_nr_runnable` tetapi tetap terhitung di `nr_running` dan `cfs.h_nr_queued`, sehingga kondisi `nr_running != h_nr_runnable` memaksa `*pulled_task = -1` (`RETRY_TASK`). **Fix:** ganti ke `this_rq->cfs.h_nr_queued` (sama dengan `kernel/sched/fair.c` 6.18). | Selesai — `4f2e1aacdcfc` |
 | `P1-3` | `vendor` (`6.18`) | `camera_dpe_isp70`<br>`mtkcam/mtk-dpe/isp_70/camera_dpe.c:5476, 5689-5710` (plus sibling non-aktif `isp_7sp`) | `b83dca0` | `DPE_open()` mengalokasikan `DPE_USER_INFO_STRUCT` (yang meng-embed `struct v4l2_fh`) memakai `kmalloc(..., GFP_ATOMIC)` bukan `kzalloc()`. `v4l2_fh_init()` mengasumsikan struct sudah zero-initialized (`fh->navailable`, `fh->m2m_ctx`). **Fix:** ubah ke `kzalloc` (atau zero-init `fh` sebelum `v4l2_fh_init()`). | Selesai — `e4bb6cf` |
-| `P1-4` | `kdm` (`6.18` + `6.12`) | `tran-led-core`<br>`drivers/leds/tran_led/tran_led_core.c:58-64, 141-267, 359, 373-378, 482-562` & `tran_led_class.c:175-211` | `39044a9498af` | Hasil rekonstruksi awal AI mengandung 6 bug nyata: (a) ioctl magic `'L'` (`0x4c`) bertentangan dengan komentar disassembly driver sendiri (`0x12`, mis. `0x40041202`–`0x80201201`), (b) stack leak `kbuf` belum di-zero sebelum `TRAN_GET_CMD` → `copy_to_user`, (c) `size_t len` unsigned underflow di multicolor show saat error, (d) sysfs handler lain tidak memanggil `tran_led_dev_check()`, (e) probe error path mengembalikan `0` dan merusak teardown, (f) `kfree(led_dev)` setelah `device_register()` gagal tanpa `put_device()`/`dev.release`. **Catatan wajib:** verifikasi ulang terhadap `.ko` stock sebelum mengubah nilai ioctl. | Terbuka |
-| `P1-5` | `kdm` (`6.18` + `6.12`) | `tc_tfcp_ta`, `pca_tfcp_ta`<br>`drivers/power/supply/transsion/tc_tfcp_ta.c:92-140, 260-278, 384-403, 594-601` & `pca_tfcp_ta.c:48, 197-235, 360-422, 474-478` | `28c7b2655c60`, `649b928bd4cc` | Hasil rekonstruksi awal AI: (a) `tfcp_ta_read_device()` tidak pernah mengirim byte alamat `reg` ke I2C dan membandingkan `crc8(tmp)` vs `crc8(&reg)`, (b) cabang `suspended` return `0` dengan stack uninitialized, (c) `i2c_set_clientdata()` dipanggil sesudah registrasi devm, (d) `get_min_voltage`/`current`/`set_current`/`set_voltage` salah mask & tanpa `io_lock`, (e) `PCA_TFCP_DEFAULT_MV = 5000000` (uV, bukan mV) terpotong `0xffff`, (f) probe `pca_tfcp_ta` mengembalikan `-ENODEV` bukan `-EPROBE_DEFER`. **Catatan wajib:** verifikasi ulang disassembly `.ko` stock sebelum memperbaiki protokol TFCP. | Terbuka |
+| `P1-4` | `kdm` (`6.18` + `6.12`) | `tran-led-core`<br>`drivers/leds/tran_led/tran_led_core.c:58-64, 141-267, 359, 373-378, 482-562` & `tran_led_class.c:175-211` | `39044a9498af` | Hasil rekonstruksi awal AI mengandung 6 bug nyata: (a) ioctl magic `'L'` (`0x4c`) bertentangan dengan komentar disassembly driver sendiri (`0x12`, mis. `0x40041202`–`0x80201201`), (b) stack leak `kbuf` belum di-zero sebelum `TRAN_GET_CMD` → `copy_to_user`, (c) `size_t len` unsigned underflow di multicolor show saat error, (d) sysfs handler lain tidak memanggil `tran_led_dev_check()`, (e) probe error path mengembalikan `0` dan merusak teardown, (f) `kfree(led_dev)` setelah `device_register()` gagal tanpa `put_device()`/`dev.release`. **Catatan wajib:** verifikasi ulang terhadap `.ko` stock sebelum mengubah nilai ioctl. | Selesai — `b8715758fdd0` (6.18), `4381397` (6.12) |
+| `P1-5` | `kdm` (`6.18` + `6.12`) | `tc_tfcp_ta`, `pca_tfcp_ta`<br>`drivers/power/supply/transsion/tc_tfcp_ta.c:92-140, 260-278, 384-403, 594-601` & `pca_tfcp_ta.c:48, 197-235, 360-422, 474-478` | `28c7b2655c60`, `649b928bd4cc` | Hasil rekonstruksi awal AI: (a) `tfcp_ta_read_device()` tidak pernah mengirim byte alamat `reg` ke I2C dan membandingkan `crc8(tmp)` vs `crc8(&reg)`, (b) cabang `suspended` return `0` dengan stack uninitialized, (c) `i2c_set_clientdata()` dipanggil sesudah registrasi devm, (d) `get_min_voltage`/`current`/`set_current`/`set_voltage` salah mask & tanpa `io_lock`, (e) `PCA_TFCP_DEFAULT_MV = 5000000` (uV, bukan mV) terpotong `0xffff`, (f) probe `pca_tfcp_ta` mengembalikan `-ENODEV` bukan `-EPROBE_DEFER`. **Catatan wajib:** verifikasi ulang disassembly `.ko` stock sebelum memperbaiki protokol TFCP. | Selesai — `21396ca35e08` + `6587619d79a5` (6.18), `8431858` + `159ae6f` (6.12) |
 | `P1-6` | `kdm` (`6.18` + `6.12`) | `gt9916_common`<br>`drivers/input/touchscreen/transsion/vendor/goodix/gt9916_common/goodix_ts_gesture.c:58-66, 253-288` | `466e4c1731c1` | `gsx_gesture_before_suspend()` dan `before_resume()` masing-masing memeriksa `gsx->gesture_type` tanpa menyimpan flag apakah suspend benar-benar mengaktifkan `enable_irq_wake()`. Jika userspace mengubah gesture saat layar mati, resume memicu wake leak atau `WARN: Unbalanced IRQ wake disable`. Selain itu `fingerprint_status_read()` masih menolak `count < len` (`-EINVAL`, seharusnya `simple_read_from_buffer()`). | Selesai — `9399ae57a3fc` (6.18), `b57598f` (6.12) |
 | `P1-7` | `kdm` (`6.18` + `6.12`) | `mtk-vcodec-common`<br>`drivers/media/platform/mtk-vcodec/mtk_vcodec_util.c:1821-1844` | `73f4b3f5dbfe` | Jalur fallback `mtk_vcodec_set_task_priority()` pada `prio > 99` memanggil `sched_setscheduler_nocheck(task, SCHED_NORMAL, &param)` tanpa me-reset `param.sched_priority = 0` → selalu gagal `-EINVAL` (juga tidak memeriksa `prio < 0`). | Selesai — `3154eb3fb18d` (6.18), `4717330` (6.12) |
 | `P1-8` | `kdm` (`6.18` + `6.12`) | `tkv`<br>`drivers/misc/transsion/tkv/tkv.c:48-67, 218-241` | `cb088a63c4b2` | `tkv_get_cmd()` membocorkan `of_node_put()`, `tkv_init()` tidak melepaskan `ioremap_cache()` (`iounmap()`), `tkv_exit()` kosong (dangling `/proc/tkv`), dan `pr_info("... %s", (char *)tkv_base)` berisiko OOB read bila region 32 KiB tidak berakhiran NUL. | Selesai — `705a15dbc441` (6.18), `1de9c4d` (6.12) |
@@ -91,7 +91,7 @@ Semua commit di atas belum diuji di perangkat; status boot tetap mengacu ke [`ST
 
 Catatan:
 - `P1-11` dipecah menjadi dua commit karena `leds-aw22xxx` dan `tran_fp` adalah dua bug terpisah.
-- `P1-4` dan `P1-5` tetap di Batch 4 dan belum diterapkan; keduanya menunggu verifikasi `.ko` stock.
+- `P1-4` dan `P1-5` diterapkan di Batch 4 setelah verifikasi ulang `.ko` stock (lihat [Hasil Batch 4](#hasil-batch-4-p1-4p1-5)).
 - Seluruh commit 6.12 belum di-build dan belum diuji di perangkat; sisa error checkpatch pada `leds-aw22xxx` hanya indent 4-spasi bawaan file vendor dan di-skip sesuai aturan repo.
 
 ---
@@ -141,6 +141,28 @@ Catatan:
 - Guard alarmtimer `< 6.13` tetap ada di repo `vendor` 6.12; yang dibersihkan hanya salinan 6.18 yang cabang aktifnya sudah `void`.
 - Commit 6.12 belum di-build dan belum ada uji perangkat untuk seluruh Batch 3.
 
+### Hasil Batch 4 (`P1-4`/`P1-5`)
+
+Verifikasi dilakukan langsung pada `tran-led-core.ko`, `tc_tfcp_ta.ko`, dan
+`pca_tfcp_ta.ko` dari dump firmware stock X6871 (biner tidak disertakan di repo).
+
+| Topik | Commit 6.18 | Commit 6.12 |
+|---|---|---|
+| `tran-led-core`: ioctl stock, zero `kbuf`, multicolor, sysfs check, probe/`dev.release` | `b8715758fdd0` | `4381397` |
+| `tc_tfcp_ta`: paket read/write TFCP, lock, mask getter, `update32` 0xb2, `set_mode` 0xb1 | `21396ca35e08` | `8431858` |
+| `pca_tfcp_ta`: 5.5 V/2.2 A & 5.3 V/3.0 A, prop 21, `-EPROBE_DEFER` | `6587619d79a5` | `159ae6f` |
+
+Hasil verifikasi stock:
+- `tran-led-core` memakai tipe ioctl `0x12` dengan nomor `0x80011200` (get chip type), `0x80201201` (get cmd), `0x40201202` (set cmd), `0x40041203` (rw i2c), `0x40041204` (set retries), dan `0x40041205` (set timeout). Semua nilai ini kini dipakai driver.
+- `tc_tfcp_ta` menulis `reg + crc8(reg)`, menunggu, lalu membaca `len + 1` byte dan memeriksa CRC payload; write mengirim `reg + len + payload + crc8`. `set_voltage`/`set_current` melakukan read-modify-write pada `0xb2` dengan readback, sedangkan `set_mode` menulis satu byte ke `0xb1`.
+- `pca_tfcp_ta` memakai `5500 mV / 2200 mA` (enable) dan `5300 mV / 3000 mA` (hardreset). `plug_out_reset`/`exit_rfc_mode` mematikan TA lewat properti USB control 21, bukan menulis tegangan.
+- Stock mengembalikan `-ENODEV` saat TA belum terdaftar; driver kini memakai `-EPROBE_DEFER` sesuai audit agar probe diulang setelah `tc_tfcp_ta` siap.
+
+Catatan:
+- Build 6.18 (`user`, mt6895) PASS; checkpatch 0 error/0 warning pada keenam commit.
+- Gate `tc_get_alias_type`/properti USB 17 yang ada di stock tidak ditambahkan ke jalur transfer TFCP karena di luar enam temuan dan berisiko memblokir transfer sebelum alias type diset.
+- Commit 6.12 belum di-build dan belum ada uji perangkat untuk Batch 4.
+
 ---
 
 ## 4. Prioritas P3 — Cacat Nyata di Modul Tidak Aktif X6871 (Opsional)
@@ -176,4 +198,4 @@ Modul berikut **tidak** termasuk dalam `x6871_modules.bzl`, sehingga tidak masuk
 1. **Batch 1 (P0):** `P0-1` s.d. `P0-6` — **selesai**, satu commit terpisah per topik (lihat [Hasil Batch 1](#hasil-batch-1-p0); `P0-6` langsung ke `6.18` & `6.12`).
 2. **Batch 2 (P1 langsung):** `P1-1` s.d. `P1-3` dan `P1-6` s.d. `P1-11` — **selesai** (lihat [Hasil Batch 2](#hasil-batch-2-p1); `P1-6` s.d. `P1-11` berlaku ke `6.18` & `6.12`).
 3. **Batch 3 (P2):** 2 gap backport ke `6.12` + cleanup debug/guard (`-DTRAN_FP_LOG_LVL_INFO=1`, log VENC frame pertama, alarmtimer `#if`, Mali migrate guard, LPM) — **selesai** (lihat [Hasil Batch 3](#hasil-batch-3-p2)).
-4. **Batch 4 (butuh verifikasi ulang `.ko` stock lebih dulu):** `P1-4` (`tran-led-core`) dan `P1-5` (`tc_tfcp_ta` / `pca_tfcp_ta`), agar perubahan ioctl/protokol sesuai 100% dengan biner stock X6871.
+4. **Batch 4 (verifikasi ulang `.ko` stock):** `P1-4` (`tran-led-core`) dan `P1-5` (`tc_tfcp_ta` / `pca_tfcp_ta`) — **selesai** (lihat [Hasil Batch 4](#hasil-batch-4-p1-4p1-5)).
