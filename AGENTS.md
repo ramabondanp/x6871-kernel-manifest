@@ -14,6 +14,16 @@ detail tersebut di sini.
   atau catat sebagai known limitation.
 - Buka kembali item yang di-skip hanya kalau ada source resmi atau regresi
   terukur.
+- **Disiplin investigasi & fix:** baca dokumen atau konteks terkait secara
+  utuh sebelum bertindak (jangan hanya mengandalkan cuplikan hasil
+  pencarian), catat commit ID baseline lintas repo, dan verifikasi bahwa
+  temuan non-trivial benar-benar nyata serta aktif di jalur X6871 sebelum
+  membuat patch (*stop* jika *false positive*).
+- Tulis dan verifikasi fix di sesi yang sama saat bug ditemukan bila
+  memungkinkan; jika pendekatan gagal, **drop** fix tersebut dan coba cara
+  lain, bukan menumpuk workaround.
+- Prioritaskan temuan berbasis fakta terverifikasi dan batas dampak nyata
+  (bukan spekulasi teoritis atau jalur privileged-only/dead code).
 
 ## 1. Scope dan rilis
 
@@ -54,6 +64,13 @@ Jangan commit file donor, tarball, atau dump firmware ke repo.
 ## 4. Commit, checkpatch, dan push
 
 - Satu commit untuk satu topik. Jangan menggabungkan beberapa bugfix.
+- Pisahkan perubahan logis yang berbeda (mis. memindahkan kode vs
+  memodifikasinya) agar setiap commit tetap dapat di-build (*bisectable*),
+  dan hindari commit *reformatting* murni pada kode vendor legacy.
+- Sertakan header `SPDX-License-Identifier` yang kompatibel `GPL-2.0-only`
+  pada file baru (baris 1 untuk `.c`/`.h` dengan `/* */` pada header `.h`,
+  baris 2 setelah shebang pada skrip); `MODULE_LICENSE()` bukan pengganti
+  SPDX.
 - **Jangan amend commit fix**, kecuali diminta pengguna. Kalau ada perbaikan,
   buat commit baru.
 - Di **manifest**, fix/analisa juga harus menjadi **commit baru**, bukan amend
@@ -191,6 +208,16 @@ Aturan pencegahan *blocker* lintas versi major Android/Linux:
   driver yang terikat ABI userspace vendor stock (seperti GPU Mali) harus
   mempertahankan ioctl ABI-nya dan menonaktifkan fitur MM opsional yang
   bentrok bila diperlukan.
+- **Standar kualitas kode C OOT:** perubahan tidak boleh menambah
+  *compiler warning* baru (perbaiki akar penyebab, jangan dibungkam dengan
+  hack), tidak boleh menambah `BUG()`/`BUG_ON()` baru (gunakan
+  `WARN_ON_ONCE()` dengan recovery, atau `pr_warn_once()` untuk jalur yang
+  dapat dipicu userspace, serta `BUILD_BUG_ON()` untuk asersi compile-time),
+  dan mengutamakan `IS_ENABLED()`/`__maybe_unused` daripada `#ifdef` acak.
+- **Audit jalur error & konkurensi:** periksa jalur cleanup `goto` agar
+  bebas *one-err bug* (pisahkan label deskriptif), bedakan locking vs
+  refcounting pada objek lintas thread, dan beri komentar singkat untuk
+  *memory barrier*, aturan lock, atau kode non-intuitif.
 
 ## 8. Branch dan backup
 
@@ -204,7 +231,10 @@ Aturan pencegahan *blocker* lintas versi major Android/Linux:
 
 ## 9. Testing dan artefak
 
-- Uji yang belum dilakukan harus dicatat di dokumen.
+- Uji atau langkah verifikasi yang **belum** dilakukan (mis.
+  *compile-tested only*, belum uji boot di perangkat, atau 6.12 belum
+  di-build) wajib dinyatakan secara eksplisit pada laporan akhir dan
+  dokumen terkait.
 - Jangan commit log, image, atau artefak uji ke repo.
 - Perintah build, repack, flash, dan verifikasi ada di `docs/`:
   - `docs/README.md` — peta/indeks dokumentasi
@@ -228,10 +258,11 @@ Aturan pencegahan *blocker* lintas versi major Android/Linux:
 - [ ] DTB/DTBO stock tidak diubah dan tidak menambah node/zone/event di luar stock.
 - [ ] Jika melakukan build/repack, `tools/verify-kmi-abi.py` lulus 8/8.
 - [ ] Porting/perubahan modul tidak menyalin header `common`, tidak menambah salinan struct privat atau *compat shim* mati, dan lulus `tools/check-private-structs.py` (serta `tools/scan-cfi-tracepoints.py` saat naik versi kernel major).
+- [ ] Perubahan C OOT tidak menambah compiler warning baru maupun `BUG()`/`BUG_ON()` baru, dan file baru memiliki header SPDX.
 - [ ] Commit baru, bukan amend (kecuali diminta pengguna), untuk fix/analisa.
 - [ ] Bahasa, prefix/akhiran commit, dan `Signed-off-by` sesuai aturan.
 - [ ] Checkpatch commit message bersih (0 error).
 - [ ] Dokumentasi memakai kutipan log, tanpa nama file log lokal, path lokal mesin, maupun URL temporer.
 - [ ] Dokumentasi aktif mudah dipindai pembaca manusia (status terkini/langkah utama jelas di atas, tanpa jargon internal tanpa konteks).
 - [ ] Struktur `docs/` rapi sesuai aturan dan `docs/README.md` terbarui bila file berubah.
-- [ ] Testing yang belum dilakukan dicatat.
+- [ ] Testing atau verifikasi yang belum dilakukan dinyatakan secara eksplisit di laporan akhir dan dokumen.

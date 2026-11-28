@@ -42,26 +42,38 @@ corrections must be new commits.
 
 ## Content and evidence rules
 
-- Keep **one topic per commit**; never bundle unrelated bugfixes.
-- State only what the diff and verified sources support (build results, device
-  verification, quoted log lines, commit hashes, or MD5 checksums). If the
-  reason for the change is unknown, return no message and say what is missing.
+- Keep **one logical change per commit**; never bundle unrelated bugfixes, mix
+  pure code moves with behavior modifications, or make pure reformatting
+  commits on legacy vendor code.
+- Explain the problem, user/system-visible impact (to aid 6.18/6.12 backport
+  decisions), and technical solution, stating only what the diff and verified
+  sources support (build results, device verification, quoted log lines, commit
+  hashes, or MD5 checksums). Explicitly note what was **not** tested when
+  relevant (e.g., compile-tested only, 6.12 not built). If the reason for the
+  change is unknown, return no message and say what is missing.
 - Never mention local log filenames (`pstoreX`, `dmesgX`, `logcatX`, `twrpX`),
   local machine paths, or temporary download URLs; quote log lines instead.
 - Use the imperative mood and keep the message as short as its content
   allows. Leave out markdown formatting, labels such as `"Root cause:"`,
   intensifiers, restatements of the subject, and narration of the
   investigation.
-- If a Coccinelle semantic patch found the bug, include it in the message
-  between `// <smpl>` and `// </smpl>` lines, or give its path under
-  `common/scripts/coccinelle/`.
+- When citing another commit in the body, include at least 12 characters of
+  its SHA-1 and its oneline summary: `Commit 1234567890ab ("summary")`.
+- When quoting kernel oops/dmesg backtraces, trim timestamps, module lists, and
+  raw register/stack dumps down to the essential error line and call trace.
+- Name the analysis or verification tool that detected or verified the issue
+  (e.g., `scan-cfi-tracepoints.py`, `check-private-structs.py`,
+  `verify-kmi-abi.py`, `sparse`, or Coccinelle). If a Coccinelle semantic
+  patch found the bug, include it between `// <smpl>` and `// </smpl>` lines
+  or give its path under `common/scripts/coccinelle/`.
 
 ## Trailers and checkpatch
 
 - Always include `Signed-off-by: Rama Bondan Prakoso <ramanarubp@gmail.com>`.
-- Take `Fixes:` tags only from the `find-fixes` skill. Add other tags (such as
-  `Reviewed-by:` or `Tested-by:`) only when explicitly supplied; never add
-  unverified or upstream mailing-list tags.
+- Take `Fixes:` tags only from the `find-fixes` skill and never line-wrap
+  `Fixes:` lines (exempt from the 72/75-column wrap limit). Add
+  `Reviewed-by:`, `Tested-by:`, or `Acked-by:` only with explicit
+  permission/supply; never add unverified or upstream mailing-list tags.
 - Validate the commit message with `checkpatch.pl` (for example,
   `<ws>/common/scripts/checkpatch.pl --git HEAD` or on a generated patch
   before pushing) and ensure 0 commit-message errors. Per `AGENTS.md`,
