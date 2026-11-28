@@ -1,6 +1,6 @@
 # Audit Commit Awal 6.12 & Bringup 6.18 pada Repo Modul OOT
 
-Diperbarui: 2026-11-28 (UTC) — Batch 1–4 sudah diterapkan
+Diperbarui: 2026-11-28 (UTC) — Batch 1–4 dan follow-up review sudah diterapkan
 
 > Dokumen ini mencatat hasil **audit statis kode** atas seluruh commit awal porting 6.12 dan bringup 6.18 pada kedua repositori modul *out-of-tree* (`alps-kernel_device_modules` dan `alps-vendor_mediatek_kernel_modules`). Batch 1 (`P0-1`–`P0-6`), Batch 2 (`P1-1`–`P1-3`, `P1-6`–`P1-11`), Batch 3 (`P2`: dua backport 6.12 + cleanup), dan Batch 4 (`P1-4`/`P1-5`, setelah verifikasi ulang `.ko` stock) sudah diterapkan sebagai commit *forward-fix* dan diverifikasi kompilasi 6.18; belum ada uji perangkat. Temuan `P3` (modul tidak aktif) masih berupa rencana. Untuk status boot terkini lihat [`STATUS.md`](STATUS.md), daftar isu log di [`TRACKER.md`](TRACKER.md), dan audit API 6.13–6.18 sebelumnya di [`API-AUDIT.md`](API-AUDIT.md).
 
@@ -162,6 +162,24 @@ Catatan:
 - Build 6.18 (`user`, mt6895) PASS; checkpatch 0 error/0 warning pada keenam commit.
 - Gate `tc_get_alias_type`/properti USB 17 yang ada di stock tidak ditambahkan ke jalur transfer TFCP karena di luar enam temuan dan berisiko memblokir transfer sebelum alias type diset.
 - Commit 6.12 belum di-build dan belum ada uji perangkat untuk Batch 4.
+
+### Hasil Follow-up Review Batch 1–4
+
+Audit ulang terhadap 48 commit Batch 1–4 menemukan 6 cacat urutan teardown, pengecekan panjang transfer/lock, refcount, dan state resume yang diperbaiki lewat commit terpisah di kedua branch `alps-kernel_device_modules`:
+
+| Topik | Commit 6.18 | Commit 6.12 |
+|---|---|---|
+| `leds-aw22xxx`: batalkan timer dan work sesudah unregister/sysfs/`devm_free_irq` | `54beaf6f75ff` | `543a155` |
+| `tc_tfcp_ta`: cek panjang transfer eksak dan kunci seluruh 11 reader dengan `io_lock` | `69758e42a6a0` | `7d72b74` |
+| `tran_extcon_usb`: lepas `otg_nb` sebelum `cancel_delayed_work_sync` dan bereskan error/put `usb_psy` | `a11e6c3fe7db` | `759f333` |
+| `tran-led-core`: bersihkan `tran_led_group` dan kobject `led`/`pdlc` saat teardown | `0e1243cbc017` | `0e350a4` |
+| `gt9916`: lacak `gesture_suspended` agar toggle `0 -> 1` saat layar mati tetap memanggil `hw_ops->resume()` | `994d3b4bd416` | `575cfae` |
+| `pca_tfcp_ta`: lepas refcount `usb_control` lewat `put_device()` | `c8982bb26f0f` | `3609610` |
+
+Catatan:
+- Build 6.18 (`user`, mt6895, `5548` aksi) PASS tanpa compiler warning baru pada ke-6 file yang diubah; `tools/check-private-structs.py` PASS 3/3.
+- Checkpatch 0 error pada seluruh pesan commit (error indent 4-spasi bawaan file vendor di `leds-aw22xxx.c` di-skip sesuai aturan repo).
+- Commit 6.12 belum di-build dan belum ada uji perangkat untuk seluruh perubahan di atas.
 
 ---
 
