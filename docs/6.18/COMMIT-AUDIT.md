@@ -1,6 +1,6 @@
 # Audit Commit Awal 6.12 & Bringup 6.18 pada Repo Modul OOT
 
-Diperbarui: 2026-11-28 (UTC) — Batch 1–4, follow-up review, tiga fix uji live, dan fix panic `pca_tfcp_ta` sudah diterapkan
+Diperbarui: 2026-11-28 (UTC) — Batch 1–4, follow-up review, tiga fix uji live, fix `pca_tfcp_ta`, dan fix `tc_tfcp_ta` sudah diterapkan
 
 > Dokumen ini mencatat hasil **audit statis kode** atas seluruh commit awal porting 6.12 dan bringup 6.18 pada kedua repositori modul *out-of-tree* (`alps-kernel_device_modules` dan `alps-vendor_mediatek_kernel_modules`). Batch 1 (`P0-1`–`P0-6`), Batch 2 (`P1-1`–`P1-3`, `P1-6`–`P1-11`), Batch 3 (`P2`: dua backport 6.12 + cleanup), dan Batch 4 (`P1-4`/`P1-5`, setelah verifikasi ulang `.ko` stock) sudah diterapkan sebagai commit *forward-fix* dan diverifikasi kompilasi 6.18; belum ada uji perangkat. Temuan `P3` (modul tidak aktif) masih berupa rencana. Untuk status boot terkini lihat [`STATUS.md`](STATUS.md), daftar isu log di [`TRACKER.md`](TRACKER.md), dan audit API 6.13–6.18 sebelumnya di [`API-AUDIT.md`](API-AUDIT.md).
 
@@ -231,7 +231,26 @@ Verifikasi build & repack `6.18` (`160ce5443d2b`):
   - `vendor_dlkm.img`: `5fcef9dd0c5f9ec66f108561ebf3dbe7` (`24551424` B; `209` modul)
   - `odm_dlkm.img`: `25724224cfc153241b7fae4549e3df81` (`4206592` B; `57` modul)
 - Checkpatch pesan commit: `0` error di kedua branch (`1` warning panjang baris kutipan log Oops).
-- Status belum diuji: image repack `6.18` (`160ce5443d2b`) **belum** di-flash/diuji di perangkat, dan branch `6.12` (`6c472b95`) **belum** di-build.
+- Status belum diuji: pada uji coba image repack `160ce5443d2b`, perangkat gagal boot hingga TWRP sehingga pengguna harus me-restore `vendor_boot` sebelumnya untuk mengakses recovery; `console-ramoops-0` tetap menyisakan snapshot lama (`pca_tfcp_authenticate_ta`) dan belum merekam dump baru dari `160ce5443d2b`, sementara branch `6.12` (`6c472b95`) **belum** di-build.
+
+### Fix Type Confusion `tc_tfcp_ta` (`container_of`) (6.18.65)
+
+Inspeksi kode `tc_tfcp_ta` pasca kegagalan boot image `160ce5443d2b` menemukan bug pointer di `tfcp_ta_get_info()`: setelah `pca_tfcp_ta` lolos `tadapter_dev_get_drvdata()` dan memanggil `tc_ta_device_authentication()` (yang turut dimuat di ramdisk recovery), `tfcp_ta_get_info(ttc)` mengembalikan `dev_get_drvdata(ttc->dev)`. Karena `devm_tc_ta_classdev_register(&client->dev, &info->ta_dev)` menimpa `ttc->dev` dengan device kelas `tc_ta` yang `drvdata`-nya menunjuk ke `&info->ta_dev` (bukan `struct tfcp_ta_info *`), setiap callback `tfcp_tc_ta_*` membaca field bergeser `0x10` byte (`ti->client` membaca `ttc->dev` bertipe `struct device *`) dan berujung dereferensi pointer korup di `mutex_lock()` / `i2c_transfer_buffer_flags()`.
+
+| Topik | Ringkasan Perbaikan | Commit 6.18 | Commit 6.12 |
+|---|---|---|---|
+| `tc_tfcp_ta`: `type confusion` pada `tfcp_ta_get_info()` | Ubah `tfcp_ta_get_info()` menjadi `container_of(ttc, struct tfcp_ta_info, ta_dev)` menyamai `.ko` stock (`Fixes: 28c7b2655c60` di `6.18`) | `849b8f15ce24` | `904628af` |
+
+Verifikasi build & repack `6.18` (`849b8f15ce24`):
+- `tools/check-private-structs.py`: PASS `3/3` (`vb2_dc_buf`, `0` untracked structs, `110` entri `ack_headers.bzl`).
+- Build `user` `6.18`: selesai sukses (`0` error/warning baru di `tc_tfcp_ta.c`).
+- Repack & `tools/verify-kmi-abi.py`: PASS `8/8` (`GKI release: 6.18.65-android17-6-gc985884f48da-4k`, `9877` simbol ABI, `0` mismatch, `487` modul).
+- MD5 artefak repack terbaru (`6.18`):
+  - `vendor_boot.img`: `7dfcb1c3190e15b0db8352a8969501ee` (`67108864` B)
+  - `vendor_dlkm.img`: `5fcef9dd0c5f9ec66f108561ebf3dbe7` (`24551424` B; `209` modul)
+  - `odm_dlkm.img`: `e91a4d75668f6d8039d5bb70efb553dd` (`4206592` B; `57` modul)
+- Checkpatch pesan commit: `0` error, `0` warning di kedua branch.
+- Status belum diuji: image repack `6.18` (`849b8f15ce24`) **belum** di-flash/diuji di perangkat, dan branch `6.12` (`904628af`) **belum** di-build.
 
 ---
 
