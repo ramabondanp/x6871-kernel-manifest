@@ -250,7 +250,41 @@ Verifikasi build & repack `6.18` (`849b8f15ce24`):
   - `vendor_dlkm.img`: `5fcef9dd0c5f9ec66f108561ebf3dbe7` (`24551424` B; `209` modul)
   - `odm_dlkm.img`: `e91a4d75668f6d8039d5bb70efb553dd` (`4206592` B; `57` modul)
 - Checkpatch pesan commit: `0` error, `0` warning di kedua branch.
-- Status belum diuji: image repack `6.18` (`849b8f15ce24`) **belum** di-flash/diuji di perangkat, dan branch `6.12` (`904628af`) **belum** di-build.
+- Status belum diuji: branch `6.12` (`904628af`) **belum** di-build; pada uji live `6.18` (`849b8f15ce24`), TWRP berhasil boot bersih (`tc_tfcp_ta` & `pca_tfcp_ta` normal), sedangkan boot Android mengalami kernel panic hingga `10` modul grup `scheduler` dikecualikan untuk isolasi.
+
+### Fix Proxy Execution `scheduler` & `task_turbo` (6.18.65)
+
+Isolasi `vendor_dlkm` pada build `849b8f15ce24` (mengecualikan `scheduler.ko`, `task_turbo.ko`, `mtk_core_ctl.ko`, `mtk_fpsgo_v8.ko`, `mtk_sbe.ko`, `vip_engine.ko`, `frs.ko`, `mtk_game.ko`, `videogo.ko`, `mtk-vcodec-sys-api.ko` dari `modules.load`) berhasil boot penuh ke Android. Saat ke-10 modul dimuat ulang via `insmod` (`RC=0`), `dmesg` menangkap dua `WARNING` beruntun di `kernel/sched/fair.c` pada proses `BloksDeviceGpuM`:
+
+```text
+WARNING: CPU: 1 PID: 6298 at kernel/sched/fair.c:5842 put_prev_entity+0x380/0x5bc
+Call trace:
+ put_prev_entity+0x380/0x5bc (P)
+ pick_next_task_fair.cold+0x80/0x4c4
+WARNING: CPU: 1 PID: 6298 at kernel/sched/fair.c:5774 set_next_entity+0x7d4/0x8f8
+Call trace:
+ set_next_entity+0x7d4/0x8f8 (P)
+ pick_next_task_fair.cold+0x9c/0x4c4
+```
+
+Di GKI `6.18`, `CONFIG_SCHED_PROXY_EXEC=y` aktif default (`/sys/kernel/sched_proxy_exec/enable == 1`), berbeda dari `6.12` yang default nonaktif. Ketika task `rq->donor` terblokir mutex (`task_is_blocked(p)`), `rq->curr` mengeksekusi proxy lock-owner sehingga `task_on_cpu()` bernilai `false` sementara `cfs_rq->curr` masih menunjuk ke `src_rq->donor`. Fungsi `mtk_can_migrate_task()` / `mtk_active_load_balance_cpu_stop()` di `balance.c` serta `next_vip_runnable_in_cpu()` / `vip_push_runnable()` di `vip.c` hanya memeriksa `task_on_cpu()`/`rq->curr` sehingga `hook_sched_balance_newidle()` memanggil `deactivate_task()` terhadap `src_rq->donor` tanpa mereset `cfs_rq->curr`. Pada path terpisah, `probe_android_rvh_rtmutex_prepare_setprio()` di `task_turbo.c` memakai `task_current()` alih-alih `task_current_donor()`.
+
+| Topik | Ringkasan Perbaikan | Commit 6.18 | Commit 6.12 |
+|---|---|---|---|
+| `sched: eas`: guard migrasi `donor`/`blocked`/`delayed` | Tolak `task_current()`, `task_current_donor()`, `task_is_blocked()`, dan `sched_delayed` di `balance.c` & `vip.c` sebelum `deactivate_task()` (`Fixes: c23616fa4e1f`, `98cc3f2845ea`, `383b35a7c27a`) | `46c5293a898b` | `1e21bf056aa0` |
+| `misc: task_turbo`: pakai `task_current_donor()` | Ganti `task_current(rq, p)` ke `task_current_donor(rq, p)` di `probe_android_rvh_rtmutex_prepare_setprio()` (`Fixes: dc443da0ca87`) | `0f5b97affe91` | `fb1b344d97c2` |
+
+Verifikasi build, repack, & uji live `6.18` (`0f5b97affe91`):
+- `tools/check-private-structs.py`: PASS `3/3` (`vb2_dc_buf`, `0` untracked structs, `110` entri `ack_headers.bzl`).
+- Build `user` `6.18`: selesai sukses (`5548` aksi, `0` compiler warning baru pada `balance.c`, `vip.c`, `task_turbo.c`).
+- Repack & `tools/verify-kmi-abi.py`: PASS `8/8` (`GKI release: 6.18.65-android17-6-gc985884f48da-4k`, `9877` simbol ABI, `0` mismatch, `487` modul).
+- MD5 artefak repack terbaru (`6.18`):
+  - `vendor_boot.img`: `2b0728cc9b7b5ff1f6603fa4cb990dc7` (`67108864` B)
+  - `vendor_dlkm.img`: `54283b9f32b0f25a7f5a075f7235f834` (`24551424` B; `209` modul)
+  - `odm_dlkm.img`: `5a7163405eecdd5139ee4c4a9ba05e4e` (`4206592` B; `57` modul)
+- Checkpatch pesan commit: `0` error pada kedua branch `alps-kernel_device_modules`.
+- **Uji live perangkat (`vendor_dlkm.img` `54283b9f32b0f25a7f5a075f7235f834`):** **PASS** boot penuh ke sistem Android (`sys.boot_completed=1`, `vendor.all.modules.ready=1`, `505` modul dimuat termasuk `scheduler`/`task_turbo`/`mtk_fpsgo_v8`/`vip_engine`, layanan `fpsgo` aktif, `0` `put_prev_entity`/`set_next_entity`/`WARNING:`/`Oops` baru di `dmesg`).
+- Status belum diuji: branch `6.12` (`1e21bf056aa0`..`fb1b344d97c2`) **belum** di-build, dan kestabilan harian jangka panjang (`6.18`) tetap dipantau.
 
 ---
 
