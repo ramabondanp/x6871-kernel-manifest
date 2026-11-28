@@ -1,6 +1,6 @@
 # Audit Commit Awal 6.12 & Bringup 6.18 pada Repo Modul OOT
 
-Diperbarui: 2026-11-28 (UTC) — Batch 1–4 dan follow-up review sudah diterapkan
+Diperbarui: 2026-11-28 (UTC) — Batch 1–4, follow-up review, dan tiga fix uji live perangkat sudah diterapkan
 
 > Dokumen ini mencatat hasil **audit statis kode** atas seluruh commit awal porting 6.12 dan bringup 6.18 pada kedua repositori modul *out-of-tree* (`alps-kernel_device_modules` dan `alps-vendor_mediatek_kernel_modules`). Batch 1 (`P0-1`–`P0-6`), Batch 2 (`P1-1`–`P1-3`, `P1-6`–`P1-11`), Batch 3 (`P2`: dua backport 6.12 + cleanup), dan Batch 4 (`P1-4`/`P1-5`, setelah verifikasi ulang `.ko` stock) sudah diterapkan sebagai commit *forward-fix* dan diverifikasi kompilasi 6.18; belum ada uji perangkat. Temuan `P3` (modul tidak aktif) masih berupa rencana. Untuk status boot terkini lihat [`STATUS.md`](STATUS.md), daftar isu log di [`TRACKER.md`](TRACKER.md), dan audit API 6.13–6.18 sebelumnya di [`API-AUDIT.md`](API-AUDIT.md).
 
@@ -179,7 +179,28 @@ Audit ulang terhadap 48 commit Batch 1–4 menemukan 6 cacat urutan teardown, pe
 Catatan:
 - Build 6.18 (`user`, mt6895, `5548` aksi) PASS tanpa compiler warning baru pada ke-6 file yang diubah; `tools/check-private-structs.py` PASS 3/3.
 - Checkpatch 0 error pada seluruh pesan commit (error indent 4-spasi bawaan file vendor di `leds-aw22xxx.c` di-skip sesuai aturan repo).
-- Commit 6.12 belum di-build dan belum ada uji perangkat untuk seluruh perubahan di atas.
+- Commit 6.12 belum di-build dan belum ada uji perangkat untuk seluruh perubahan di atas pada saat build ini dibuat.
+
+### Hasil Uji Live Perangkat & Tiga Fix Lanjutan (6.18.65)
+
+Uji live ADB pada perangkat X6871 (`6.18.65-android17-6-gc985884f48da-rama982-4k`, build follow-up Batch 1–4) memastikan tidak ada Oops, `BUG`, RCU stall, CFI failure, maupun `Unbalanced IRQ`; spam `tran_fp` hilang, `aw22127` (`/dev/tran_led*`) aktif, `gt9916` gesture suspend dan pembacaan 1-byte `/proc/fingerprint_status` berfungsi, serta `tran_extcon_usb` normal. Audit log kernel pada uji yang sama menemukan 3 masalah runtime yang kemudian diperbaiki pada kedua branch `alps-kernel_device_modules`:
+
+| Topik | Ringkasan Perbaikan | Commit 6.18 | Commit 6.12 |
+|---|---|---|---|
+| `mtk/sched`: duplikat simbol `g_trans_sched_interface` | Pindahkan definisi dan `EXPORT_SYMBOL(g_trans_sched_interface)` dari `common.c` ke `eas/sched_main.c` (`scheduler.ko`), menyamai stock agar `cpufreq_sugov_ext.ko` tidak memblokir muat `scheduler`/`mtk_core_ctl`/`task_turbo`/`fpsgo`/`sbe` | `48ae05854c76` | `cb22fab6` |
+| `tc_tfcp_ta`: gagal `pinctrl_lookup_state` | Gunakan nama state `"tfcp_i2c_sda_mode"` sesuai DTBO stock dan jadikan kegagalan lookup/get pinctrl non-fatal seperti perilaku `.ko` stock | `1f4662c9d029` | `d80ca8d9` |
+| `tkv`: region `reserved-memory` berbendera `no-map` | Tambahkan `tkv_region_in_reserved_dt()` untuk menerima rentang `/reserved-memory/mblock-24-tkv-reserved` pada `tkv_region_is_valid()` selain `page_is_ram()` | `9980342d4875` | `0eb01f67` |
+
+Verifikasi build & repack `6.18` (`9980342d4875`):
+- `tools/check-private-structs.py`: PASS `3/3` (`vb2_dc_buf`, 0 untracked structs, 110 entri `ack_headers.bzl`).
+- Build `user` `6.18` (`build.sh`): selesai sukses (`0` error, `0` compiler warning baru pada berkas yang diubah); `cpufreq_sugov_ext.ko` terverifikasi tidak lagi mengekspor `g_trans_sched_interface` dan hanya `scheduler.ko` yang mengekspornya.
+- Repack & `tools/verify-kmi-abi.py`: PASS `8/8` (`GKI release: 6.18.65-android17-6-gc985884f48da-4k`, `9877` simbol ABI, `0` mismatch, `487` modul).
+- MD5 artefak uji hasil repack (`6.18`):
+  - `vendor_boot.img`: `af781989488381b0ed3129871fceca91` (`67108864` B; `dtb`/`bootconfig`/`vendor_ramdisk01` identik base)
+  - `vendor_dlkm.img`: `3f3739ca17a3722fb53bfa1e5e2ea4d5` (`24551424` B; `209` modul)
+  - `odm_dlkm.img`: `887717c672ef878d07608e19088813e8` (`4206592` B; `57` modul)
+- Checkpatch pesan commit: `0` error untuk ketiga commit di kedua branch.
+- Status belum diuji: image repack `6.18` hasil ketiga fix lanjutan di atas **belum** di-flash/diuji di perangkat, dan branch `6.12` **belum** di-build.
 
 ---
 
