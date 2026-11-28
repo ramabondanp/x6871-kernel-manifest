@@ -25,8 +25,8 @@ prosedur flash & rollback, serta checklist pengujian subsistem di perangkat.
    (perbandingan historis KMI 5 mencatat `2174/2174` CRC kernel cocok). Untuk
    setiap build rilis, gunakan pasangan image dari generasi KMI yang sama (§1).
 3. **Build modul tidak menghasilkan DTB/DTBO perangkat.** Repack
-   `vendor_boot` mempertahankan DTB dari image dasar TWRP. `dtbo.img`
-   bawaan perangkat tidak diubah atau di-flash dalam panduan ini.
+   `vendor_boot` mempertahankan DTB dari image dasar recovery (OrangeFox/TWRP).
+   `dtbo.img` bawaan perangkat tidak diubah atau di-flash dalam panduan ini.
 
 ## 1. Komposisi Artefak 6.12 (KMI 6)
 
@@ -47,12 +47,17 @@ lama sudah dihapus).
 ## 2. Membuat image vendor_boot & DLKM
 
 Siapkan workspace sesuai [README](../../README.md#build-dari-source). Repack
-`vendor_boot` juga membutuhkan image TWRP dasar untuk X6871 (tidak disertakan
+`vendor_boot` juga membutuhkan image recovery dasar untuk X6871 (tidak disertakan
 di repo) dan checkout `cfig/Android_boot_image_editor` yang mendukung zstd
 (lihat [setup patch zstd di BUILD.md](BUILD.md#setup-patch-zstd-untuk-android_boot_image_editor)).
-Taruh image dasar sebagai `vendor_boot.img` di direktori packer, lalu
-jalankan `./gradlew unpack` dari sana. Pastikan `build/unzip_boot/root.1`
-ada dan dependensi Gradle tersedia untuk `pack --offline`.
+Untuk **6.18**, unduh [`OrangeFox-X6871-k6.18-xos16.3.0.155.img`](https://github.com/transsion-custom-recovery-6-12/twrp-device_infinix_Infinix-X6871/releases/download/fox-16.0-k6.18-20261128/OrangeFox-X6871-k6.18-xos16.3.0.155.img)
+(rilis `fox-16.0-k6.18-20261128`, MD5 `6503f225505f24bb18cd9453ae1abca4`,
+SHA-256 `3d194830507f4d350caf99f2181aaf4a303dff13271c0082cda67670e6edaa8c`;
+sudah menyertakan `permissive kernel;`); untuk **6.12**, gunakan rilis `k6.12`
+(`fox-16.0-20261128`) dari repo yang sama. Taruh image dasar sebagai
+`vendor_boot.img` di direktori packer, lalu jalankan `./gradlew unpack` dari sana.
+Pastikan `build/unzip_boot/root.1` ada dan dependensi Gradle tersedia untuk
+`pack --offline`.
 
 Contoh memakai checkout packer di `<dir-packer>`. Siapkan `python3`, `llvm-strip`,
 `llvm-objcopy`, `readelf`, `depmod`, `modinfo`, `zstd`, dan `cpio` di `PATH`.
@@ -200,7 +205,7 @@ cabut-colok pada GKI resmi KMI 6.)*
   Staging mencakup modul di luar `vendor_boot`. Daftar 222 modul untuk
   `vendor_boot` dikunci oleh `tools/recovery-modules.txt`, bukan filter nama
   stock, supaya modul build-only tidak hilang.
-- **DTB dari image dasar TWRP dan DTBO bawaan perangkat** dipakai apa adanya.
+- **DTB dari image dasar recovery (OrangeFox/TWRP) dan DTBO bawaan perangkat** dipakai apa adanya.
   Jika driver melaporkan properti Device Tree yang tidak dikenal, cek
   kecocokan properti itu dengan driver yang dibangun.
 - **API hardware baru** di tiga modul: `clk-common`, `tran_ldo`,

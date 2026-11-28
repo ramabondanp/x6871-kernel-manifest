@@ -24,6 +24,7 @@ Panduan operasional aktif untuk membangun modul kernel X6871 (baseline stabil **
 - **Source donor OPPO MT6896 (kernel 6.12):** [repo modul kernel OPPO Reno12, branch `oppo/mt6896_b_16.0_reno12`](https://github.com/oppo-source/android_kernel_modules_oppo_mt6896/tree/oppo/mt6896_b_16.0_reno12). Modul donor yang dipakai sudah disertakan di repo modul vendor X6871; tidak perlu clone terpisah untuk build.
 - **Source donor Transsion 6.1:** [unduh `android15_kernel_modules_and_devicetree_mt6897.tar.gz`](https://d1wd32b69guoqm.cloudfront.net/opensource/android15_kernel_modules_and_devicetree_mt6897.tar.gz) dari [Infinix Open Source Center](https://opensource.dev.infinixmobility.com/). Tarball ini hanya untuk referensi porting driver, bukan basis atau prasyarat build.
 - **Firmware stock X6871:** [dump firmware di GitLab](https://gitlab.com/rama-firmware-dumps/infinix/Infinix-X6871), versi referensi `X6871-16.3.0.155SP20`. Dipakai untuk mencari image bawaan serta membandingkan modul dan DTB/DTBO. Untuk rollback, gunakan firmware bawaan yang sesuai dengan perangkat dan versi yang dipakai sebelumnya.
+- **Base `vendor_boot` recovery X6871 (6.18):** [`OrangeFox-X6871-k6.18-xos16.3.0.155.img`](https://github.com/transsion-custom-recovery-6-12/twrp-device_infinix_Infinix-X6871/releases/download/fox-16.0-k6.18-20261128/OrangeFox-X6871-k6.18-xos16.3.0.155.img) (rilis `fox-16.0-k6.18-20261128`, 64 MiB, SHA-256 `3d194830507f4d350caf99f2181aaf4a303dff13271c0082cda67670e6edaa8c`, MD5 `6503f225505f24bb18cd9453ae1abca4`; sudah menyertakan `permissive kernel;` untuk `firmware_load` 6.18). Untuk 6.12 gunakan rilis `k6.12` (`fox-16.0-20261128`) di repo yang sama.
 
 ### Perintah build
 
@@ -120,7 +121,7 @@ Catatan penting profil ini:
 ### Repack vendor_boot (WAJIB dari build terbaru)
 
 Ikuti [alur repack dan verifikasi di FLASH-AND-TEST](FLASH-AND-TEST.md#2-membuat-image-vendor_boot--dlkm),
-termasuk penyiapan base TWRP dan packer.
+termasuk penyiapan base recovery (OrangeFox/TWRP) dan packer.
 
 Skrip ini menjalankan build di [Perintah build](#perintah-build), mengambil staging
 **hasil build itu**, men-stage 222 modul dari `tools/recovery-modules.txt`
@@ -134,7 +135,7 @@ Menambah/mengurangi modul recovery: edit `tools/recovery-modules*.txt`,
 
 #### Setup patch zstd untuk Android_boot_image_editor
 
-Image TWRP untuk X6871 memakai ramdisk **zstd** (`28 b5 2f fd`), bukan lz4.
+Image recovery OrangeFox/TWRP untuk X6871 memakai ramdisk **zstd** (`28 b5 2f fd`), bukan lz4.
 `cfig/Android_boot_image_editor` (commit `f692aff`) belum mengenalnya dan
 berhenti dengan `ramdisk is in unknown format` saat `./gradlew unpack`.
 

@@ -57,6 +57,7 @@ detail tersebut di sini.
 | Stock X6871 GitLab | <https://gitlab.com/rama-firmware-dumps/infinix/Infinix-X6871> | DTB, DTBO, image, dan `.ko` stock |
 | Stock X6871 branch | `X6871-16.3.0.155SP20(OP008PF001AZ)` | Versi referensi stock |
 | OPPO PMX110 (MTK 6.18) | <https://gitlab.com/rama-firmware-dumps/oppo/PMX110> | Referensi biner `.ko` 6.18 (lihat `docs/6.18/PMX110-REFERENCE.md`) |
+| Base vendor_boot 6.18 (OrangeFox 16.0) | <https://github.com/transsion-custom-recovery-6-12/twrp-device_infinix_Infinix-X6871/releases/download/fox-16.0-k6.18-20261128/OrangeFox-X6871-k6.18-xos16.3.0.155.img> | Base `vendor_boot` 6.18 (DTB/bootconfig stock + OrangeFox `fox_16.0`, `permissive kernel;`) |
 
 Langkah unduh referensi ada di [`docs/guides/BUILD.md`](docs/guides/BUILD.md#unduhan-referensi).
 Jangan commit file donor, tarball, atau dump firmware ke repo.
@@ -169,7 +170,7 @@ Jangan commit file donor, tarball, atau dump firmware ke repo.
   modul.
 - Repack `vendor_boot` harus mempertahankan `dtb` dan `bootconfig`
   byte-identical dengan stock/base packer, serta mempertahankan
-  `vendor_ramdisk01` dari base TWRP.
+  `vendor_ramdisk01` dari base recovery (OrangeFox/TWRP).
 - Node yang disabled di stock tetap disabled.
 - Jangan menambah node, thermal zone, GCE event, atau channel CMDQ yang tidak
   ada di stock.
