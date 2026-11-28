@@ -3,19 +3,20 @@
 
 Safeguards enforced (exit non-zero on any failure):
   1. Pure GKI check: warns/fails if the pinned GKI tree has local edits (--allow-dirty-gki to override).
-  2. Vermagic check: every .ko across vendor_boot/vendor_dlkm/odm_dlkm matches the built GKI release.
-  3. Official GKI ABI check: 0 CRC mismatches against <gki>/gki/aarch64/abi.stg.
-  4. Trimmed-GKI check: 0 imports of unlisted (non-KMI) vmlinux symbols.
-  5. CONFIG_MODULE_SIG_PROTECT check: 0 exports colliding with protected GKI system_dlkm modules.
-  6. Symbol & CRC closure:
-       - vendor_boot standalone (vs vmlinux + vendor_boot only)
-       - full runtime closure (vendor_boot + vendor_dlkm + odm_dlkm vs vmlinux + system_dlkm)
-  7. modules.dep / modules.load sanity checks (no dangling entries, usb_dp_selector -> mediatek_drm_v1).
+  2. KMI/vermagic check: every .ko across vendor_boot/vendor_dlkm/odm_dlkm matches the target GKI
+     KMI generation, page-size (-4k/-16k), and vermagic flags (--strict-vermagic enforces exact
+     release/git-SHA vermagic match).
+  3. CONFIG_MODULE_SIG_PROTECT check: 0 exports colliding with protected GKI system_dlkm modules.
+  4. vendor_boot standalone symbol & CRC closure (vs vmlinux + vendor_boot only).
+  5. Full runtime symbol & CRC closure (vendor_boot + vendor_dlkm + odm_dlkm vs vmlinux + system_dlkm).
+  6. Official GKI ABI check: 0 CRC mismatches against <gki>/gki/aarch64/abi.stg.
+  7. Trimmed-GKI check: 0 imports of unlisted (non-KMI) vmlinux symbols.
+  8. modules.dep / modules.load sanity checks (no dangling entries, usb_dp_selector -> mediatek_drm_v1).
 
 Usage:
   ./tools/verify-kmi-abi.py
   ./tools/verify-kmi-abi.py --kver 6.18 --ws "$HOME/6.18/ws" \\
-      --out-dir "$HOME/x6871-kernel/out_bazel" \\
+      --out-dir "$HOME/6.18/ws/out_bazel_6.18" \\
       --vb-dir "$HOME/tmp/vbwork-twrp/build/unzip_boot/root.1/lib/modules" \\
       --vd-dir "$HOME/x6871-out/dlkm-latest-work/vendor_dlkm/lib/modules" \\
       --od-dir "$HOME/x6871-out/dlkm-latest-work/odm_dlkm/lib/modules"
@@ -108,6 +109,20 @@ def parse_ko(path: str):
 
     vermagic = subprocess.check_output(["modinfo", "-F", "vermagic", path], text=True).strip()
     return exports, weak_imports, imp_crcs, vermagic
+
+
+def parse_vermagic(vm: str):
+    """Extract (major.minor, android_kmi, page_size, flags) from vermagic."""
+    parts = vm.strip().split(None, 1)
+    if len(parts) != 2:
+        return None
+    rel, flags = parts
+    m = re.match(r"^(\d+\.\d+)\.\d+-(android\d+-\d+)(?:-|$)", rel)
+    if not m:
+        return None
+    pm = re.search(r"-(4k|16k)$", rel)
+    page_sz = pm.group(1) if pm else ""
+    return (m.group(1), m.group(2), page_sz, flags)
 
 
 def load_abi_stg(abi_path: str):
@@ -205,6 +220,11 @@ def main():
     ap.add_argument("--vd-dir", default=None, help="vendor_dlkm/lib/modules directory")
     ap.add_argument("--od-dir", default=None, help="odm_dlkm/lib/modules directory")
     ap.add_argument("--allow-dirty-gki", action="store_true")
+    ap.add_argument(
+        "--strict-vermagic",
+        action="store_true",
+        help="require exact vermagic string match instead of KMI + flags match",
+    )
     args = ap.parse_args()
 
     for tool in ("git", "llvm-objcopy", "readelf", "modinfo"):
@@ -238,6 +258,7 @@ def main():
         sys.exit(f"ERROR: no staging tree found under {m_dir}")
     kver = os.path.basename(stgs[0])
     want_vm = f"{kver} SMP preempt mod_unload modversions aarch64"
+    want_kmi = parse_vermagic(want_vm)
 
     # Auto-detect newest dlkm work dir if not explicitly passed
     out_root = os.path.join(os.path.dirname(args.ws), "out")
@@ -303,6 +324,7 @@ def main():
     provider = {}
     vb_provider = {}
     bad_vm = []
+    diff_vm = []
     prot_hits = []
     counts = {}
 
@@ -313,8 +335,14 @@ def main():
         for f in kos:
             exps, wimps, icrcs, vm = parse_ko(os.path.join(d, f))
             all_data[(part, f)] = (exps, wimps, icrcs)
-            if vm != want_vm:
-                bad_vm.append((part, f, vm))
+            if args.strict_vermagic or want_kmi is None:
+                if vm != want_vm:
+                    bad_vm.append((part, f, vm))
+            else:
+                if parse_vermagic(vm) != want_kmi:
+                    bad_vm.append((part, f, vm))
+                elif vm != want_vm:
+                    diff_vm.append((part, f, vm))
             for sym, c in exps.items():
                 provider[sym] = (f"{part}/{f}", c)
                 if part == "vendor_boot":
@@ -361,11 +389,15 @@ def main():
             if hc != wc:
                 crc_bad.append((part, f, sym, hex(wc), hex(hc)))
 
+    vm_gate = "Wrong vermagic (strict)         " if args.strict_vermagic else "Wrong KMI/vermagic flags        "
+    vm_extra = f" (exact-vermagic diffs: {len(diff_vm)})" if diff_vm and not args.strict_vermagic else ""
+    vm_fail = "WRONG VERMAGIC" if args.strict_vermagic else "WRONG KMI/VERMAGIC"
+
     print(f"GKI release : {kver}")
     print(f"ABI symbols : {len(abi_crcs)} (build vs abi.stg mismatches: {len(build_vs_abi)})")
     print(f"Modules     : {sum(counts.values())} ({counts})")
     print(f"  1. Pure GKI ({os.path.basename(k_src)} clean){'':<8}: {'PASS' if not gki_dirty else 'DIRTY'}")
-    print(f"  2. Wrong vermagic                  : {len(bad_vm)}")
+    print(f"  2. {vm_gate}: {len(bad_vm)}{vm_extra}")
     print(f"  3. CONFIG_MODULE_SIG_PROTECT hits  : {len(prot_hits)}")
     print(f"  4. vendor_boot standalone unres/crc: {len(vb_unres)} / {len(vb_crc_bad)}")
     print(f"  5. Full runtime closure unres/crc  : {len(unres)} / {len(crc_bad)}")
@@ -373,8 +405,18 @@ def main():
     print(f"  7. Non-KMI unlisted vmlinux imports: {len(non_kmi)}")
     print(f"  8. modules.dep/load & other errors : {len(errors)}")
 
+    if diff_vm and not args.strict_vermagic:
+        alt_vms = sorted({vm for _, _, vm in diff_vm})
+        print(
+            f"\n[INFO] {len(diff_vm)} modules differ in exact vermagic string "
+            f"(KMI + flags match; pass --strict-vermagic to enforce exact match):"
+        )
+        for avm in alt_vms[:10]:
+            cnt = sum(1 for _, _, vm in diff_vm if vm == avm)
+            print(f"  - {avm} ({cnt} modules)")
+
     for label, items in [
-        ("WRONG VERMAGIC", bad_vm),
+        (vm_fail, bad_vm),
         ("PROTECTED GKI EXPORT COLLISION", prot_hits),
         ("VENDOR_BOOT UNRESOLVED", vb_unres),
         ("VENDOR_BOOT CRC MISMATCH", vb_crc_bad),

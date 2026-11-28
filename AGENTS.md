@@ -142,7 +142,9 @@ Jangan commit file donor, tarball, atau dump firmware ke repo.
   tetap dapat dimuat dan boot selama generasi KMI dan simbol/CRC-nya cocok.
   Yang wajib satu set build adalah `boot` + `system_dlkm` pada build GKI
   lokal (ephemeral signing key), sedangkan cek `vermagic` di
-  `verify-kmi-abi.py` hanya safeguard konsistensi set build lokal.
+  `verify-kmi-abi.py` secara default memvalidasi generasi KMI, page-size, dan
+  flag `vermagic` (gunakan `--strict-vermagic` untuk memaksa kecocokan
+  string `vermagic` persis satu set build).
 - **Hard rule DTB/DTBO:** semua `dtb` dan `dtbo.img` yang dipakai di vendor
   berasal dari stock. Jangan berasumsi ada DTBO kustom dan jangan mengubah
   `dtbo.img` stock.

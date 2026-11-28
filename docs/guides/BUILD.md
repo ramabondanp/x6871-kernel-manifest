@@ -160,10 +160,11 @@ Gunakan [perintah lengkap di FLASH-AND-TEST](FLASH-AND-TEST.md#2-membuat-image-v
 Skrip repack DLKM memverifikasi AVB hashtree. `verify-kmi-abi.py` memeriksa
 kompatibilitas modul; arahkan `--vd-dir` dan `--od-dir` ke hasil repack bila
 direktori kerja tidak berada di `out/` di sebelah workspace (default `~/out`).
-Catatan: gerbang #2 (`Wrong vermagic`) di `verify-kmi-abi.py` adalah safeguard
-konsistensi set build lokal — pada runtime GKI, kompatibilitas modul OOT
-ditentukan oleh generasi KMI dan kecocokan simbol/CRC (`modversions`), bukan
-exact `vermagic`.
+Catatan: secara default, gerbang #2 di `verify-kmi-abi.py` memvalidasi
+generasi KMI, page-size, dan flag `vermagic` agar selaras dengan
+kompatibilitas runtime GKI (bukan exact `vermagic`); gunakan
+`--strict-vermagic` bila ingin memaksa kecocokan string `vermagic` persis
+satu set build.
 
 #### Checklist cepat upgrade GKI
 
