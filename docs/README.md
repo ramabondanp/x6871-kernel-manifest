@@ -18,6 +18,7 @@ Indeks seluruh dokumentasi di `docs/`, dikelompokkan berdasarkan tujuan pembaca.
 - [STATUS.md](6.18/STATUS.md) — status fase & subsistem terkini, komposisi 487 modul, verifier 8 gerbang, dan perintah cepat 6.18.
 - [TRACKER.md](6.18/TRACKER.md) — temuan log, prioritas perbaikan (P0–P3), known limitation, dan checklist verifikasi pasca-fix.
 - [API-AUDIT.md](6.18/API-AUDIT.md) — audit perubahan semantik API Linux 6.13–6.18 dan hasil pemindaian KCFI tracepoint.
+- [COMMIT-AUDIT.md](6.18/COMMIT-AUDIT.md) — audit statis commit awal 6.12 & bringup 6.18 pada kedua repo modul OOT (daftar P0–P3 dan rencana perbaikan forward-fix).
 - [PMX110-REFERENCE.md](6.18/PMX110-REFERENCE.md) — referensi biner modul `.ko` dari dump OPPO PMX110 (MediaTek 6.18).
 
 ## Arsip Historis (`archive/`, read-only)
