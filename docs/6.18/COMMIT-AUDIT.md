@@ -1,8 +1,8 @@
 # Audit Commit Awal 6.12 & Bringup 6.18 pada Repo Modul OOT
 
-Diperbarui: 2026-11-28 (UTC) — Batch 1–2 (`P0`–`P1`) sudah diterapkan
+Diperbarui: 2026-11-28 (UTC) — Batch 1–3 (`P0`–`P2`) sudah diterapkan
 
-> Dokumen ini mencatat hasil **audit statis kode** atas seluruh commit awal porting 6.12 dan bringup 6.18 pada kedua repositori modul *out-of-tree* (`alps-kernel_device_modules` dan `alps-vendor_mediatek_kernel_modules`). Batch 1 (`P0-1`–`P0-6`) dan Batch 2 (`P1-1`–`P1-3`, `P1-6`–`P1-11`) sudah diterapkan sebagai commit *forward-fix* dan diverifikasi kompilasi 6.18; belum ada uji perangkat. `P1-4`/`P1-5` (Batch 4) dan `P2`–`P3` masih berupa rencana. Untuk status boot terkini lihat [`STATUS.md`](STATUS.md), daftar isu log di [`TRACKER.md`](TRACKER.md), dan audit API 6.13–6.18 sebelumnya di [`API-AUDIT.md`](API-AUDIT.md).
+> Dokumen ini mencatat hasil **audit statis kode** atas seluruh commit awal porting 6.12 dan bringup 6.18 pada kedua repositori modul *out-of-tree* (`alps-kernel_device_modules` dan `alps-vendor_mediatek_kernel_modules`). Batch 1 (`P0-1`–`P0-6`), Batch 2 (`P1-1`–`P1-3`, `P1-6`–`P1-11`), dan Batch 3 (`P2`: dua backport 6.12 + cleanup) sudah diterapkan sebagai commit *forward-fix* dan diverifikasi kompilasi 6.18; belum ada uji perangkat. `P1-4`/`P1-5` (Batch 4) dan `P3` masih berupa rencana. Untuk status boot terkini lihat [`STATUS.md`](STATUS.md), daftar isu log di [`TRACKER.md`](TRACKER.md), dan audit API 6.13–6.18 sebelumnya di [`API-AUDIT.md`](API-AUDIT.md).
 
 ## Kebijakan & Ringkasan
 
@@ -100,23 +100,46 @@ Catatan:
 
 ### 3.1 Gap Backport ke `x6871-android16-6.12`
 
-Mayoritas bugfix di `6.18` sudah masuk ke `x6871-android16-6.12` (`175263d9b928` / `5e9b2d8`). Tersisa **2** fix khusus `6.12` (ditambah `pmic_lvsys_notify.c` pada `P0-6` yang berlaku di kedua branch):
+Mayoritas bugfix di `6.18` sudah masuk ke `x6871-android16-6.12` (`175263d9b928` / `5e9b2d8`). Kedua fix khusus `6.12` berikut sudah diterapkan (ditambah `pmic_lvsys_notify.c` pada `P0-6` yang berlaku di kedua branch):
 
 | Repo | Lokasi di `6.12` | Fix di `6.18` | Detail & Dampak di `6.12` |
 |---|---|---|---|
 | `vendor` | `met_drv_v3/common/trace_event.c:92, 107` | `d500e72` | Header `kernel-6.12/include/trace/events/power.h:410, 453` sudah memakai signature baru (`s32 value` dan `enum pm_qos_req_action`), sedangkan `trace_event.c` di `6.12` (`5e9b2d8`) masih memakai prototipe lama → risiko KCFI mismatch bila MET power event diaktifkan. |
 | `kdm` | `drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c:107-113`, `mtk_vcodec_enc.c:89-95` | `59e73c2d2f4a` | `mtk_vdec_sec_dc_unmap_dmabuf()` & `mtk_venc_sec_dc_unmap_dmabuf()` di `6.12` masih mengoper raw `void *` ke parameter `struct iosys_map *` milik `dma_buf_vunmap()` tanpa `dma_resv_lock`. Perlu `iosys_map_set_vaddr()` + `dma_buf_vunmap_unlocked()`. |
 
+Commit 6.12: `74be11c` (vendor, `met`) dan `a1461a9` (kdm, `mtk-vcodec`).
+
 ### 3.2 Cleanup Layak di `HEAD`
 
-| Repo & Branch | File & Baris | Commit Asal | Masalah & Arah Cleanup |
-|---|---|---|---|
-| `kdm` (`6.18` + `6.12`) | `drivers/input/fingerprint/BUILD.bazel:44` | `6566cb27da18` | Hapus `-DTRAN_FP_LOG_LVL_INFO=1` (flag diagnostik bringup yang membuat `TRAN_FP_INFO` menyepam `dmesg` di setiap ioctl FOD). |
-| `kdm` (`6.18` + `6.12`) | `drivers/media/platform/mtk-vcodec/venc/venc_vcp_if.c:1442-1451` | `f75c717036ac` | Turunkan atau hapus sisa `mtk_v4l2_debug(0, "first %s: ...")` yang selalu tercetak ke `dmesg` tiap sesi encode baru. |
-| `vendor` (`6.18`) | `connectivity/conninfra/conn_drv/connv2/debug_utility/connsyslog/connsyslog.c:1390-1421`, `connectivity/wlan/core/gen4m/os/linux/gl_kal.c:7245-7290` | `bf88f97` | Cabang `#if (KERNEL_VERSION(6, 13, 0) > ...)` alarmtimer rusak/duplikat (`connsyslog.c` dua cabang identik `void`; `gl_kal.c` deklarasi `enum alarmtimer_restart` namun `return;`). Pulihkan cabang `< 6.13` atau bersihkan guard mati. |
-| `vendor` (`6.18`) | `gpu/gpu_mali/mali_avalon/a16w/drivers/gpu/arm/midgard/mali_kbase_mem_migrate.c:713-717` | `28934e3` + `9edfe27` | `SetPageMovableOps()` tidak valid di 6.18 (aman saat ini hanya karena `kbase_page_migration_enabled = 0` di ACK). Tolak/abaikan `kbase_page_migration_enabled=1` secara eksplisit pada `>= 6.18`. |
-| `kdm` (`6.18`) | `drivers/misc/mediatek/lpm_legacy/modules/debug/v1/lpm_dbg_cpuidle_status.c:647` | `b68b368f3e51` | Pulihkan `mtk_idle->cpu = cpu;` yang ikut terhapus regex `hrtimer_setup` (saat ini field belum dibaca). |
-| `kdm` (`6.18` + `6.12`) | `drivers/power/supply/BUILD.bazel:168-170`, `tran_fp_main.c:105-201`, `tnek_api.c:218-220` | `fb88495998a7`, `36e0f17945e8`, `24b5fe361653` | Hapus komentar bahasa Indonesia usang di `BUILD.bazel` setelah `copts` dipindah ke `X6871.config`; opsional hapus dead code `tran_fp_allow_ree_transfer` dan lengkapi cleanup antrean di `tnek_api_exit()`. |
+| Repo & Branch | File & Baris | Commit Asal | Masalah & Arah Cleanup | Status |
+|---|---|---|---|---|
+| `kdm` (`6.18` + `6.12`) | `drivers/input/fingerprint/BUILD.bazel:44` | `6566cb27da18` | Hapus `-DTRAN_FP_LOG_LVL_INFO=1` (flag diagnostik bringup yang membuat `TRAN_FP_INFO` menyepam `dmesg` di setiap ioctl FOD). | Selesai — `aae94c0bbf5a` / `412ff90` |
+| `kdm` (`6.18` + `6.12`) | `drivers/media/platform/mtk-vcodec/venc/venc_vcp_if.c:1442-1451` | `f75c717036ac` | Turunkan atau hapus sisa `mtk_v4l2_debug(0, "first %s: ...")` yang selalu tercetak ke `dmesg` tiap sesi encode baru. | Selesai — `0a15d3002f1b` / `fd97bf1` |
+| `vendor` (`6.18`) | `connectivity/conninfra/conn_drv/connv2/debug_utility/connsyslog/connsyslog.c:1390-1421`, `connectivity/wlan/core/gen4m/os/linux/gl_kal.c:7245-7290` | `bf88f97` | Cabang `#if (KERNEL_VERSION(6, 13, 0) > ...)` alarmtimer rusak/duplikat (`connsyslog.c` dua cabang identik `void`; `gl_kal.c` deklarasi `enum alarmtimer_restart` namun `return;`). Pulihkan cabang `< 6.13` atau bersihkan guard mati. | Selesai — `1992b33` |
+| `vendor` (`6.18`) | `gpu/gpu_mali/mali_avalon/a16w/drivers/gpu/arm/midgard/mali_kbase_mem_migrate.c:713-717` | `28934e3` + `9edfe27` | `SetPageMovableOps()` tidak valid di 6.18 (aman saat ini hanya karena `kbase_page_migration_enabled = 0` di ACK). Tolak/abaikan `kbase_page_migration_enabled=1` secara eksplisit pada `>= 6.18`. | Selesai — `1a6f030` |
+| `kdm` (`6.18`) | `drivers/misc/mediatek/lpm_legacy/modules/debug/v1/lpm_dbg_cpuidle_status.c:647` | `b68b368f3e51` | Pulihkan `mtk_idle->cpu = cpu;` yang ikut terhapus regex `hrtimer_setup` (saat ini field belum dibaca). | Selesai — `95ce0e41bf0f` |
+| `kdm` (`6.18` + `6.12`) | `drivers/power/supply/BUILD.bazel:168-170`, `tran_fp_main.c:105-201`, `tnek_api.c:218-220` | `fb88495998a7`, `36e0f17945e8`, `24b5fe361653` | Hapus komentar bahasa Indonesia usang di `BUILD.bazel` setelah `copts` dipindah ke `X6871.config`; opsional hapus dead code `tran_fp_allow_ree_transfer` dan lengkapi cleanup antrean di `tnek_api_exit()`. | Selesai — komentar `efd612fb2b57` / `edbdffd`, tnek `b4b5ae9c4b33` / `193472a`; REE transfer sengaja dipertahankan (lihat catatan) |
+
+### Hasil Batch 3 (`P2`)
+
+| Topik | Commit 6.18 | Commit 6.12 |
+|---|---|---|
+| Prototipe probe `pm_qos` MET | sudah ada (`d500e72`) | `74be11c` |
+| `dma_buf_vunmap_unlocked` jalur secure `mtk-vcodec` | sudah ada (`59e73c2d2f4a`) | `a1461a9` |
+| Hapus `-DTRAN_FP_LOG_LVL_INFO=1` | `aae94c0bbf5a` | `412ff90` |
+| Level log frame pertama VENC | `0a15d3002f1b` | `fd97bf1` |
+| Guard alarmtimer mati (`connsyslog`, `gl_kal`) | `1992b33` | — |
+| Page migration Mali ditolak pada `>= 6.18` | `1a6f030` | — |
+| Pulihkan `mtk_idle->cpu` | `95ce0e41bf0f` | — |
+| Komentar `tc_misc_intf` usang | `efd612fb2b57` | `edbdffd` |
+| Cleanup antrean `tnek_api_exit()` | `b4b5ae9c4b33` | `193472a` |
+
+Catatan:
+- Build 6.18 (`user`, mt6895) PASS setelah seluruh perubahan; rebuild paksa unit kompilasi yang berubah tidak memunculkan warning baru (warning yang tersisa berasal dari kode vendor lain yang tidak diubah).
+- Checkpatch 0 error pada seluruh commit; satu warning `LINUX_VERSION_CODE` pada guard Mali adalah pola bawaan driver multi-kernel dan di-skip sesuai aturan repo.
+- `tran_fp_allow_ree_transfer` **tidak** dihapus: parameter ini adalah jalur debug opt-in yang disengaja, bukan kode mati; menghapusnya mengurangi fungsi, sedangkan audit menandainya opsional.
+- Guard alarmtimer `< 6.13` tetap ada di repo `vendor` 6.12; yang dibersihkan hanya salinan 6.18 yang cabang aktifnya sudah `void`.
+- Commit 6.12 belum di-build dan belum ada uji perangkat untuk seluruh Batch 3.
 
 ---
 
@@ -152,5 +175,5 @@ Modul berikut **tidak** termasuk dalam `x6871_modules.bzl`, sehingga tidak masuk
 
 1. **Batch 1 (P0):** `P0-1` s.d. `P0-6` — **selesai**, satu commit terpisah per topik (lihat [Hasil Batch 1](#hasil-batch-1-p0); `P0-6` langsung ke `6.18` & `6.12`).
 2. **Batch 2 (P1 langsung):** `P1-1` s.d. `P1-3` dan `P1-6` s.d. `P1-11` — **selesai** (lihat [Hasil Batch 2](#hasil-batch-2-p1); `P1-6` s.d. `P1-11` berlaku ke `6.18` & `6.12`).
-3. **Batch 3 (P2):** 2 gap backport ke `6.12` + cleanup debug/guard (`-DTRAN_FP_LOG_LVL_INFO=1`, log VENC frame pertama, alarmtimer `#if`, Mali migrate guard, LPM).
+3. **Batch 3 (P2):** 2 gap backport ke `6.12` + cleanup debug/guard (`-DTRAN_FP_LOG_LVL_INFO=1`, log VENC frame pertama, alarmtimer `#if`, Mali migrate guard, LPM) — **selesai** (lihat [Hasil Batch 3](#hasil-batch-3-p2)).
 4. **Batch 4 (butuh verifikasi ulang `.ko` stock lebih dulu):** `P1-4` (`tran-led-core`) dan `P1-5` (`tc_tfcp_ta` / `pca_tfcp_ta`), agar perubahan ioctl/protokol sesuai 100% dengan biner stock X6871.
