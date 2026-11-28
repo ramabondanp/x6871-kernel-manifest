@@ -1,6 +1,6 @@
 # Audit Commit Awal 6.12 & Bringup 6.18 pada Repo Modul OOT
 
-Diperbarui: 2026-11-28 (UTC) — Batch 1–4, follow-up review, dan tiga fix uji live perangkat sudah diterapkan
+Diperbarui: 2026-11-28 (UTC) — Batch 1–4, follow-up review, tiga fix uji live, dan fix panic `pca_tfcp_ta` sudah diterapkan
 
 > Dokumen ini mencatat hasil **audit statis kode** atas seluruh commit awal porting 6.12 dan bringup 6.18 pada kedua repositori modul *out-of-tree* (`alps-kernel_device_modules` dan `alps-vendor_mediatek_kernel_modules`). Batch 1 (`P0-1`–`P0-6`), Batch 2 (`P1-1`–`P1-3`, `P1-6`–`P1-11`), Batch 3 (`P2`: dua backport 6.12 + cleanup), dan Batch 4 (`P1-4`/`P1-5`, setelah verifikasi ulang `.ko` stock) sudah diterapkan sebagai commit *forward-fix* dan diverifikasi kompilasi 6.18; belum ada uji perangkat. Temuan `P3` (modul tidak aktif) masih berupa rencana. Untuk status boot terkini lihat [`STATUS.md`](STATUS.md), daftar isu log di [`TRACKER.md`](TRACKER.md), dan audit API 6.13–6.18 sebelumnya di [`API-AUDIT.md`](API-AUDIT.md).
 
@@ -200,7 +200,38 @@ Verifikasi build & repack `6.18` (`9980342d4875`):
   - `vendor_dlkm.img`: `3f3739ca17a3722fb53bfa1e5e2ea4d5` (`24551424` B; `209` modul)
   - `odm_dlkm.img`: `887717c672ef878d07608e19088813e8` (`4206592` B; `57` modul)
 - Checkpatch pesan commit: `0` error untuk ketiga commit di kedua branch.
-- Status belum diuji: image repack `6.18` hasil ketiga fix lanjutan di atas **belum** di-flash/diuji di perangkat, dan branch `6.12` **belum** di-build.
+- Status belum diuji: pada build awal tiga fix lanjutan tersebut image repack belum diuji di perangkat; pada uji live berikutnya (lihat subbagian di bawah) fix `tc_tfcp_ta` terkonfirmasi mengaktifkan `tfcp_adapter` dan memicu temuan panic `pca_tfcp_ta`. Branch `6.12` tetap **belum** di-build.
+
+### Fix Panic `pca_tfcp_ta` dari `console-ramoops-0` (6.18.65)
+
+Uji boot image repack `6.18` hasil tiga fix lanjutan (`9980342d4875`) mengaktifkan probe `tc_tfcp_ta` dan pendaftaran `tadapter_device_register: name=tfcp_adapter` (`t=7.585168`), namun memicu kernel panic NULL pointer dereference di `charger_thread` saat `tc_pep50` mengautentikasi adapter:
+
+```text
+tadapter_device_register: name=tfcp_adapter
+Unable to handle kernel NULL pointer dereference at virtual address 0000000000000010
+Internal error: Oops: 0000000096000005 [#1]  SMP
+pc : pca_tfcp_authenticate_ta+0x38/0x1f8 [pca_tfcp_ta]
+lr : tadapter_dev_authentication+0x3c/0x54 [tc_adapter_class]
+```
+
+Akar masalah: `tadapter_device_register()` hanya mengisi `dev_set_drvdata(&tadapter_dev->dev, devdata)` dan membiarkan `tadapter_dev->driver_data` bernilai `NULL`, sedangkan `tadapter_dev_get_drvdata()` membaca `tadapter_dev->driver_data`. Berbeda dengan `tc_pd_adapter` dan biner `.ko` stock, `pca_tfcp_probe()` tidak memanggil `tadapter_dev_set_drvdata(info->tadapter_dev, info);`.
+
+| Topik | Ringkasan Perbaikan | Commit 6.18 | Commit 6.12 |
+|---|---|---|---|
+| `pca_tfcp_ta`: NULL dereference `tadapter_dev_get_drvdata` | Tambahkan `tadapter_dev_set_drvdata(info->tadapter_dev, info);` di `pca_tfcp_probe()` (`Fixes: 649b928bd4cc` di `6.18`) | `160ce5443d2b` | `6c472b95` |
+
+Temuan non-fatal tambahan di `console-ramoops-0` (`t=7.511687`): `WARNING` `sysfs: cannot create duplicate filename '/class/MT_pmic_adc_cali'` dari `adc_cali_cdev_init()` (`tc_gauge`) karena `mt6375-gauge` sudah mendaftarkan class tersebut sebelumnya (belum diubah).
+
+Verifikasi build & repack `6.18` (`160ce5443d2b`):
+- `tools/check-private-structs.py`: PASS `3/3` (`vb2_dc_buf`, `0` untracked structs, `110` entri `ack_headers.bzl`).
+- Build `user` `6.18`: selesai sukses (`26` aksi, `0` compiler warning pada `pca_tfcp_ta.c`).
+- Repack & `tools/verify-kmi-abi.py`: PASS `8/8` (`GKI release: 6.18.65-android17-6-gc985884f48da-4k`, `9877` simbol ABI, `0` mismatch, `487` modul).
+- MD5 artefak repack terbaru (`6.18`):
+  - `vendor_boot.img`: `42536ffd6828ae15dd16062fc2f6b9f3` (`67108864` B)
+  - `vendor_dlkm.img`: `5fcef9dd0c5f9ec66f108561ebf3dbe7` (`24551424` B; `209` modul)
+  - `odm_dlkm.img`: `25724224cfc153241b7fae4549e3df81` (`4206592` B; `57` modul)
+- Checkpatch pesan commit: `0` error di kedua branch (`1` warning panjang baris kutipan log Oops).
+- Status belum diuji: image repack `6.18` (`160ce5443d2b`) **belum** di-flash/diuji di perangkat, dan branch `6.12` (`6c472b95`) **belum** di-build.
 
 ---
 
