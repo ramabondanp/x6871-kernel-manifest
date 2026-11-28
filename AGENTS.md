@@ -136,6 +136,13 @@ Jangan commit file donor, tarball, atau dump firmware ke repo.
 - **Wajib lulus 8/8 `tools/verify-kmi-abi.py`** sebelum uji/rilis; jangan
   memasukkan modul GKI terproteksi (`CONFIG_MODULE_SIG_PROTECT`) ke
   `vendor_boot`, `vendor_dlkm`, atau `odm_dlkm`.
+- **Kompatibilitas modul OOT di GKI ditentukan oleh generasi KMI dan
+  kecocokan simbol/CRC (`modversions`), bukan exact `vermagic`:** modul OOT
+  (`vendor_boot`, `vendor_dlkm`, `odm_dlkm`) dengan `vermagic` berbeda
+  tetap dapat dimuat dan boot selama generasi KMI dan simbol/CRC-nya cocok.
+  Yang wajib satu set build adalah `boot` + `system_dlkm` pada build GKI
+  lokal (ephemeral signing key), sedangkan cek `vermagic` di
+  `verify-kmi-abi.py` hanya safeguard konsistensi set build lokal.
 - **Hard rule DTB/DTBO:** semua `dtb` dan `dtbo.img` yang dipakai di vendor
   berasal dari stock. Jangan berasumsi ada DTBO kustom dan jangan mengubah
   `dtbo.img` stock.

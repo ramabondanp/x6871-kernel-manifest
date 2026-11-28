@@ -84,11 +84,14 @@ KVER=6.18 OUT_DIR="$PWD/out_bazel_6.18_lts" "$manifest/build.sh" gki
 
 Catatan penting profil ini:
 
-- **Harus satu set build lokal:** `boot-lz4.img` dan
+- **Pasangan wajib `boot` + `system_dlkm` lokal:** `boot-lz4.img` dan
   `system_dlkm.flatten.erofs.img` dari `./build.sh gki` memakai kunci signing
-  ephemeral dari build tersebut. Flash kelima image (`boot`, `vendor_boot`,
-  `system_dlkm`, `vendor_dlkm`, `odm_dlkm`) sekaligus di `fastbootd` dan jangan
-  dicampur dengan image Google CI atau KMI 5.
+  ephemeral dari build tersebut sehingga keduanya wajib berasal dari satu set
+  build yang sama (dan jangan dicampur dengan KMI 5). Untuk modul OOT
+  (`vendor_boot`, `vendor_dlkm`, `odm_dlkm`), penentu boot di GKI adalah
+  generasi KMI dan kecocokan simbol/CRC (`modversions`), bukan exact
+  `vermagic`; modul OOT dengan `vermagic` berbeda pada KMI yang sama tetap
+  dapat boot selama simbol/CRC-nya cocok.
 - **Patch sementara `common` (`c22205f6c5bc`):** `6.18.63+` upstream sempat
   menghapus guard NULL di `blk_plug_invalidate_ts()` sehingga preemption IRQ di
   dalam `blk_finish_plug+0x54/0x78` memicu
@@ -157,6 +160,10 @@ Gunakan [perintah lengkap di FLASH-AND-TEST](FLASH-AND-TEST.md#2-membuat-image-v
 Skrip repack DLKM memverifikasi AVB hashtree. `verify-kmi-abi.py` memeriksa
 kompatibilitas modul; arahkan `--vd-dir` dan `--od-dir` ke hasil repack bila
 direktori kerja tidak berada di `out/` di sebelah workspace (default `~/out`).
+Catatan: gerbang #2 (`Wrong vermagic`) di `verify-kmi-abi.py` adalah safeguard
+konsistensi set build lokal — pada runtime GKI, kompatibilitas modul OOT
+ditentukan oleh generasi KMI dan kecocokan simbol/CRC (`modversions`), bukan
+exact `vermagic`.
 
 #### Checklist cepat upgrade GKI
 
